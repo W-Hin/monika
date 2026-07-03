@@ -33,8 +33,15 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
               ),
               icon: Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(10)),
-                child: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.add_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
               ),
             ),
           ),
@@ -50,17 +57,44 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
                 children: [
                   Row(
                     children: [
-                      Expanded(child: StatCard(label: 'Total Programs', value: '${DummyData.availableTrainings.length}', icon: Icons.school_rounded, iconColor: AppColors.primary, iconBg: AppColors.primaryLight)),
+                      Expanded(
+                        child: StatCard(
+                          label: 'Total Programs',
+                          value: '${DummyData.availableTrainings.length}',
+                          icon: Icons.school_rounded,
+                          iconColor: AppColors.primary,
+                          iconBg: AppColors.primaryLight,
+                        ),
+                      ),
                       const SizedBox(width: 12),
-                      Expanded(child: StatCard(label: 'Mandatory', value: '${DummyData.mandatoryTrainings.length}', icon: Icons.assignment_rounded, iconColor: AppColors.riskHigh, iconBg: AppColors.riskHighBg)),
+                      Expanded(
+                        child: StatCard(
+                          label: 'Mandatory',
+                          value: '${DummyData.mandatoryTrainings.length}',
+                          icon: Icons.assignment_rounded,
+                          iconColor: AppColors.riskHigh,
+                          iconBg: AppColors.riskHighBg,
+                        ),
+                      ),
                       const SizedBox(width: 12),
-                      Expanded(child: StatCard(label: 'Recommended', value: '${DummyData.recommendedTrainings.length}', icon: Icons.auto_awesome_rounded, iconColor: AppColors.amber, iconBg: AppColors.amberBg)),
+                      Expanded(
+                        child: StatCard(
+                          label: 'Recommended',
+                          value: '${DummyData.recommendedTrainings.length}',
+                          icon: Icons.auto_awesome_rounded,
+                          iconColor: AppColors.amber,
+                          iconBg: AppColors.amberBg,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(14)),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceMuted,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                     child: Row(
                       children: List.generate(_tabs.length, (i) {
                         final sel = _tab == i;
@@ -73,10 +107,26 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
                               decoration: BoxDecoration(
                                 color: sel ? Colors.white : Colors.transparent,
                                 borderRadius: BorderRadius.circular(11),
-                                boxShadow: sel ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 6)] : null,
+                                boxShadow: sel
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.06),
+                                          blurRadius: 6,
+                                        ),
+                                      ]
+                                    : null,
                               ),
-                              child: Text(_tabs[i], textAlign: TextAlign.center,
-                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: sel ? AppColors.textPrimary : AppColors.textMuted)),
+                              child: Text(
+                                _tabs[i],
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: sel
+                                      ? AppColors.textPrimary
+                                      : AppColors.textMuted,
+                                ),
+                              ),
                             ),
                           ),
                         );
@@ -91,14 +141,19 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
               child: _tab == 2
                   ? _CompletionTab()
                   : ListView(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                children: (_tab == 0 ? DummyData.availableTrainings : DummyData.mandatoryTrainings)
-                    .map((t) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _HrTrainingCard(program: t),
-                ))
-                    .toList(),
-              ),
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                      children:
+                          (_tab == 0
+                                  ? DummyData.availableTrainings
+                                  : DummyData.mandatoryTrainings)
+                              .map(
+                                (t) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _HrTrainingCard(program: t),
+                                ),
+                              )
+                              .toList(),
+                    ),
             ),
           ],
         ),
@@ -113,17 +168,23 @@ class _HrTrainingCard extends StatelessWidget {
 
   Color get _catColor {
     switch (program.category) {
-      case 'Leadership': return AppColors.purple;
-      case 'Behavioural': return AppColors.amber;
-      default: return AppColors.infoBlue;
+      case 'Leadership':
+        return AppColors.purple;
+      case 'Behavioural':
+        return AppColors.amber;
+      default:
+        return AppColors.infoBlue;
     }
   }
 
   Color get _catBg {
     switch (program.category) {
-      case 'Leadership': return AppColors.purpleBg;
-      case 'Behavioural': return AppColors.amberBg;
-      default: return AppColors.infoBlueBg;
+      case 'Leadership':
+        return AppColors.purpleBg;
+      case 'Behavioural':
+        return AppColors.amberBg;
+      default:
+        return AppColors.infoBlueBg;
     }
   }
 
@@ -137,38 +198,106 @@ class _HrTrainingCard extends StatelessWidget {
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(color: _catBg, borderRadius: BorderRadius.circular(100)),
-                child: Text(program.category, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: _catColor)),
+                decoration: BoxDecoration(
+                  color: _catBg,
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Text(
+                  program.category,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: _catColor,
+                  ),
+                ),
               ),
               const Spacer(),
               if (program.isMandatory)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                  decoration: BoxDecoration(color: AppColors.riskHighBg, borderRadius: BorderRadius.circular(100)),
-                  child: const Text('Mandatory', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.riskHigh)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.riskHighBg,
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: const Text(
+                    'Mandatory',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.riskHigh,
+                    ),
+                  ),
                 ),
               if (program.isRecommended)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                  decoration: BoxDecoration(color: AppColors.amberBg, borderRadius: BorderRadius.circular(100)),
-                  child: const Text('ML Recommended', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.amber)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.amberBg,
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: const Text(
+                    'ML Recommended',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.amber,
+                    ),
+                  ),
                 ),
             ],
           ),
           const SizedBox(height: 10),
-          Text(program.title, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800)),
+          Text(
+            program.title,
+            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
+          ),
           const SizedBox(height: 4),
-          Text(program.description, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.4)),
+          Text(
+            program.description,
+            style: const TextStyle(
+              fontSize: 12.5,
+              color: AppColors.textSecondary,
+              height: 1.4,
+            ),
+          ),
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(Icons.schedule_rounded, size: 13, color: AppColors.textMuted),
+              const Icon(
+                Icons.schedule_rounded,
+                size: 13,
+                color: AppColors.textMuted,
+              ),
               const SizedBox(width: 5),
-              Text(program.duration, style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+              Text(
+                program.duration,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               const Spacer(),
-              const Icon(Icons.people_outline_rounded, size: 13, color: AppColors.textMuted),
+              const Icon(
+                Icons.people_outline_rounded,
+                size: 13,
+                color: AppColors.textMuted,
+              ),
               const SizedBox(width: 5),
-              const Text('12 enrolled', style: TextStyle(fontSize: 11.5, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+              const Text(
+                '12 enrolled',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -177,7 +306,9 @@ class _HrTrainingCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () {},
-                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 10)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
                   child: const Text('Edit', style: TextStyle(fontSize: 12.5)),
                 ),
               ),
@@ -185,8 +316,13 @@ class _HrTrainingCard extends StatelessWidget {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () {},
-                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 10)),
-                  child: const Text('Assign Dept', style: TextStyle(fontSize: 12.5)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  child: const Text(
+                    'Assign Dept',
+                    style: TextStyle(fontSize: 12.5),
+                  ),
                 ),
               ),
             ],
@@ -216,14 +352,29 @@ class _CompletionTab extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Overall Completion Rate', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+              const Text(
+                'Overall Completion Rate',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary,
+                ),
+              ),
               const SizedBox(height: 8),
               ClipRRect(
                 borderRadius: BorderRadius.circular(100),
-                child: LinearProgressIndicator(value: 0.55, minHeight: 10, backgroundColor: AppColors.surfaceMuted, valueColor: const AlwaysStoppedAnimation(AppColors.primary)),
+                child: LinearProgressIndicator(
+                  value: 0.55,
+                  minHeight: 10,
+                  backgroundColor: AppColors.surfaceMuted,
+                  valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+                ),
               ),
               const SizedBox(height: 6),
-              const Text('55% across all active training programmes', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+              const Text(
+                '55% across all active training programmes',
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
             ],
           ),
         ),
@@ -231,7 +382,11 @@ class _CompletionTab extends StatelessWidget {
         const SectionHeader(title: 'Employee Progress'),
         ..._data.map((d) {
           final initials = d.$1.split(' ').map((w) => w[0]).take(2).join();
-          final color = d.$3 >= 1.0 ? AppColors.primary : d.$3 >= 0.5 ? AppColors.amber : AppColors.riskHigh;
+          final color = d.$3 >= 1.0
+              ? AppColors.primary
+              : d.$3 >= 0.5
+              ? AppColors.amber
+              : AppColors.riskHigh;
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: AppCard(
@@ -243,18 +398,42 @@ class _CompletionTab extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(d.$1, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                        Text(d.$4, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+                        Text(
+                          d.$1,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          d.$4,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
                         const SizedBox(height: 6),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(100),
-                          child: LinearProgressIndicator(value: d.$3, minHeight: 6, backgroundColor: AppColors.surfaceMuted, valueColor: AlwaysStoppedAnimation(color)),
+                          child: LinearProgressIndicator(
+                            value: d.$3,
+                            minHeight: 6,
+                            backgroundColor: AppColors.surfaceMuted,
+                            valueColor: AlwaysStoppedAnimation(color),
+                          ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text('${(d.$3 * 100).toInt()}%', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color)),
+                  Text(
+                    '${(d.$3 * 100).toInt()}%',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -283,24 +462,55 @@ class _CreateProgramSheetState extends State<_CreateProgramSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      padding: EdgeInsets.fromLTRB(24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        24,
+        20,
+        24,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(100)))),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(100),
+                ),
+              ),
+            ),
             const SizedBox(height: 20),
-            const Text('Create Training Program', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+            const Text(
+              'Create Training Program',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            ),
             const SizedBox(height: 20),
 
-            const Text('Program Title', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            const Text(
+              'Program Title',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 8),
-            TextField(controller: _title, decoration: const InputDecoration(hintText: 'e.g. Advanced Leadership Workshop')),
+            TextField(
+              controller: _title,
+              decoration: const InputDecoration(
+                hintText: 'e.g. Advanced Leadership Workshop',
+              ),
+            ),
             const SizedBox(height: 14),
 
-            const Text('Category', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            const Text(
+              'Category',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -311,28 +521,66 @@ class _CreateProgramSheetState extends State<_CreateProgramSheet> {
                   selected: sel,
                   onSelected: (_) => setState(() => _category = c),
                   selectedColor: AppColors.primaryLight,
-                  labelStyle: TextStyle(color: sel ? AppColors.primaryDark : AppColors.textSecondary, fontWeight: FontWeight.w700, fontSize: 12.5),
-                  side: BorderSide(color: sel ? AppColors.primary : Colors.transparent),
+                  labelStyle: TextStyle(
+                    color: sel
+                        ? AppColors.primaryDark
+                        : AppColors.textSecondary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                  ),
+                  side: BorderSide(
+                    color: sel ? AppColors.primary : Colors.transparent,
+                  ),
                 );
               }).toList(),
             ),
             const SizedBox(height: 14),
 
-            const Text('Description', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            const Text(
+              'Description',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 8),
-            TextField(controller: _desc, maxLines: 3, decoration: const InputDecoration(hintText: 'Brief description of the training content and goals...')),
+            TextField(
+              controller: _desc,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText:
+                    'Brief description of the training content and goals...',
+              ),
+            ),
             const SizedBox(height: 14),
 
-            const Text('Duration', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            const Text(
+              'Duration',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 8),
-            TextField(controller: _duration, decoration: const InputDecoration(hintText: 'e.g. 2 weeks · Self-paced', prefixIcon: Icon(Icons.schedule_rounded, size: 18, color: AppColors.textMuted))),
+            TextField(
+              controller: _duration,
+              decoration: const InputDecoration(
+                hintText: 'e.g. 2 weeks · Self-paced',
+                prefixIcon: Icon(
+                  Icons.schedule_rounded,
+                  size: 18,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ),
             const SizedBox(height: 14),
 
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Mark as Mandatory', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                Switch(value: _mandatory, onChanged: (v) => setState(() => _mandatory = v), activeColor: AppColors.primary),
+                const Text(
+                  'Mark as Mandatory',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+                Switch(
+                  value: _mandatory,
+                  onChanged: (v) => setState(() => _mandatory = v),
+                  activeThumbColor: AppColors.primary,
+                ),
               ],
             ),
             const SizedBox(height: 20),
@@ -346,7 +594,11 @@ class _CreateProgramSheetState extends State<_CreateProgramSheet> {
                   if (!mounted) return;
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('✓ Training programme created successfully')),
+                    const SnackBar(
+                      content: Text(
+                        '✓ Training programme created successfully',
+                      ),
+                    ),
                   );
                 });
               },

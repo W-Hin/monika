@@ -5,6 +5,7 @@ import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
+import 'add_employee.dart';
 
 class HrEmployeesScreen extends StatelessWidget {
   const HrEmployeesScreen({super.key});

@@ -9,6 +9,7 @@ import '../analytics/anomaly_detail.dart';
 import '../approvals/hr_approvals.dart';
 import '../analytics/hr_analytics.dart';
 import '../employees/hr_employees.dart';
+import '../employees/add_employee.dart';
 import '../policy/policy_config.dart';
 
 class HrHomeScreen extends StatelessWidget {
@@ -127,7 +128,7 @@ class HrHomeScreen extends StatelessWidget {
                     label: 'Add Employee',
                     color: AppColors.primary,
                     bg: AppColors.primaryLight,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HrEmployeesScreen())),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddEmployeeScreen())),
                   ),
                 ),
                 const SizedBox(width: 12),
