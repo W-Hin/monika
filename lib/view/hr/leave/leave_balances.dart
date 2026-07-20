@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
+import '../../../core/theme/app_colors_extension.dart';
 
 class HrLeaveBalancesScreen extends StatefulWidget {
   const HrLeaveBalancesScreen({super.key});
@@ -78,33 +78,45 @@ class _HrLeaveBalancesScreenState extends State<HrLeaveBalancesScreen> {
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
             const SectionHeader(title: 'Employee Leave Balances'),
-            ..._balances.map((b) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: AppCard(
-                    onTap: () => _adjustBalance(b),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(child: Text(b.employeeName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800))),
-                            const Icon(Icons.tune_rounded, size: 16, color: AppColors.textMuted),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(child: _BalancePill(label: 'Annual', remaining: b.annualRemaining, total: b.annualTotal, color: AppColors.primary)),
-                            const SizedBox(width: 8),
-                            Expanded(child: _BalancePill(label: 'Medical', remaining: b.medicalRemaining, total: b.medicalTotal, color: AppColors.infoBlue)),
-                            const SizedBox(width: 8),
-                            Expanded(child: _BalancePill(label: 'Emergency', remaining: b.emergencyRemaining, total: b.emergencyTotal, color: AppColors.amber)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                )),
+            ListRow(children: _balances.map((b) => _BalanceRow(balance: b, onTap: () => _adjustBalance(b))).toList()),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BalanceRow extends StatelessWidget {
+  final LeaveBalance balance;
+  final VoidCallback onTap;
+  const _BalanceRow({required this.balance, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text(balance.employeeName, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: c.textPrimary))),
+                Icon(Icons.tune_rounded, size: 16, color: c.textMuted),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: _BalancePill(label: 'Annual', remaining: balance.annualRemaining, total: balance.annualTotal, color: c.primary)),
+                const SizedBox(width: 8),
+                Expanded(child: _BalancePill(label: 'Medical', remaining: balance.medicalRemaining, total: balance.medicalTotal, color: c.infoBlue)),
+                const SizedBox(width: 8),
+                Expanded(child: _BalancePill(label: 'Emergency', remaining: balance.emergencyRemaining, total: balance.emergencyTotal, color: c.amber)),
+              ],
+            ),
           ],
         ),
       ),
@@ -121,14 +133,17 @@ class _BalancePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
       child: Column(
         children: [
-          Text('$remaining/$total', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: color)),
+          Text('$remaining/$total',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: color, fontFeatures: const [FontFeature.tabularFigures()]),
+          ),
           const SizedBox(height: 2),
-          Text(label, style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+          Text(label, style: TextStyle(fontSize: 10.5, color: c.textSecondary, fontWeight: FontWeight.w600)),
         ],
       ),
     );
