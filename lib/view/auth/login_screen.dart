@@ -4,7 +4,6 @@ import '../shared/widgets/buttons.dart';
 import '../../model/models.dart';
 import '../employee/employee_shell.dart';
 import '../hr/hr_shell.dart';
-import 'forgot_password.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -140,9 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
-                  ),
+                  onPressed: () {},
                   child: const Text('Forgot password?'),
                 ),
               ),
