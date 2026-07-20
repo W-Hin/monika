@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 
 class AddEmployeeScreen extends StatefulWidget {
@@ -24,9 +24,9 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
   void _submit() {
     if (_name.text.isEmpty || _email.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill in all required fields'),
-          backgroundColor: AppColors.riskHigh,
+        SnackBar(
+          content: const Text('Please fill in all required fields'),
+          backgroundColor: context.colors.riskHigh,
         ),
       );
       return;
@@ -37,41 +37,45 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
       setState(() => _isSubmitting = false);
       showDialog(
         context: context,
-        builder: (_) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 60, height: 60,
-                decoration: const BoxDecoration(color: AppColors.primaryLight, shape: BoxShape.circle),
-                child: const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 34),
-              ),
-              const SizedBox(height: 16),
-              const Text('Account Created', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 8),
-              const Text(
-                'A setup invitation has been sent to the employee\'s email address. They can now register their device and set a password.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.4),
-              ),
-              const SizedBox(height: 20),
-              PrimaryButton(
-                label: 'Done',
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).pop();
-                },
-              ),
-            ],
-          ),
-        ),
+        builder: (dialogContext) {
+          final c = dialogContext.colors;
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 60, height: 60,
+                  decoration: BoxDecoration(color: c.primaryLight, shape: BoxShape.circle),
+                  child: Icon(Icons.check_circle_rounded, color: c.primary, size: 34),
+                ),
+                const SizedBox(height: 16),
+                const Text('Account Created', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                Text(
+                  'A setup invitation has been sent to the employee\'s email address. They can now register their device and set a password.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12.5, color: c.textSecondary, height: 1.4),
+                ),
+                const SizedBox(height: 20),
+                PrimaryButton(
+                  label: 'Done',
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            ),
+          );
+        },
       );
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Scaffold(
       appBar: AppBar(title: const Text('Add New Employee')),
       body: SafeArea(
@@ -125,16 +129,16 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: AppColors.infoBlueBg, borderRadius: BorderRadius.circular(10)),
-                child: const Row(
+                decoration: BoxDecoration(color: c.infoBlueBg, borderRadius: BorderRadius.circular(10)),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.info_outline_rounded, size: 14, color: AppColors.infoBlue),
-                    SizedBox(width: 8),
+                    Icon(Icons.info_outline_rounded, size: 14, color: c.infoBlue),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Attendance-based deduction rules are applied automatically per the Policy Configuration settings.',
-                        style: TextStyle(fontSize: 11.5, color: AppColors.infoBlue, height: 1.4),
+                        style: TextStyle(fontSize: 11.5, color: c.infoBlue, height: 1.4),
                       ),
                     ),
                   ],
@@ -148,24 +152,24 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: c.surface,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
+                  boxShadow: [c.shadowNeutral],
                 ),
-                child: const Column(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.link_rounded, size: 18, color: AppColors.primary),
-                        SizedBox(width: 8),
-                        Text('Automatic Device Binding', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                        Icon(Icons.link_rounded, size: 18, color: c.primary),
+                        const SizedBox(width: 8),
+                        Text('Automatic Device Binding', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
                       ],
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'The employee\'s device will be bound automatically when they first log in on their mobile device. HR can reset the binding anytime from the Employee Management screen.',
-                      style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.4),
+                      style: TextStyle(fontSize: 12.5, color: c.textSecondary, height: 1.4),
                     ),
                   ],
                 ),
@@ -193,11 +197,12 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Row(
       children: [
-        Icon(icon, size: 18, color: AppColors.primary),
+        Icon(icon, size: 18, color: c.primary),
         const SizedBox(width: 8),
-        Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+        Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: c.textPrimary)),
       ],
     );
   }
@@ -220,17 +225,18 @@ class _Field extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
         const SizedBox(height: 8),
         TextField(
           controller: controller,
           keyboardType: type,
           decoration: InputDecoration(
             hintText: hint,
-            prefixIcon: Icon(icon, size: 18, color: AppColors.textMuted),
+            prefixIcon: Icon(icon, size: 18, color: c.textMuted),
           ),
         ),
       ],
@@ -255,17 +261,18 @@ class _DropdownField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-          decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
           child: Row(
             children: [
-              Icon(icon, size: 18, color: AppColors.textMuted),
+              Icon(icon, size: 18, color: c.textMuted),
               const SizedBox(width: 10),
               Expanded(
                 child: DropdownButtonHideUnderline(

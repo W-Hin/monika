@@ -1,18 +1,42 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../shared/widgets/buttons.dart';
+import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
 import 'add_employee.dart';
+import 'employee_detail.dart';
 
-class HrEmployeesScreen extends StatelessWidget {
+class HrEmployeesScreen extends StatefulWidget {
   const HrEmployeesScreen({super.key});
 
   @override
+  State<HrEmployeesScreen> createState() => _HrEmployeesScreenState();
+}
+
+class _HrEmployeesScreenState extends State<HrEmployeesScreen> {
+  late List<TeamMemberSummary> _employees;
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _employees = List.from(DummyData.teamOverview);
+  }
+
+  void _updateEmployee(TeamMemberSummary updated) {
+    setState(() {
+      final i = _employees.indexWhere((e) => e.id == updated.id);
+      if (i != -1) _employees[i] = updated;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final employees = DummyData.teamOverview;
+    final c = context.colors;
+    final filtered = _query.isEmpty
+        ? _employees
+        : _employees.where((e) => e.name.toLowerCase().contains(_query.toLowerCase()) || e.department.toLowerCase().contains(_query.toLowerCase())).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -21,10 +45,10 @@ class HrEmployeesScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: IconButton(
-              onPressed: () => _showAddEmployeeSheet(context),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddEmployeeScreen())),
               icon: Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(color: c.primary, borderRadius: BorderRadius.circular(10)),
                 child: const Icon(Icons.person_add_rounded, color: Colors.white, size: 18),
               ),
             ),
@@ -38,18 +62,25 @@ class HrEmployeesScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
               child: TextField(
-                decoration: const InputDecoration(
+                onChanged: (v) => setState(() => _query = v),
+                decoration: InputDecoration(
                   hintText: 'Search employees...',
-                  prefixIcon: Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
+                  prefixIcon: Icon(Icons.search_rounded, size: 20, color: c.textMuted),
                 ),
               ),
             ),
             Expanded(
-              child: ListView.separated(
+              child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                itemCount: employees.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) => _EmployeeTile(emp: employees[i]),
+                children: [
+                  ListRow(children: filtered.map((emp) => _EmployeeRow(
+                    emp: emp,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => EmployeeDetailScreen(employee: emp, onUpdate: _updateEmployee)),
+                    ),
+                  )).toList()),
+                ],
               ),
             ),
           ],
@@ -57,88 +88,56 @@ class HrEmployeesScreen extends StatelessWidget {
       ),
     );
   }
-
-  void _showAddEmployeeSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const _AddEmployeeSheet(),
-    );
-  }
 }
 
-class _EmployeeTile extends StatelessWidget {
+class _EmployeeRow extends StatelessWidget {
   final TeamMemberSummary emp;
-  const _EmployeeTile({required this.emp});
+  final VoidCallback onTap;
+  const _EmployeeRow({required this.emp, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      child: Row(
-        children: [
-          InitialsAvatar(initials: emp.avatarInitials),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    final c = context.colors;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            InitialsAvatar(initials: emp.avatarInitials),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(emp.name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.textPrimary)),
+                      if (!emp.isActive) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(100)),
+                          child: Text('Deactivated', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: c.textMuted)),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(emp.department, style: TextStyle(fontSize: 12, color: c.textMuted)),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(emp.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 2),
-                Text(emp.department, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                StatusPill.risk(emp.risk),
+                const SizedBox(height: 4),
+                Text('${(emp.attendanceRate * 100).toInt()}% attendance', style: TextStyle(fontSize: 11, color: c.textMuted, fontFeatures: const [FontFeature.tabularFigures()])),
               ],
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              StatusPill.risk(emp.risk),
-              const SizedBox(height: 4),
-              Text('${(emp.attendanceRate * 100).toInt()}% attendance', style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AddEmployeeSheet extends StatelessWidget {
-  const _AddEmployeeSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
-        left: 20, right: 20, top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Add New Employee', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const TextField(decoration: InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person_outline_rounded, size: 20))),
-          const SizedBox(height: 12),
-          const TextField(decoration: InputDecoration(labelText: 'Email Address', prefixIcon: Icon(Icons.mail_outline_rounded, size: 20))),
-          const SizedBox(height: 12),
-          const TextField(decoration: InputDecoration(labelText: 'Department', prefixIcon: Icon(Icons.apartment_rounded, size: 20))),
-          const SizedBox(height: 12),
-          const TextField(decoration: InputDecoration(labelText: 'Job Title / Role', prefixIcon: Icon(Icons.work_outline_rounded, size: 20))),
-          const SizedBox(height: 24),
-          PrimaryButton(label: 'Create Account & Send Invite', onPressed: () => Navigator.pop(context)),
-        ],
+          ],
+        ),
       ),
     );
   }
