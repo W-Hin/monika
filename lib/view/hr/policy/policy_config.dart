@@ -32,7 +32,6 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
   double _leadershipThreshold = 60;
   double _technicalThreshold = 65;
   double _behaviouralThreshold = 60;
-  double _minTenureMonths = 6;
 
   bool _saving = false;
 
@@ -313,16 +312,6 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                   color: c.amber,
                   suffix: '/100',
                 ),
-                _SliderRow(
-                  label: 'Minimum employment duration before eligibility',
-                  value: _minTenureMonths,
-                  min: 0,
-                  max: 24,
-                  divisions: 24,
-                  onChanged: (v) => setState(() => _minTenureMonths = v),
-                  color: c.infoBlue,
-                  suffix: ' mo',
-                ),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -330,7 +319,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    'Example: If Leadership threshold is 60 and an employee scores 55 on Leadership KPI (and has met the minimum employment duration), a Leadership training programme will be automatically recommended.',
+                    'Example: If Leadership threshold is 60 and an employee scores 55 on Leadership KPI, a Leadership training programme will be automatically recommended.',
                     style: TextStyle(
                       fontSize: 11.5,
                       color: c.amber,
