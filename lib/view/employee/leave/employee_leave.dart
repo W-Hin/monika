@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
@@ -12,7 +12,9 @@ class EmployeeLeaveScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final apps = DummyData.employeeLeaveApplications;
+    final balance = DummyData.myLeaveBalance;
 
     return Scaffold(
       appBar: AppBar(
@@ -24,7 +26,7 @@ class EmployeeLeaveScreen extends StatelessWidget {
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LeaveApplyScreen())),
               icon: Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(color: c.primary, borderRadius: BorderRadius.circular(10)),
                 child: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
               ),
             ),
@@ -38,11 +40,11 @@ class EmployeeLeaveScreen extends StatelessWidget {
           children: [
             Row(
               children: [
-                Expanded(child: _BalanceCard(label: 'Annual', value: '9', total: '14', color: AppColors.primary)),
+                Expanded(child: _BalanceCard(label: 'Annual', value: '${balance.annualRemaining}', total: '${balance.annualTotal}', color: c.primary)),
                 const SizedBox(width: 10),
-                Expanded(child: _BalanceCard(label: 'Medical', value: '11', total: '14', color: AppColors.infoBlue)),
+                Expanded(child: _BalanceCard(label: 'Medical', value: '${balance.medicalRemaining}', total: '${balance.medicalTotal}', color: c.infoBlue)),
                 const SizedBox(width: 10),
-                Expanded(child: _BalanceCard(label: 'Emergency', value: '3', total: '3', color: AppColors.amber)),
+                Expanded(child: _BalanceCard(label: 'Emergency', value: '${balance.emergencyRemaining}', total: '${balance.emergencyTotal}', color: c.amber)),
               ],
             ),
             const SizedBox(height: 24),
@@ -73,6 +75,7 @@ class _BalanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return AppCard(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
       child: Column(
@@ -81,12 +84,12 @@ class _BalanceCard extends StatelessWidget {
             TextSpan(
               children: [
                 TextSpan(text: value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: color)),
-                TextSpan(text: '/$total', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
+                TextSpan(text: '/$total', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c.textMuted)),
               ],
             ),
           ),
           const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+          Text(label, style: TextStyle(fontSize: 11, color: c.textSecondary, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -99,6 +102,7 @@ class _LeaveTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,13 +118,13 @@ class _LeaveTile extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              const Icon(Icons.date_range_rounded, size: 14, color: AppColors.textMuted),
+              Icon(Icons.date_range_rounded, size: 14, color: c.textMuted),
               const SizedBox(width: 6),
-              Text('${app.startDate} – ${app.endDate} · ${app.days} day(s)', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              Text('${app.startDate} – ${app.endDate} · ${app.days} day(s)', style: TextStyle(fontSize: 12, color: c.textSecondary)),
             ],
           ),
           const SizedBox(height: 8),
-          Text(app.reason, style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted, fontStyle: FontStyle.italic)),
+          Text(app.reason, style: TextStyle(fontSize: 12.5, color: c.textMuted, fontStyle: FontStyle.italic)),
         ],
       ),
     );

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 
 class LeaveApplyScreen extends StatefulWidget {
@@ -23,42 +23,46 @@ class _LeaveApplyScreenState extends State<LeaveApplyScreen> {
       setState(() => _isSubmitting = false);
       showDialog(
         context: context,
-        builder: (_) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: const BoxDecoration(color: AppColors.primaryLight, shape: BoxShape.circle),
-                child: const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 32),
-              ),
-              const SizedBox(height: 16),
-              const Text('Application Submitted', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 6),
-              const Text(
-                'Your leave application has been sent to HR for review. You can track its status anytime.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.4),
-              ),
-              const SizedBox(height: 20),
-              PrimaryButton(
-                label: 'Done',
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).pop();
-                },
-              ),
-            ],
-          ),
-        ),
+        builder: (ctx) {
+          final c = ctx.colors;
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(color: c.primaryLight, shape: BoxShape.circle),
+                  child: Icon(Icons.check_circle_rounded, color: c.primary, size: 32),
+                ),
+                const SizedBox(height: 16),
+                const Text('Application Submitted', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 6),
+                Text(
+                  'Your leave application has been sent to HR for review. You can track its status anytime.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12.5, color: c.textSecondary, height: 1.4),
+                ),
+                const SizedBox(height: 20),
+                PrimaryButton(
+                  label: 'Done',
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            ),
+          );
+        },
       );
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Scaffold(
       appBar: const SimpleAppBar(title: 'Apply for Leave'),
       body: SafeArea(
@@ -78,14 +82,14 @@ class _LeaveApplyScreenState extends State<LeaveApplyScreen> {
                     label: Text(type),
                     selected: selected,
                     onSelected: (_) => setState(() => _selectedType = type),
-                    selectedColor: AppColors.primaryLight,
-                    backgroundColor: AppColors.surfaceMuted,
+                    selectedColor: c.primaryLight,
+                    backgroundColor: c.surfaceMuted,
                     labelStyle: TextStyle(
-                      color: selected ? AppColors.primaryDark : AppColors.textSecondary,
+                      color: selected ? c.primaryDark : c.textSecondary,
                       fontWeight: FontWeight.w700,
                       fontSize: 12.5,
                     ),
-                    side: BorderSide(color: selected ? AppColors.primary : Colors.transparent),
+                    side: BorderSide(color: selected ? c.primary : Colors.transparent),
                   );
                 }).toList(),
               ),
@@ -103,12 +107,12 @@ class _LeaveApplyScreenState extends State<LeaveApplyScreen> {
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(color: AppColors.infoBlueBg, borderRadius: BorderRadius.circular(10)),
-                child: const Row(
+                decoration: BoxDecoration(color: c.infoBlueBg, borderRadius: BorderRadius.circular(10)),
+                child: Row(
                   children: [
-                    Icon(Icons.info_outline_rounded, size: 15, color: AppColors.infoBlue),
-                    SizedBox(width: 8),
-                    Text('Total: 3 days  ·  Balance after: 6 days', style: TextStyle(fontSize: 12, color: AppColors.infoBlue, fontWeight: FontWeight.w600)),
+                    Icon(Icons.info_outline_rounded, size: 15, color: c.infoBlue),
+                    const SizedBox(width: 8),
+                    Text('Total: 3 days  ·  Balance after: 6 days', style: TextStyle(fontSize: 12, color: c.infoBlue, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -134,14 +138,14 @@ class _LeaveApplyScreenState extends State<LeaveApplyScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 20),
                   decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.border, width: 1.4),
+                    border: Border.all(color: c.border, width: 1.4),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Column(
+                  child: Column(
                     children: [
-                      Icon(Icons.upload_file_rounded, color: AppColors.textMuted, size: 24),
-                      SizedBox(height: 6),
-                      Text('Tap to upload MC or supporting document', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                      Icon(Icons.upload_file_rounded, color: c.textMuted, size: 24),
+                      const SizedBox(height: 6),
+                      Text('Tap to upload MC or supporting document', style: TextStyle(fontSize: 12, color: c.textMuted)),
                     ],
                   ),
                 ),
@@ -168,22 +172,23 @@ class _DatePickerField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
       child: Row(
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 10.5, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                Text(label, style: TextStyle(fontSize: 10.5, color: c.textMuted, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2),
                 Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
               ],
             ),
           ),
-          const Icon(Icons.calendar_today_rounded, size: 16, color: AppColors.textMuted),
+          Icon(Icons.calendar_today_rounded, size: 16, color: c.textMuted),
         ],
       ),
     );
