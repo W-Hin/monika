@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../core/data/dummy_data.dart';
@@ -9,6 +9,7 @@ class EmployeeAttendanceScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final user = DummyData.employeeUser;
 
     return Scaffold(
@@ -25,12 +26,12 @@ class EmployeeAttendanceScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Column(
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Risk Classification', style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-                          SizedBox(height: 4),
-                          Text('Based on last 90 days', style: TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
+                          Text('Risk Classification', style: TextStyle(fontSize: 13, color: c.textSecondary, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 4),
+                          Text('Based on last 90 days', style: TextStyle(fontSize: 11.5, color: c.textMuted)),
                         ],
                       ),
                       StatusPill.risk(user.riskLevel),
@@ -39,11 +40,11 @@ class EmployeeAttendanceScreen extends StatelessWidget {
                   const SizedBox(height: 18),
                   Row(
                     children: [
-                      _RiskFactor(label: 'Score', value: '94', color: AppColors.primary),
+                      _RiskFactor(label: 'Score', value: '94', color: c.primary),
                       const SizedBox(width: 12),
-                      _RiskFactor(label: 'Violations', value: '1', color: AppColors.amber),
+                      _RiskFactor(label: 'Violations', value: '1', color: c.amber),
                       const SizedBox(width: 12),
-                      _RiskFactor(label: 'Late Days', value: '1', color: AppColors.infoBlue),
+                      _RiskFactor(label: 'Late Days', value: '1', color: c.infoBlue),
                     ],
                   ),
                 ],
@@ -57,8 +58,8 @@ class EmployeeAttendanceScreen extends StatelessWidget {
                     label: 'Days Present',
                     value: '21',
                     icon: Icons.event_available_rounded,
-                    iconColor: AppColors.primary,
-                    iconBg: AppColors.primaryLight,
+                    iconColor: c.primary,
+                    iconBg: c.primaryLight,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -67,8 +68,8 @@ class EmployeeAttendanceScreen extends StatelessWidget {
                     label: 'On Leave',
                     value: '2',
                     icon: Icons.beach_access_rounded,
-                    iconColor: AppColors.infoBlue,
-                    iconBg: AppColors.infoBlueBg,
+                    iconColor: c.infoBlue,
+                    iconBg: c.infoBlueBg,
                   ),
                 ),
               ],
@@ -89,10 +90,10 @@ class EmployeeAttendanceScreen extends StatelessWidget {
               ok: true,
             ),
             const SizedBox(height: 10),
-            const _VerificationInfoCard(
+            _VerificationInfoCard(
               icon: Icons.phone_android_rounded,
               title: 'Registered Device',
-              desc: 'iPhone 15 Pro · Bound on 12 Jan 2025',
+              desc: '${user.registeredDevice} · Bound on ${user.deviceBoundSince}',
               ok: true,
             ),
             const SizedBox(height: 24),
@@ -109,7 +110,7 @@ class EmployeeAttendanceScreen extends StatelessWidget {
                         children: [
                           Text(r.date, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
                           const SizedBox(height: 2),
-                          Text('${r.clockIn}${r.clockOut != null ? " → ${r.clockOut}" : ""}', style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                          Text('${r.clockIn}${r.clockOut != null ? " → ${r.clockOut}" : ""}', style: TextStyle(fontSize: 12, color: c.textMuted)),
                         ],
                       ),
                     ),
@@ -133,15 +134,16 @@ class _RiskFactor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
         child: Column(
           children: [
             Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: color)),
             const SizedBox(height: 2),
-            Text(label, style: const TextStyle(fontSize: 10.5, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+            Text(label, style: TextStyle(fontSize: 10.5, color: c.textMuted, fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -158,6 +160,7 @@ class _VerificationInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return AppCard(
       child: Row(
         children: [
@@ -165,8 +168,8 @@ class _VerificationInfoCard extends StatelessWidget {
             width: 40,
             height: 40,
             alignment: Alignment.center,
-            decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(11)),
-            child: Icon(icon, size: 19, color: AppColors.primaryDark),
+            decoration: BoxDecoration(color: c.primaryLight, borderRadius: BorderRadius.circular(11)),
+            child: Icon(icon, size: 19, color: c.primaryDark),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -175,11 +178,11 @@ class _VerificationInfoCard extends StatelessWidget {
               children: [
                 Text(title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 2),
-                Text(desc, style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
+                Text(desc, style: TextStyle(fontSize: 11.5, color: c.textMuted)),
               ],
             ),
           ),
-          Icon(ok ? Icons.check_circle_rounded : Icons.error_rounded, color: ok ? AppColors.primary : AppColors.riskHigh, size: 20),
+          Icon(ok ? Icons.check_circle_rounded : Icons.error_rounded, color: ok ? c.primary : c.riskHigh, size: 20),
         ],
       ),
     );

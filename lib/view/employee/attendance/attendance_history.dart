@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
@@ -11,6 +11,7 @@ class AttendanceHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final records = DummyData.attendanceHistory;
     final flagged = records.where((r) => r.status == AttendanceStatus.flagged).length;
     final late = records.where((r) => r.status == AttendanceStatus.late).length;
@@ -28,8 +29,8 @@ class AttendanceHistoryScreen extends StatelessWidget {
                     label: 'This Month',
                     value: '96%',
                     icon: Icons.event_available_rounded,
-                    iconColor: AppColors.primary,
-                    iconBg: AppColors.primaryLight,
+                    iconColor: c.primary,
+                    iconBg: c.primaryLight,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -38,8 +39,8 @@ class AttendanceHistoryScreen extends StatelessWidget {
                     label: 'Late Arrivals',
                     value: '$late',
                     icon: Icons.schedule_rounded,
-                    iconColor: AppColors.amber,
-                    iconBg: AppColors.amberBg,
+                    iconColor: c.amber,
+                    iconBg: c.amberBg,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -48,18 +49,15 @@ class AttendanceHistoryScreen extends StatelessWidget {
                     label: 'Flagged',
                     value: '$flagged',
                     icon: Icons.flag_outlined,
-                    iconColor: AppColors.riskHigh,
-                    iconBg: AppColors.riskHighBg,
+                    iconColor: c.riskHigh,
+                    iconBg: c.riskHighBg,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 24),
             const SectionHeader(title: 'June 2026'),
-            ...records.map((r) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _HistoryTile(record: r),
-            )),
+            ListRow(children: records.map((r) => _HistoryRow(record: r)).toList()),
           ],
         ),
       ),
@@ -67,35 +65,35 @@ class AttendanceHistoryScreen extends StatelessWidget {
   }
 }
 
-class _HistoryTile extends StatelessWidget {
+class _HistoryRow extends StatelessWidget {
   final AttendanceRecord record;
-  const _HistoryTile({required this.record});
+  const _HistoryRow({required this.record});
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final flagged = record.status == AttendanceStatus.flagged;
-    return AppCard(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(record.date, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-              ),
+              Expanded(child: Text(record.date, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: c.textPrimary))),
               StatusPill.attendance(record.status),
             ],
           ),
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(Icons.login_rounded, size: 14, color: AppColors.textMuted),
+              Icon(Icons.login_rounded, size: 14, color: c.textMuted),
               const SizedBox(width: 6),
-              Text('In: ${record.clockIn}', style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+              Text('In: ${record.clockIn}', style: TextStyle(fontSize: 12.5, color: c.textSecondary, fontFeatures: const [FontFeature.tabularFigures()])),
               const SizedBox(width: 16),
-              const Icon(Icons.logout_rounded, size: 14, color: AppColors.textMuted),
+              Icon(Icons.logout_rounded, size: 14, color: c.textMuted),
               const SizedBox(width: 6),
-              Text('Out: ${record.clockOut ?? "—"}', style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+              Text('Out: ${record.clockOut ?? "—"}', style: TextStyle(fontSize: 12.5, color: c.textSecondary, fontFeatures: const [FontFeature.tabularFigures()])),
             ],
           ),
           if (flagged && record.flagReason != null) ...[
@@ -103,20 +101,12 @@ class _HistoryTile extends StatelessWidget {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.riskHighBg,
-                borderRadius: BorderRadius.circular(10),
-              ),
+              decoration: BoxDecoration(color: c.riskHighBg, borderRadius: BorderRadius.circular(10)),
               child: Row(
                 children: [
-                  const Icon(Icons.warning_amber_rounded, size: 14, color: AppColors.riskHigh),
+                  Icon(Icons.warning_amber_rounded, size: 14, color: c.riskHigh),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      record.flagReason!,
-                      style: const TextStyle(fontSize: 11.5, color: AppColors.riskHigh, fontWeight: FontWeight.w600),
-                    ),
-                  ),
+                  Expanded(child: Text(record.flagReason!, style: TextStyle(fontSize: 11.5, color: c.riskHigh, fontWeight: FontWeight.w600))),
                 ],
               ),
             ),

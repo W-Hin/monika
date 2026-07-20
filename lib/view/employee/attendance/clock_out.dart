@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 
 enum _StepState { pending, checking, success }
@@ -36,6 +36,7 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Scaffold(
       appBar: const SimpleAppBar(title: 'Clock Out'),
       body: SafeArea(
@@ -44,14 +45,14 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'End of Day Clock-Out',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: c.textPrimary),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'MONIKA confirms your location before recording your clock-out time.',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+                style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4),
               ),
               const SizedBox(height: 28),
               Expanded(
@@ -68,27 +69,27 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: AppColors.riskLowBg,
+                          color: c.riskLowBg,
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: AppColors.primary.withOpacity(0.25)),
+                          boxShadow: [c.shadowTinted()],
                         ),
                         child: Column(
                           children: [
                             Container(
                               width: 56,
                               height: 56,
-                              decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                              decoration: BoxDecoration(color: c.primary, shape: BoxShape.circle),
                               child: const Icon(Icons.check_rounded, color: Colors.white, size: 30),
                             ),
                             const SizedBox(height: 14),
-                            const Text(
+                            Text(
                               'Clock-Out Successful',
-                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: c.textPrimary),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Recorded at $_recordedTime, ${DateFormat('EEE d MMMM yyyy').format(DateTime.now())}',
-                              style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                              style: TextStyle(fontSize: 12.5, color: c.textSecondary),
                             ),
                           ],
                         ),
@@ -133,32 +134,33 @@ class _ValidationStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     Color iconColor;
     Color iconBg;
     Widget trailing;
 
     switch (state) {
       case _StepState.pending:
-        iconColor = AppColors.textMuted;
-        iconBg = AppColors.surfaceMuted;
-        trailing = const Icon(Icons.radio_button_unchecked_rounded, color: AppColors.textMuted, size: 22);
+        iconColor = c.textMuted;
+        iconBg = c.surfaceMuted;
+        trailing = Icon(Icons.radio_button_unchecked_rounded, color: c.textMuted, size: 22);
         break;
       case _StepState.checking:
-        iconColor = AppColors.primary;
-        iconBg = AppColors.primaryLight;
-        trailing = const SizedBox(
+        iconColor = c.primary;
+        iconBg = c.primaryLight;
+        trailing = SizedBox(
           width: 20,
           height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2.4, color: AppColors.primary),
+          child: CircularProgressIndicator(strokeWidth: 2.4, color: c.primary),
         );
         break;
       case _StepState.success:
-        iconColor = AppColors.primary;
-        iconBg = AppColors.primaryLight;
+        iconColor = c.primary;
+        iconBg = c.primaryLight;
         trailing = Container(
           width: 22,
           height: 22,
-          decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+          decoration: BoxDecoration(color: c.primary, shape: BoxShape.circle),
           child: const Icon(Icons.check_rounded, color: Colors.white, size: 15),
         );
         break;
@@ -167,11 +169,9 @@ class _ValidationStep extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: c.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: state == _StepState.success ? AppColors.primary.withOpacity(0.3) : AppColors.border,
-        ),
+        boxShadow: [state == _StepState.success ? c.shadowTinted() : c.shadowNeutral],
       ),
       child: Row(
         children: [
@@ -187,9 +187,9 @@ class _ValidationStep extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.textPrimary)),
                 const SizedBox(height: 3),
-                Text(subtitle, style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
+                Text(subtitle, style: TextStyle(fontSize: 11.5, color: c.textMuted)),
               ],
             ),
           ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import 'package:intl/intl.dart';
+import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 
 enum _StepState { pending, checking, success, failed }
@@ -17,6 +18,7 @@ class _ClockInScreenState extends State<ClockInScreen> {
   _StepState _device = _StepState.pending;
   bool _isRunning = false;
   bool _isComplete = false;
+  String _recordedTime = '';
 
   Future<void> _runValidation() async {
     setState(() {
@@ -44,11 +46,13 @@ class _ClockInScreenState extends State<ClockInScreen> {
       _device = _StepState.success;
       _isRunning = false;
       _isComplete = true;
+      _recordedTime = DateFormat('hh:mm a').format(DateTime.now());
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Scaffold(
       appBar: const SimpleAppBar(title: 'Clock In'),
       body: SafeArea(
@@ -57,14 +61,14 @@ class _ClockInScreenState extends State<ClockInScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Triple-Layer Verification',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: c.textPrimary),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'MONIKA validates your location, network, and device simultaneously to prevent proxy attendance.',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+                style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4),
               ),
               const SizedBox(height: 28),
 
@@ -97,27 +101,27 @@ class _ClockInScreenState extends State<ClockInScreen> {
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: AppColors.riskLowBg,
+                          color: c.riskLowBg,
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: AppColors.primary.withOpacity(0.25)),
+                          boxShadow: [c.shadowTinted()],
                         ),
                         child: Column(
                           children: [
                             Container(
                               width: 56,
                               height: 56,
-                              decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                              decoration: BoxDecoration(color: c.primary, shape: BoxShape.circle),
                               child: const Icon(Icons.check_rounded, color: Colors.white, size: 30),
                             ),
                             const SizedBox(height: 14),
-                            const Text(
+                            Text(
                               'Clock-In Successful',
-                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: c.textPrimary),
                             ),
                             const SizedBox(height: 4),
-                            const Text(
-                              'Recorded at 09:01 AM, Sun 21 June 2026',
-                              style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                            Text(
+                              'Recorded at $_recordedTime, ${DateFormat('EEE d MMMM yyyy').format(DateTime.now())}',
+                              style: TextStyle(fontSize: 12.5, color: c.textSecondary),
                             ),
                           ],
                         ),
@@ -138,7 +142,7 @@ class _ClockInScreenState extends State<ClockInScreen> {
                 PrimaryButton(
                   label: 'Done',
                   icon: Icons.check_rounded,
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => Navigator.of(context).pop(_recordedTime),
                 ),
             ],
           ),
@@ -163,50 +167,49 @@ class _ValidationStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     Color iconColor;
     Color iconBg;
     Widget trailing;
 
     switch (state) {
       case _StepState.pending:
-        iconColor = AppColors.textMuted;
-        iconBg = AppColors.surfaceMuted;
-        trailing = const Icon(Icons.radio_button_unchecked_rounded, color: AppColors.textMuted, size: 22);
+        iconColor = c.textMuted;
+        iconBg = c.surfaceMuted;
+        trailing = Icon(Icons.radio_button_unchecked_rounded, color: c.textMuted, size: 22);
         break;
       case _StepState.checking:
-        iconColor = AppColors.primary;
-        iconBg = AppColors.primaryLight;
-        trailing = const SizedBox(
+        iconColor = c.primary;
+        iconBg = c.primaryLight;
+        trailing = SizedBox(
           width: 20,
           height: 20,
-          child: CircularProgressIndicator(strokeWidth: 2.4, color: AppColors.primary),
+          child: CircularProgressIndicator(strokeWidth: 2.4, color: c.primary),
         );
         break;
       case _StepState.success:
-        iconColor = AppColors.primary;
-        iconBg = AppColors.primaryLight;
+        iconColor = c.primary;
+        iconBg = c.primaryLight;
         trailing = Container(
           width: 22,
           height: 22,
-          decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+          decoration: BoxDecoration(color: c.primary, shape: BoxShape.circle),
           child: const Icon(Icons.check_rounded, color: Colors.white, size: 15),
         );
         break;
       case _StepState.failed:
-        iconColor = AppColors.riskHigh;
-        iconBg = AppColors.riskHighBg;
-        trailing = const Icon(Icons.cancel_rounded, color: AppColors.riskHigh, size: 22);
+        iconColor = c.riskHigh;
+        iconBg = c.riskHighBg;
+        trailing = Icon(Icons.cancel_rounded, color: c.riskHigh, size: 22);
         break;
     }
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: c.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: state == _StepState.success ? AppColors.primary.withOpacity(0.3) : AppColors.border,
-        ),
+        boxShadow: [state == _StepState.success ? c.shadowTinted() : c.shadowNeutral],
       ),
       child: Row(
         children: [
@@ -222,9 +225,9 @@ class _ValidationStep extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.textPrimary)),
                 const SizedBox(height: 3),
-                Text(subtitle, style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
+                Text(subtitle, style: TextStyle(fontSize: 11.5, color: c.textMuted)),
               ],
             ),
           ),
@@ -242,11 +245,12 @@ class _ConnectorLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Container(
       margin: const EdgeInsets.only(left: 38),
       height: 16,
       width: 2,
-      color: active ? AppColors.primary.withOpacity(0.4) : AppColors.border,
+      color: active ? c.primary.withOpacity(0.4) : c.border,
     );
   }
 }
