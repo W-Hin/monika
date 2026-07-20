@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../../core/data/dummy_data.dart';
@@ -9,6 +10,7 @@ class PayrollScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final payroll = DummyData.currentPayroll;
 
     return Scaffold(
@@ -21,8 +23,9 @@ class PayrollScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: AppColors.kpiGradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
+                gradient: LinearGradient(colors: c.kpiGradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
                 borderRadius: BorderRadius.circular(20),
+                boxShadow: [c.shadowTinted()],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -32,7 +35,7 @@ class PayrollScreen extends StatelessWidget {
                   const Text('Net Pay', style: TextStyle(color: Colors.white70, fontSize: 13)),
                   Text(
                     'RM ${payroll.netPay.toStringAsFixed(2)}',
-                    style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900),
+                    style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, fontFeatures: [FontFeature.tabularFigures()]),
                   ),
                 ],
               ),
@@ -45,8 +48,8 @@ class PayrollScreen extends StatelessWidget {
                     label: 'Base Salary',
                     value: 'RM ${payroll.baseSalary.toStringAsFixed(0)}',
                     icon: Icons.account_balance_wallet_outlined,
-                    iconColor: AppColors.primary,
-                    iconBg: AppColors.primaryLight,
+                    iconColor: c.primary,
+                    iconBg: c.primaryLight,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -55,8 +58,8 @@ class PayrollScreen extends StatelessWidget {
                     label: 'Total Deductions',
                     value: 'RM ${payroll.deductions.toStringAsFixed(0)}',
                     icon: Icons.remove_circle_outline_rounded,
-                    iconColor: AppColors.riskHigh,
-                    iconBg: AppColors.riskHighBg,
+                    iconColor: c.riskHigh,
+                    iconBg: c.riskHighBg,
                   ),
                 ),
               ],
@@ -72,18 +75,18 @@ class PayrollScreen extends StatelessWidget {
                         Container(
                           width: 8,
                           height: 8,
-                          decoration: const BoxDecoration(color: AppColors.riskHigh, shape: BoxShape.circle),
+                          decoration: BoxDecoration(color: c.riskHigh, shape: BoxShape.circle),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             payroll.items[i].label,
-                            style: const TextStyle(fontSize: 12.5, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+                            style: TextStyle(fontSize: 12.5, color: c.textPrimary, fontWeight: FontWeight.w600),
                           ),
                         ),
                         Text(
                           '- RM ${payroll.items[i].amount.toStringAsFixed(2)}',
-                          style: const TextStyle(fontSize: 12.5, color: AppColors.riskHigh, fontWeight: FontWeight.w700),
+                          style: TextStyle(fontSize: 12.5, color: c.riskHigh, fontWeight: FontWeight.w700, fontFeatures: const [FontFeature.tabularFigures()]),
                         ),
                       ],
                     ),
@@ -105,14 +108,14 @@ class PayrollScreen extends StatelessWidget {
                   children: [
                     Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(10)),
-                      child: const Icon(Icons.receipt_long_outlined, size: 16, color: AppColors.textSecondary),
+                      decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(10)),
+                      child: Icon(Icons.receipt_long_outlined, size: 16, color: c.textSecondary),
                     ),
                     const SizedBox(width: 12),
                     Expanded(child: Text(m, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700))),
-                    const Text('RM 4,420.00', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+                    Text('RM 4,420.00', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textSecondary, fontFeatures: const [FontFeature.tabularFigures()])),
                     const SizedBox(width: 8),
-                    const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted, size: 18),
+                    Icon(Icons.chevron_right_rounded, color: c.textMuted, size: 18),
                   ],
                 ),
               ),

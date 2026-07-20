@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../../core/data/dummy_data.dart';
@@ -10,6 +11,7 @@ class PeDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final pe = DummyData.currentPE;
     final total = pe.weightedTotal;
 
@@ -23,13 +25,13 @@ class PeDetailScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: c.surface,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.border),
+                boxShadow: [c.shadowTinted()],
               ),
               child: Column(
                 children: [
-                  Text('Evaluation Year ${pe.year}', style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                  Text('Evaluation Year ${pe.year}', style: TextStyle(fontSize: 12.5, color: c.textMuted, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 12),
                   SizedBox(
                     width: 140,
@@ -43,16 +45,16 @@ class PeDetailScreen extends StatelessWidget {
                           child: CircularProgressIndicator(
                             value: total / 100,
                             strokeWidth: 12,
-                            backgroundColor: AppColors.surfaceMuted,
-                            valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+                            backgroundColor: c.surfaceMuted,
+                            valueColor: AlwaysStoppedAnimation(c.primary),
                             strokeCap: StrokeCap.round,
                           ),
                         ),
                         Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(total.toStringAsFixed(1), style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
-                            const Text('/ 100', style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                            Text(total.toStringAsFixed(1), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: c.textPrimary, fontFeatures: const [FontFeature.tabularFigures()])),
+                            Text('/ 100', style: TextStyle(fontSize: 12, color: c.textMuted)),
                           ],
                         ),
                       ],
@@ -61,8 +63,8 @@ class PeDetailScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(100)),
-                    child: const Text('Weighted Total Score', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.primaryDark)),
+                    decoration: BoxDecoration(color: c.primaryLight, borderRadius: BorderRadius.circular(100)),
+                    child: Text('Weighted Total Score', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: c.primaryDark)),
                   ),
                 ],
               ),
@@ -79,12 +81,12 @@ class PeDetailScreen extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.format_quote_rounded, color: AppColors.primary, size: 20),
+                  Icon(Icons.format_quote_rounded, color: c.primary, size: 20),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       pe.comments,
-                      style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5, fontStyle: FontStyle.italic),
+                      style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.5, fontStyle: FontStyle.italic),
                     ),
                   ),
                 ],
@@ -100,17 +102,17 @@ class PeDetailScreen extends StatelessWidget {
                   children: [
                     Container(
                       padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(10)),
-                      child: const Icon(Icons.calendar_month_rounded, size: 16, color: AppColors.textSecondary),
+                      decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(10)),
+                      child: Icon(Icons.calendar_month_rounded, size: 16, color: c.textSecondary),
                     ),
                     const SizedBox(width: 12),
                     Expanded(child: Text('Evaluation ${e.year}', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700))),
                     Text(
                       e.weightedTotal.toStringAsFixed(1),
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.primary),
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: c.primary, fontFeatures: const [FontFeature.tabularFigures()]),
                     ),
                     const SizedBox(width: 8),
-                    const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted, size: 18),
+                    Icon(Icons.chevron_right_rounded, color: c.textMuted, size: 18),
                   ],
                 ),
               ),
@@ -126,14 +128,16 @@ class _KpiBar extends StatelessWidget {
   final KpiItem kpi;
   const _KpiBar({required this.kpi});
 
-  Color get _color {
-    if (kpi.score >= 80) return AppColors.primary;
-    if (kpi.score >= 60) return AppColors.amber;
-    return AppColors.riskHigh;
+  Color _getColor(AppColorsExtension c) {
+    if (kpi.score >= 80) return c.primary;
+    if (kpi.score >= 60) return c.amber;
+    return c.riskHigh;
   }
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+    final color = _getColor(c);
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -143,7 +147,7 @@ class _KpiBar extends StatelessWidget {
               Expanded(
                 child: Text(kpi.name, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
               ),
-              Text('${kpi.weightage.toStringAsFixed(0)}% weight', style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+              Text('${kpi.weightage.toStringAsFixed(0)}% weight', style: TextStyle(fontSize: 11, color: c.textMuted, fontWeight: FontWeight.w600)),
             ],
           ),
           const SizedBox(height: 10),
@@ -152,8 +156,8 @@ class _KpiBar extends StatelessWidget {
             child: LinearProgressIndicator(
               value: kpi.score / 100,
               minHeight: 8,
-              backgroundColor: AppColors.surfaceMuted,
-              valueColor: AlwaysStoppedAnimation(_color),
+              backgroundColor: c.surfaceMuted,
+              valueColor: AlwaysStoppedAnimation(color),
             ),
           ),
           const SizedBox(height: 6),
@@ -161,7 +165,7 @@ class _KpiBar extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: Text(
               '${kpi.score.toStringAsFixed(0)} / 100',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: _color),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: color),
             ),
           ),
         ],
