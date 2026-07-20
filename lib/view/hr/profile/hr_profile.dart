@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors_extension.dart';
+import '../../../main.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../../core/data/dummy_data.dart';
 import '../../auth/login_screen.dart';
@@ -7,12 +8,16 @@ import '../policy/policy_config.dart';
 import '../pe/hr_pe.dart';
 import '../training/hr_training.dart';
 import '../../shared/company_calendar.dart';
+import '../../shared/settings_placeholder.dart';
+import '../leave/leave_balances.dart';
+import '../payroll/hr_payroll.dart';
 
 class HrProfileScreen extends StatelessWidget {
   const HrProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final user = DummyData.hrUser;
 
     return Scaffold(
@@ -30,9 +35,10 @@ class HrProfileScreen extends StatelessWidget {
                   Container(
                     width: 80, height: 80,
                     alignment: Alignment.center,
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(colors: AppColors.kpiGradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: c.kpiGradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
                       shape: BoxShape.circle,
+                      boxShadow: [c.shadowTinted()],
                     ),
                     child: Text(user.avatarInitials, style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900)),
                   ),
@@ -41,8 +47,8 @@ class HrProfileScreen extends StatelessWidget {
                   const SizedBox(height: 4),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                    decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(100)),
-                    child: const Text('HR Administrator', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.primaryDark)),
+                    decoration: BoxDecoration(color: c.primaryLight, borderRadius: BorderRadius.circular(100)),
+                    child: Text('HR Administrator', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.primaryDark)),
                   ),
                 ],
               ),
@@ -76,28 +82,42 @@ class HrProfileScreen extends StatelessWidget {
                   _MenuRow(
                     icon: Icons.tune_rounded,
                     label: 'Policy & Configuration',
-                    color: AppColors.purple,
+                    color: c.purple,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PolicyConfigScreen())),
                   ),
                   const Divider(height: 1, indent: 56),
                   _MenuRow(
                     icon: Icons.assessment_rounded,
                     label: 'Performance Evaluation',
-                    color: AppColors.amber,
+                    color: c.amber,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HrPeScreen())),
                   ),
                   const Divider(height: 1, indent: 56),
                   _MenuRow(
                     icon: Icons.school_rounded,
                     label: 'Training Management',
-                    color: AppColors.infoBlue,
+                    color: c.infoBlue,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HrTrainingScreen())),
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _MenuRow(
+                    icon: Icons.account_balance_wallet_outlined,
+                    label: 'Leave Balances',
+                    color: c.infoBlue,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HrLeaveBalancesScreen())),
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _MenuRow(
+                    icon: Icons.receipt_long_rounded,
+                    label: 'Payroll Summaries',
+                    color: c.purple,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HrPayrollScreen())),
                   ),
                   const Divider(height: 1, indent: 56),
                   _MenuRow(
                     icon: Icons.calendar_month_rounded,
                     label: 'Company Calendar',
-                    color: AppColors.primary,
+                    color: c.primary,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CompanyCalendarScreen())),
                   ),
                 ],
@@ -109,9 +129,9 @@ class HrProfileScreen extends StatelessWidget {
             const SectionHeader(title: 'System Overview'),
             Row(
               children: [
-                Expanded(child: StatCard(label: 'Total Employees', value: '${DummyData.totalEmployees}', icon: Icons.groups_rounded, iconColor: AppColors.primary, iconBg: AppColors.primaryLight)),
+                Expanded(child: StatCard(label: 'Total Employees', value: '${DummyData.totalEmployees}', icon: Icons.groups_rounded, iconColor: c.primary, iconBg: c.primaryLight)),
                 const SizedBox(width: 12),
-                Expanded(child: StatCard(label: 'Active Modules', value: '10', icon: Icons.widgets_rounded, iconColor: AppColors.infoBlue, iconBg: AppColors.infoBlueBg)),
+                Expanded(child: StatCard(label: 'Active Modules', value: '10', icon: Icons.widgets_rounded, iconColor: c.infoBlue, iconBg: c.infoBlueBg)),
               ],
             ),
             const SizedBox(height: 24),
@@ -122,11 +142,25 @@ class HrProfileScreen extends StatelessWidget {
               padding: EdgeInsets.zero,
               child: Column(
                 children: [
-                  _MenuRow(icon: Icons.notifications_none_rounded, label: 'Notification Preferences', color: AppColors.textSecondary, onTap: () {}),
+                  _DarkModeRow(),
                   const Divider(height: 1, indent: 56),
-                  _MenuRow(icon: Icons.lock_outline_rounded, label: 'Change Password', color: AppColors.textSecondary, onTap: () {}),
+                  _MenuRow(
+                    icon: Icons.notifications_none_rounded,
+                    label: 'Notification Preferences',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPlaceholderScreen(title: 'Notification Preferences', icon: Icons.notifications_none_rounded))),
+                  ),
                   const Divider(height: 1, indent: 56),
-                  _MenuRow(icon: Icons.help_outline_rounded, label: 'Help & Support', color: AppColors.textSecondary, onTap: () {}),
+                  _MenuRow(
+                    icon: Icons.lock_outline_rounded,
+                    label: 'Change Password',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPlaceholderScreen(title: 'Change Password', icon: Icons.lock_outline_rounded))),
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _MenuRow(
+                    icon: Icons.help_outline_rounded,
+                    label: 'Help & Support',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPlaceholderScreen(title: 'Help & Support', icon: Icons.help_outline_rounded))),
+                  ),
                 ],
               ),
             ),
@@ -139,11 +173,11 @@ class HrProfileScreen extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
                       (route) => false,
                 ),
-                icon: const Icon(Icons.logout_rounded, size: 18, color: AppColors.riskHigh),
+                icon: Icon(Icons.logout_rounded, size: 18, color: c.riskHigh),
                 label: const Text('Log Out'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.riskHigh,
-                  side: const BorderSide(color: AppColors.riskHigh),
+                  foregroundColor: c.riskHigh,
+                  side: BorderSide(color: c.riskHigh),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
               ),
@@ -163,15 +197,16 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppColors.textMuted),
+          Icon(icon, size: 18, color: c.textMuted),
           const SizedBox(width: 14),
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
+          Expanded(child: Text(label, style: TextStyle(fontSize: 13, color: c.textSecondary))),
           Flexible(
-            child: Text(value, textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
+            child: Text(value, textAlign: TextAlign.right, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary), overflow: TextOverflow.ellipsis),
           ),
         ],
       ),
@@ -182,22 +217,50 @@ class _InfoRow extends StatelessWidget {
 class _MenuRow extends StatelessWidget {
   final IconData icon;
   final String label;
-  final Color color;
+  final Color? color;
   final VoidCallback onTap;
-  const _MenuRow({required this.icon, required this.label, required this.color, required this.onTap});
+  const _MenuRow({required this.icon, required this.label, this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: color),
+            Icon(icon, size: 18, color: color ?? c.textSecondary),
             const SizedBox(width: 14),
             Expanded(child: Text(label, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600))),
-            const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
+            Icon(Icons.chevron_right_rounded, size: 18, color: c.textMuted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DarkModeRow extends StatelessWidget {
+  const _DarkModeRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeController,
+      builder: (context, mode, _) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            Icon(Icons.dark_mode_outlined, size: 18, color: c.textSecondary),
+            const SizedBox(width: 14),
+            Expanded(child: Text('Dark Mode', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.textPrimary))),
+            Switch(
+              value: mode == ThemeMode.dark,
+              onChanged: (_) => themeController.toggle(),
+              activeThumbColor: c.primary,
+            ),
           ],
         ),
       ),

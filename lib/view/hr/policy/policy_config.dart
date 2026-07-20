@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 
 class PolicyConfigScreen extends StatefulWidget {
@@ -32,6 +32,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
   double _leadershipThreshold = 60;
   double _technicalThreshold = 65;
   double _behaviouralThreshold = 60;
+  double _minTenureMonths = 6;
 
   bool _saving = false;
 
@@ -50,6 +51,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Policy & Configuration'),
@@ -73,8 +75,8 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
             // ── Attendance Policy ──────────────────────────────────
             _SectionCard(
               icon: Icons.fingerprint_rounded,
-              color: AppColors.primary,
-              bg: AppColors.primaryLight,
+              color: c.primary,
+              bg: c.primaryLight,
               title: 'Attendance Policy',
               subtitle:
                   'Configure working hours, grace period, and IoT verification settings',
@@ -127,24 +129,24 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
+                    color: c.primaryLight,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Row(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(
                         Icons.info_outline_rounded,
                         size: 14,
-                        color: AppColors.primaryDark,
+                        color: c.primaryDark,
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Clock-in requires: GPS within geofence radius AND connected to office WiFi AND registered device token. All three must pass.',
                           style: TextStyle(
                             fontSize: 11.5,
-                            color: AppColors.primaryDark,
+                            color: c.primaryDark,
                             height: 1.4,
                           ),
                         ),
@@ -158,8 +160,8 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
             // ── Risk Score Weights ─────────────────────────────────
             _SectionCard(
               icon: Icons.shield_outlined,
-              color: AppColors.riskHigh,
-              bg: AppColors.riskHighBg,
+              color: c.riskHigh,
+              bg: c.riskHighBg,
               title: 'Risk Score Deduction Weights',
               subtitle:
                   'Points deducted from employee risk score per violation type',
@@ -170,7 +172,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                   min: 1,
                   max: 5,
                   onChanged: (v) => setState(() => _lateWeight = v),
-                  color: AppColors.riskLow,
+                  color: c.riskLow,
                 ),
                 _SliderRow(
                   label: 'WiFi SSID Mismatch',
@@ -178,7 +180,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                   min: 1,
                   max: 5,
                   onChanged: (v) => setState(() => _wifiMismatchWeight = v),
-                  color: AppColors.riskMedium,
+                  color: c.riskMedium,
                 ),
                 _SliderRow(
                   label: 'Out-of-Zone Clock-In',
@@ -186,7 +188,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                   min: 1,
                   max: 5,
                   onChanged: (v) => setState(() => _outOfZoneWeight = v),
-                  color: AppColors.riskMedium,
+                  color: c.riskMedium,
                 ),
                 _SliderRow(
                   label: 'Shared-Device Attempt',
@@ -194,19 +196,19 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                   min: 1,
                   max: 5,
                   onChanged: (v) => setState(() => _sharedDeviceWeight = v),
-                  color: AppColors.riskHigh,
+                  color: c.riskHigh,
                 ),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceMuted,
+                    color: c.surfaceMuted,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Risk Tiers: Score ≥ 80 = Low Risk   |   50–79 = Medium Risk   |   < 50 = High Risk',
                     style: TextStyle(
                       fontSize: 11.5,
-                      color: AppColors.textSecondary,
+                      color: c.textSecondary,
                       fontWeight: FontWeight.w600,
                     ),
                     textAlign: TextAlign.center,
@@ -218,8 +220,8 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
             // ── Payroll Deductions ─────────────────────────────────
             _SectionCard(
               icon: Icons.account_balance_wallet_outlined,
-              color: AppColors.purple,
-              bg: AppColors.purpleBg,
+              color: c.purple,
+              bg: c.purpleBg,
               title: 'Payroll Deduction Rules',
               subtitle:
                   'Configurable deduction amounts applied during payroll computation (RM)',
@@ -257,14 +259,14 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.purpleBg,
+                    color: c.purpleBg,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Approved Annual and Medical leave will not trigger deductions. Deductions are applied automatically at payroll computation time.',
                     style: TextStyle(
                       fontSize: 11.5,
-                      color: AppColors.purple,
+                      color: c.purple,
                       height: 1.4,
                     ),
                   ),
@@ -275,8 +277,8 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
             // ── Training Trigger Thresholds ────────────────────────
             _SectionCard(
               icon: Icons.auto_awesome_rounded,
-              color: AppColors.amber,
-              bg: AppColors.amberBg,
+              color: c.amber,
+              bg: c.amberBg,
               title: 'Training Recommendation Triggers',
               subtitle:
                   'KPI scores below these thresholds automatically trigger training recommendations in the ML engine',
@@ -288,7 +290,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                   max: 80,
                   divisions: 8,
                   onChanged: (v) => setState(() => _leadershipThreshold = v),
-                  color: AppColors.purple,
+                  color: c.purple,
                   suffix: '/100',
                 ),
                 _SliderRow(
@@ -298,7 +300,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                   max: 80,
                   divisions: 8,
                   onChanged: (v) => setState(() => _technicalThreshold = v),
-                  color: AppColors.infoBlue,
+                  color: c.infoBlue,
                   suffix: '/100',
                 ),
                 _SliderRow(
@@ -308,20 +310,30 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                   max: 80,
                   divisions: 8,
                   onChanged: (v) => setState(() => _behaviouralThreshold = v),
-                  color: AppColors.amber,
+                  color: c.amber,
                   suffix: '/100',
+                ),
+                _SliderRow(
+                  label: 'Minimum employment duration before eligibility',
+                  value: _minTenureMonths,
+                  min: 0,
+                  max: 24,
+                  divisions: 24,
+                  onChanged: (v) => setState(() => _minTenureMonths = v),
+                  color: c.infoBlue,
+                  suffix: ' mo',
                 ),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.amberBg,
+                    color: c.amberBg,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Text(
-                    'Example: If Leadership threshold is 60 and an employee scores 55 on Leadership KPI, a Leadership training programme will be automatically recommended.',
+                  child: Text(
+                    'Example: If Leadership threshold is 60 and an employee scores 55 on Leadership KPI (and has met the minimum employment duration), a Leadership training programme will be automatically recommended.',
                     style: TextStyle(
                       fontSize: 11.5,
-                      color: AppColors.amber,
+                      color: c.amber,
                       height: 1.4,
                     ),
                   ),
@@ -362,12 +374,13 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: c.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        boxShadow: [c.shadowNeutral],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -399,9 +412,9 @@ class _SectionCard extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         subtitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11.5,
-                          color: AppColors.textSecondary,
+                          color: c.textSecondary,
                           height: 1.3,
                         ),
                       ),
@@ -442,15 +455,16 @@ class _Field extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12.5,
             fontWeight: FontWeight.w700,
-            color: AppColors.textSecondary,
+            color: c.textSecondary,
           ),
         ),
         const SizedBox(height: 6),
@@ -459,7 +473,7 @@ class _Field extends StatelessWidget {
           keyboardType: keyboardType,
           decoration: InputDecoration(
             hintText: hint,
-            prefixIcon: Icon(icon, size: 18, color: AppColors.textMuted),
+            prefixIcon: Icon(icon, size: 18, color: c.textMuted),
           ),
         ),
       ],
@@ -490,6 +504,7 @@ class _SliderRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -501,10 +516,10 @@ class _SliderRow extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    color: c.textSecondary,
                   ),
                 ),
               ),
