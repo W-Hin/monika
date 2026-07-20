@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_colors_extension.dart';
 import 'home/employee_home.dart';
 import 'attendance/employee_attendance.dart';
 import 'leave/employee_leave.dart';
@@ -26,8 +26,9 @@ class _EmployeeShellState extends State<EmployeeShell> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: c.background,
       body: IndexedStack(index: _index, children: _screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
