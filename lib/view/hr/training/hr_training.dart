@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../../core/data/dummy_data.dart';
@@ -16,8 +17,70 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
   int _tab = 0;
   final _tabs = ['All Programs', 'Mandatory', 'Completion'];
 
+  late List<TrainingProgram> _available;
+  late List<TrainingProgram> _mandatory;
+
+  final _departments = ['Engineering', 'Sales', 'Operations', 'Marketing', 'Design', 'Human Resources', 'Finance'];
+
+  @override
+  void initState() {
+    super.initState();
+    _available = List.from(DummyData.availableTrainings);
+    _mandatory = List.from(DummyData.mandatoryTrainings);
+  }
+
+  void _replaceProgram(TrainingProgram original, TrainingProgram updated) {
+    setState(() {
+      for (final list in [_available, _mandatory]) {
+        final i = list.indexWhere((t) => t.title == original.title);
+        if (i != -1) list[i] = updated;
+      }
+    });
+  }
+
+  void _assignDepartment(TrainingProgram program) {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('Assign "${program.title}" to Department', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+            ),
+            ..._departments.map((d) => ListTile(
+                  title: Text(d),
+                  trailing: program.department == d ? const Icon(Icons.check_rounded, color: AppColors.primary) : null,
+                  onTap: () {
+                    _replaceProgram(program, program.copyWith(department: d));
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('✓ Assigned to $d department')),
+                    );
+                  },
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _editProgram(TrainingProgram program) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CreateProgramSheet(
+        existing: program,
+        onSaved: (updated) => _replaceProgram(program, updated),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Training Management'),
@@ -29,12 +92,14 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
                 context: context,
                 isScrollControlled: true,
                 backgroundColor: Colors.transparent,
-                builder: (_) => const _CreateProgramSheet(),
+                builder: (_) => _CreateProgramSheet(
+                  onSaved: (created) => setState(() => _available = [..._available, created]),
+                ),
               ),
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: c.primary,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
@@ -60,20 +125,20 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
                       Expanded(
                         child: StatCard(
                           label: 'Total Programs',
-                          value: '${DummyData.availableTrainings.length}',
+                          value: '${_available.length}',
                           icon: Icons.school_rounded,
-                          iconColor: AppColors.primary,
-                          iconBg: AppColors.primaryLight,
+                          iconColor: c.primary,
+                          iconBg: c.primaryLight,
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: StatCard(
                           label: 'Mandatory',
-                          value: '${DummyData.mandatoryTrainings.length}',
+                          value: '${_mandatory.length}',
                           icon: Icons.assignment_rounded,
-                          iconColor: AppColors.riskHigh,
-                          iconBg: AppColors.riskHighBg,
+                          iconColor: c.riskHigh,
+                          iconBg: c.riskHighBg,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -82,8 +147,8 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
                           label: 'Recommended',
                           value: '${DummyData.recommendedTrainings.length}',
                           icon: Icons.auto_awesome_rounded,
-                          iconColor: AppColors.amber,
-                          iconBg: AppColors.amberBg,
+                          iconColor: c.amber,
+                          iconBg: c.amberBg,
                         ),
                       ),
                     ],
@@ -92,7 +157,7 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceMuted,
+                      color: c.surfaceMuted,
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Row(
@@ -105,7 +170,7 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
                               duration: const Duration(milliseconds: 200),
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
-                                color: sel ? Colors.white : Colors.transparent,
+                                color: sel ? c.surface : Colors.transparent,
                                 borderRadius: BorderRadius.circular(11),
                                 boxShadow: sel
                                     ? [
@@ -123,8 +188,8 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   color: sel
-                                      ? AppColors.textPrimary
-                                      : AppColors.textMuted,
+                                      ? c.textPrimary
+                                      : c.textMuted,
                                 ),
                               ),
                             ),
@@ -139,17 +204,19 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
             ),
             Expanded(
               child: _tab == 2
-                  ? _CompletionTab()
+                  ? const _CompletionTab()
                   : ListView(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                       children:
-                          (_tab == 0
-                                  ? DummyData.availableTrainings
-                                  : DummyData.mandatoryTrainings)
+                          (_tab == 0 ? _available : _mandatory)
                               .map(
                                 (t) => Padding(
                                   padding: const EdgeInsets.only(bottom: 12),
-                                  child: _HrTrainingCard(program: t),
+                                  child: _HrTrainingCard(
+                                    program: t,
+                                    onEdit: () => _editProgram(t),
+                                    onAssignDept: () => _assignDepartment(t),
+                                  ),
                                 ),
                               )
                               .toList(),
@@ -164,32 +231,35 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
 
 class _HrTrainingCard extends StatelessWidget {
   final TrainingProgram program;
-  const _HrTrainingCard({required this.program});
+  final VoidCallback onEdit;
+  final VoidCallback onAssignDept;
+  const _HrTrainingCard({required this.program, required this.onEdit, required this.onAssignDept});
 
-  Color get _catColor {
+  Color _catColor(AppColorsExtension c) {
     switch (program.category) {
       case 'Leadership':
-        return AppColors.purple;
+        return c.purple;
       case 'Behavioural':
-        return AppColors.amber;
+        return c.amber;
       default:
-        return AppColors.infoBlue;
+        return c.infoBlue;
     }
   }
 
-  Color get _catBg {
+  Color _catBg(AppColorsExtension c) {
     switch (program.category) {
       case 'Leadership':
-        return AppColors.purpleBg;
+        return c.purpleBg;
       case 'Behavioural':
-        return AppColors.amberBg;
+        return c.amberBg;
       default:
-        return AppColors.infoBlueBg;
+        return c.infoBlueBg;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -199,7 +269,7 @@ class _HrTrainingCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                 decoration: BoxDecoration(
-                  color: _catBg,
+                  color: _catBg(c),
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Text(
@@ -207,7 +277,7 @@ class _HrTrainingCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
-                    color: _catColor,
+                    color: _catColor(c),
                   ),
                 ),
               ),
@@ -219,15 +289,15 @@ class _HrTrainingCard extends StatelessWidget {
                     vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.riskHighBg,
+                    color: c.riskHighBg,
                     borderRadius: BorderRadius.circular(100),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Mandatory',
                     style: TextStyle(
                       fontSize: 10.5,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.riskHigh,
+                      color: c.riskHigh,
                     ),
                   ),
                 ),
@@ -238,15 +308,15 @@ class _HrTrainingCard extends StatelessWidget {
                     vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.amberBg,
+                    color: c.amberBg,
                     borderRadius: BorderRadius.circular(100),
                   ),
-                  child: const Text(
+                  child: Text(
                     'ML Recommended',
                     style: TextStyle(
                       fontSize: 10.5,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.amber,
+                      color: c.amber,
                     ),
                   ),
                 ),
@@ -260,52 +330,62 @@ class _HrTrainingCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             program.description,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12.5,
-              color: AppColors.textSecondary,
+              color: c.textSecondary,
               height: 1.4,
             ),
           ),
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.schedule_rounded,
                 size: 13,
-                color: AppColors.textMuted,
+                color: c.textMuted,
               ),
               const SizedBox(width: 5),
               Text(
                 program.duration,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11.5,
-                  color: AppColors.textMuted,
+                  color: c.textMuted,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               const Spacer(),
-              const Icon(
+              Icon(
                 Icons.people_outline_rounded,
                 size: 13,
-                color: AppColors.textMuted,
+                color: c.textMuted,
               ),
               const SizedBox(width: 5),
-              const Text(
+              Text(
                 '12 enrolled',
                 style: TextStyle(
                   fontSize: 11.5,
-                  color: AppColors.textMuted,
+                  color: c.textMuted,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
+          if (program.department != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.apartment_rounded, size: 13, color: c.primaryDark),
+                const SizedBox(width: 5),
+                Text('Assigned to ${program.department}', style: TextStyle(fontSize: 11.5, color: c.primaryDark, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ],
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () {},
+                  onPressed: onEdit,
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
@@ -315,7 +395,7 @@ class _HrTrainingCard extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () {},
+                  onPressed: onAssignDept,
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
@@ -334,16 +414,11 @@ class _HrTrainingCard extends StatelessWidget {
 }
 
 class _CompletionTab extends StatelessWidget {
-  final _data = const [
-    ('Hin Chen Wei', 'Engineering', 0.6, 'Workplace Data Privacy'),
-    ('Nur Aina Zulkifli', 'Design', 1.0, 'Leadership Fundamentals'),
-    ('Ramesh Kumar', 'Sales', 0.3, 'Effective Stakeholder Comm.'),
-    ('Tan Wei Ming', 'Engineering', 0.0, 'Advanced Flutter Architecture'),
-    ('Faiz Hidayat', 'Operations', 0.85, 'Time Management Essentials'),
-  ];
+  const _CompletionTab();
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       children: [
@@ -352,12 +427,12 @@ class _CompletionTab extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Overall Completion Rate',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textSecondary,
+                  color: c.textSecondary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -366,27 +441,27 @@ class _CompletionTab extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: 0.55,
                   minHeight: 10,
-                  backgroundColor: AppColors.surfaceMuted,
-                  valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+                  backgroundColor: c.surfaceMuted,
+                  valueColor: AlwaysStoppedAnimation(c.primary),
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 '55% across all active training programmes',
-                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                style: TextStyle(fontSize: 12, color: c.textMuted),
               ),
             ],
           ),
         ),
         const SizedBox(height: 16),
         const SectionHeader(title: 'Employee Progress'),
-        ..._data.map((d) {
-          final initials = d.$1.split(' ').map((w) => w[0]).take(2).join();
-          final color = d.$3 >= 1.0
-              ? AppColors.primary
-              : d.$3 >= 0.5
-              ? AppColors.amber
-              : AppColors.riskHigh;
+        ...DummyData.trainingCompletionRecords.map((d) {
+          final initials = d.employeeName.split(' ').map((w) => w[0]).take(2).join();
+          final color = d.progress >= 1.0
+              ? c.primary
+              : d.progress >= 0.5
+              ? c.amber
+              : c.riskHigh;
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: AppCard(
@@ -399,26 +474,26 @@ class _CompletionTab extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          d.$1,
+                          d.employeeName,
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                         Text(
-                          d.$4,
-                          style: const TextStyle(
+                          d.programTitle,
+                          style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.textMuted,
+                            color: c.textMuted,
                           ),
                         ),
                         const SizedBox(height: 6),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(100),
                           child: LinearProgressIndicator(
-                            value: d.$3,
+                            value: d.progress,
                             minHeight: 6,
-                            backgroundColor: AppColors.surfaceMuted,
+                            backgroundColor: c.surfaceMuted,
                             valueColor: AlwaysStoppedAnimation(color),
                           ),
                         ),
@@ -426,13 +501,23 @@ class _CompletionTab extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    '${(d.$3 * 100).toInt()}%',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: color,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '${(d.progress * 100).toInt()}%',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: color,
+                        ),
+                      ),
+                      if (d.performanceScore != null)
+                        Text(
+                          'Score: ${d.performanceScore!.toInt()}',
+                          style: TextStyle(fontSize: 10.5, color: c.textMuted, fontWeight: FontWeight.w600),
+                        ),
+                    ],
                   ),
                 ],
               ),
@@ -445,25 +530,31 @@ class _CompletionTab extends StatelessWidget {
 }
 
 class _CreateProgramSheet extends StatefulWidget {
-  const _CreateProgramSheet();
+  final TrainingProgram? existing;
+  final ValueChanged<TrainingProgram> onSaved;
+
+  const _CreateProgramSheet({this.existing, required this.onSaved});
 
   @override
   State<_CreateProgramSheet> createState() => _CreateProgramSheetState();
 }
 
 class _CreateProgramSheetState extends State<_CreateProgramSheet> {
-  final _title = TextEditingController();
-  final _desc = TextEditingController();
-  final _duration = TextEditingController();
-  String _category = 'Technical';
-  bool _mandatory = false;
+  late final _title = TextEditingController(text: widget.existing?.title);
+  late final _desc = TextEditingController(text: widget.existing?.description);
+  late final _duration = TextEditingController(text: widget.existing?.duration);
+  late String _category = widget.existing?.category ?? 'Technical';
+  late bool _mandatory = widget.existing?.isMandatory ?? false;
   bool _saving = false;
+
+  bool get _isEditing => widget.existing != null;
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
+      decoration: BoxDecoration(
+        color: c.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       padding: EdgeInsets.fromLTRB(
@@ -482,15 +573,15 @@ class _CreateProgramSheetState extends State<_CreateProgramSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: AppColors.border,
+                  color: c.border,
                   borderRadius: BorderRadius.circular(100),
                 ),
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Create Training Program',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            Text(
+              _isEditing ? 'Edit Training Program' : 'Create Training Program',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 20),
 
@@ -514,22 +605,22 @@ class _CreateProgramSheetState extends State<_CreateProgramSheet> {
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
-              children: ['Technical', 'Behavioural', 'Leadership'].map((c) {
-                final sel = _category == c;
+              children: ['Technical', 'Behavioural', 'Leadership'].map((cat) {
+                final sel = _category == cat;
                 return ChoiceChip(
-                  label: Text(c),
+                  label: Text(cat),
                   selected: sel,
-                  onSelected: (_) => setState(() => _category = c),
-                  selectedColor: AppColors.primaryLight,
+                  onSelected: (_) => setState(() => _category = cat),
+                  selectedColor: c.primaryLight,
                   labelStyle: TextStyle(
                     color: sel
-                        ? AppColors.primaryDark
-                        : AppColors.textSecondary,
+                        ? c.primaryDark
+                        : c.textSecondary,
                     fontWeight: FontWeight.w700,
                     fontSize: 12.5,
                   ),
                   side: BorderSide(
-                    color: sel ? AppColors.primary : Colors.transparent,
+                    color: sel ? c.primary : Colors.transparent,
                   ),
                 );
               }).toList(),
@@ -558,12 +649,12 @@ class _CreateProgramSheetState extends State<_CreateProgramSheet> {
             const SizedBox(height: 8),
             TextField(
               controller: _duration,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'e.g. 2 weeks · Self-paced',
                 prefixIcon: Icon(
                   Icons.schedule_rounded,
                   size: 18,
-                  color: AppColors.textMuted,
+                  color: c.textMuted,
                 ),
               ),
             ),
@@ -579,24 +670,38 @@ class _CreateProgramSheetState extends State<_CreateProgramSheet> {
                 Switch(
                   value: _mandatory,
                   onChanged: (v) => setState(() => _mandatory = v),
-                  activeThumbColor: AppColors.primary,
+                  activeThumbColor: c.primary,
                 ),
               ],
             ),
             const SizedBox(height: 20),
 
             PrimaryButton(
-              label: 'Create Program',
-              icon: Icons.school_rounded,
+              label: _isEditing ? 'Save Changes' : 'Create Program',
+              icon: _isEditing ? Icons.save_rounded : Icons.school_rounded,
               onPressed: () {
                 setState(() => _saving = true);
                 Future.delayed(const Duration(milliseconds: 700), () {
                   if (!mounted) return;
+                  final result = TrainingProgram(
+                    title: _title.text,
+                    category: _category,
+                    description: _desc.text,
+                    isMandatory: _mandatory,
+                    isRecommended: widget.existing?.isRecommended ?? false,
+                    recommendationReason: widget.existing?.recommendationReason,
+                    progress: widget.existing?.progress ?? 0,
+                    duration: _duration.text,
+                    isCompleted: widget.existing?.isCompleted ?? false,
+                    performanceScore: widget.existing?.performanceScore,
+                    department: widget.existing?.department,
+                  );
+                  widget.onSaved(result);
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
+                    SnackBar(
                       content: Text(
-                        '✓ Training programme created successfully',
+                        _isEditing ? '✓ Training programme updated successfully' : '✓ Training programme created successfully',
                       ),
                     ),
                   );

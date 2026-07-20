@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../../core/data/dummy_data.dart';
+import '../../../model/models.dart';
 
 class HrPeScreen extends StatefulWidget {
   const HrPeScreen({super.key});
@@ -12,48 +14,80 @@ class HrPeScreen extends StatefulWidget {
 }
 
 class _HrPeScreenState extends State<HrPeScreen> {
-  final _selectedEmployee = DummyData.teamOverview[0];
+  late TeamMemberSummary _selectedEmployee;
+  late KpiTemplate _selectedTemplate;
   final _year = '2026';
   bool _isSubmitting = false;
 
-  // KPI scores — editable sliders
-  final List<Map<String, dynamic>> _kpis = [
-    {
-      'name': 'Attendance Rate',
-      'weightage': 20.0,
-      'score': 92.0,
-      'category': 'Operational',
-    },
-    {
-      'name': 'Task Delivery Quality',
-      'weightage': 30.0,
-      'score': 88.0,
-      'category': 'Technical',
-    },
-    {
-      'name': 'Project Output',
-      'weightage': 25.0,
-      'score': 81.0,
-      'category': 'Technical',
-    },
-    {
-      'name': 'Teamwork & Communication',
-      'weightage': 15.0,
-      'score': 74.0,
-      'category': 'Behavioural',
-    },
-    {
-      'name': 'Leadership Initiative',
-      'weightage': 10.0,
-      'score': 58.0,
-      'category': 'Leadership',
-    },
-  ];
+  late List<Map<String, dynamic>> _kpis;
 
-  final _commentsController = TextEditingController(
-    text:
-        'Strong technical delivery this cycle. Continue developing stakeholder communication skills.',
-  );
+  final _commentsController = TextEditingController();
+
+  String _categoryFor(String kpiName) {
+    if (kpiName.contains('Leadership')) return 'Leadership';
+    if (kpiName.contains('Team') || kpiName.contains('Communication') || kpiName.contains('Customer')) return 'Behavioural';
+    if (kpiName.contains('Attendance')) return 'Operational';
+    return 'Technical';
+  }
+
+  KpiTemplate _templateFor(String department) {
+    final match = DummyData.kpiTemplates.where((t) => t.department == department);
+    if (match.isNotEmpty) return match.first;
+    return DummyData.kpiTemplates.firstWhere((t) => t.department == 'All Departments', orElse: () => DummyData.kpiTemplates.last);
+  }
+
+  void _loadTemplate(KpiTemplate template) {
+    _selectedTemplate = template;
+    _kpis = template.items
+        .map((i) => {
+              'name': i.name,
+              'weightage': i.weightage,
+              'score': 70.0,
+              'category': _categoryFor(i.name),
+            })
+        .toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedEmployee = DummyData.teamOverview[0];
+    _loadTemplate(_templateFor(_selectedEmployee.department));
+    _commentsController.text = 'Strong technical delivery this cycle. Continue developing stakeholder communication skills.';
+  }
+
+  void _pickEmployee() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PickerSheet<TeamMemberSummary>(
+        title: 'Select Employee',
+        items: DummyData.teamOverview,
+        labelBuilder: (e) => e.name,
+        subtitleBuilder: (e) => '${e.jobTitle} · ${e.department}',
+        onSelected: (e) => setState(() {
+          _selectedEmployee = e;
+          _loadTemplate(_templateFor(e.department));
+        }),
+      ),
+    );
+  }
+
+  void _pickTemplate() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PickerSheet<KpiTemplate>(
+        title: 'Select KPI Template',
+        items: DummyData.kpiTemplates,
+        labelBuilder: (t) => t.name,
+        subtitleBuilder: (t) => '${t.department} · ${t.items.length} KPIs',
+        onSelected: (t) => setState(() => _loadTemplate(t)),
+      ),
+    );
+  }
 
   double get _weightedTotal {
     double total = 0;
@@ -63,10 +97,10 @@ class _HrPeScreenState extends State<HrPeScreen> {
     return total;
   }
 
-  Color _scoreColor(double score) {
-    if (score >= 80) return AppColors.primary;
-    if (score >= 60) return AppColors.amber;
-    return AppColors.riskHigh;
+  Color _scoreColor(double score, AppColorsExtension c) {
+    if (score >= 80) return c.primary;
+    if (score >= 60) return c.amber;
+    return c.riskHigh;
   }
 
   void _submit() {
@@ -128,6 +162,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Scaffold(
       appBar: AppBar(title: const Text('Performance Evaluation')),
       body: SafeArea(
@@ -137,6 +172,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
           children: [
             // Employee + Year selector
             AppCard(
+              onTap: _pickEmployee,
               child: Row(
                 children: [
                   InitialsAvatar(
@@ -157,9 +193,9 @@ class _HrPeScreenState extends State<HrPeScreen> {
                         ),
                         Text(
                           _selectedEmployee.department,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textSecondary,
+                            color: c.textSecondary,
                           ),
                         ),
                       ],
@@ -171,7 +207,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
+                      color: c.primaryLight,
                       borderRadius: BorderRadius.circular(100),
                     ),
                     child: Text(
@@ -183,7 +219,28 @@ class _HrPeScreenState extends State<HrPeScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 6),
+                  Icon(Icons.unfold_more_rounded, size: 18, color: c.textMuted),
                 ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            InkWell(
+              onTap: _pickTemplate,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+                child: Row(
+                  children: [
+                    Icon(Icons.fact_check_outlined, size: 16, color: c.textSecondary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text('KPI Template: ${_selectedTemplate.name}', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.textPrimary)),
+                    ),
+                    Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: c.primary)),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -193,12 +250,13 @@ class _HrPeScreenState extends State<HrPeScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: AppColors.kpiGradient,
+                gradient: LinearGradient(
+                  colors: c.kpiGradient,
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(16),
+                boxShadow: [c.shadowTinted()],
               ),
               child: Row(
                 children: [
@@ -217,6 +275,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
                           fontSize: 40,
                           fontWeight: FontWeight.w900,
                           height: 1,
+                          fontFeatures: [FontFeature.tabularFigures()],
                         ),
                       ),
                       const Text(
@@ -247,13 +306,13 @@ class _HrPeScreenState extends State<HrPeScreen> {
               final i = e.key;
               final kpi = e.value;
               final score = kpi['score'] as double;
-              final color = _scoreColor(score);
+              final color = _scoreColor(score, c);
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: c.surface,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
+                  boxShadow: [c.shadowNeutral],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -276,9 +335,9 @@ class _HrPeScreenState extends State<HrPeScreen> {
                                 const SizedBox(height: 2),
                                 Text(
                                   '${(kpi['weightage'] as double).toInt()}% weight  ·  ${kpi['category']}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11.5,
-                                    color: AppColors.textMuted,
+                                    color: c.textMuted,
                                   ),
                                 ),
                               ],
@@ -299,6 +358,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
                                 fontSize: 13,
                                 fontWeight: FontWeight.w900,
                                 color: color,
+                                fontFeatures: const [FontFeature.tabularFigures()],
                               ),
                             ),
                           ),
@@ -331,23 +391,23 @@ class _HrPeScreenState extends State<HrPeScreen> {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.amberBg,
+                            color: c.amberBg,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(
+                              Icon(
                                 Icons.auto_awesome_rounded,
                                 size: 13,
-                                color: AppColors.amber,
+                                color: c.amber,
                               ),
                               const SizedBox(width: 6),
                               Text(
                                 'Training recommendation will be triggered for ${kpi['category']}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
-                                  color: AppColors.amber,
+                                  color: c.amber,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -387,13 +447,13 @@ class _HrPeScreenState extends State<HrPeScreen> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: AppColors.surfaceMuted,
+                          color: c.surfaceMuted,
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.calendar_month_rounded,
                           size: 16,
-                          color: AppColors.textSecondary,
+                          color: c.textSecondary,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -408,18 +468,19 @@ class _HrPeScreenState extends State<HrPeScreen> {
                       ),
                       Text(
                         pe.weightedTotal.toStringAsFixed(1),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w900,
-                          color: AppColors.primary,
+                          color: c.primary,
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Text(
+                      Text(
                         '/ 100',
                         style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.textMuted,
+                          color: c.textMuted,
                         ),
                       ),
                     ],
@@ -437,6 +498,62 @@ class _HrPeScreenState extends State<HrPeScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PickerSheet<T> extends StatelessWidget {
+  final String title;
+  final List<T> items;
+  final String Function(T) labelBuilder;
+  final String Function(T) subtitleBuilder;
+  final ValueChanged<T> onSelected;
+
+  const _PickerSheet({
+    required this.title,
+    required this.items,
+    required this.labelBuilder,
+    required this.subtitleBuilder,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 16),
+          Flexible(
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (_, i) {
+                final item = items[i];
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(labelBuilder(item), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                  subtitle: Text(subtitleBuilder(item), style: TextStyle(fontSize: 12, color: c.textMuted)),
+                  onTap: () {
+                    onSelected(item);
+                    Navigator.of(context).pop();
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
