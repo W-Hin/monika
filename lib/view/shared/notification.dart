@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_colors_extension.dart';
 import 'widgets/common_widgets.dart';
 
@@ -101,6 +100,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Scaffold(
       appBar: AppBar(
         title: Row(
@@ -111,7 +111,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.riskHigh,
+                  color: c.riskHigh,
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Text(
@@ -149,16 +149,16 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 itemBuilder: (_, i) {
                   final n = _notifs[i];
                   final isRead = _readState[i];
-                  final (color, bg) = resolveHue(context.colors, n.hue);
+                  final (color, bg) = resolveHue(c, n.hue);
                   return GestureDetector(
                     onTap: () => setState(() => _readState[i] = true),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: c.surface,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: isRead
-                              ? AppColors.border
+                              ? c.border
                               : color.withOpacity(0.3),
                         ),
                       ),
@@ -192,24 +192,24 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                           fontWeight: isRead
                                               ? FontWeight.w600
                                               : FontWeight.w800,
-                                          color: AppColors.textPrimary,
+                                          color: c.textPrimary,
                                         ),
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
                                         n.body,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 12.5,
-                                          color: AppColors.textSecondary,
+                                          color: c.textSecondary,
                                           height: 1.4,
                                         ),
                                       ),
                                       const SizedBox(height: 6),
                                       Text(
                                         n.time,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 11,
-                                          color: AppColors.textMuted,
+                                          color: c.textMuted,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),

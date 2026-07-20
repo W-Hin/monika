@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_colors_extension.dart';
 import '../shared/widgets/common_widgets.dart';
 
@@ -60,6 +59,7 @@ class _CompanyCalendarScreenState extends State<CompanyCalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final filtered = _filtered;
 
     // Group by month
@@ -82,11 +82,11 @@ class _CompanyCalendarScreenState extends State<CompanyCalendarScreen> {
                 children: [
                   Row(
                     children: [
-                      Expanded(child: StatCard(label: 'Public Holidays', value: '$_holidayCount', icon: Icons.flag_rounded, iconColor: AppColors.primary, iconBg: AppColors.primaryLight)),
+                      Expanded(child: StatCard(label: 'Public Holidays', value: '$_holidayCount', icon: Icons.flag_rounded, iconColor: c.primary, iconBg: c.primaryLight)),
                       const SizedBox(width: 12),
-                      Expanded(child: StatCard(label: 'Company Events', value: '$_eventCount', icon: Icons.groups_rounded, iconColor: AppColors.infoBlue, iconBg: AppColors.infoBlueBg)),
+                      Expanded(child: StatCard(label: 'Company Events', value: '$_eventCount', icon: Icons.groups_rounded, iconColor: c.infoBlue, iconBg: c.infoBlueBg)),
                       const SizedBox(width: 12),
-                      Expanded(child: StatCard(label: 'HR Events', value: '${_events.where((e) => e.type == 'HR Event').length}', icon: Icons.insights_rounded, iconColor: AppColors.amber, iconBg: AppColors.amberBg)),
+                      Expanded(child: StatCard(label: 'HR Events', value: '${_events.where((e) => e.type == 'HR Event').length}', icon: Icons.insights_rounded, iconColor: c.amber, iconBg: c.amberBg)),
                     ],
                   ),
                   const SizedBox(height: 14),
@@ -103,10 +103,10 @@ class _CompanyCalendarScreenState extends State<CompanyCalendarScreen> {
                               duration: const Duration(milliseconds: 200),
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                               decoration: BoxDecoration(
-                                color: sel ? AppColors.primary : AppColors.surfaceMuted,
+                                color: sel ? c.primary : c.surfaceMuted,
                                 borderRadius: BorderRadius.circular(100),
                               ),
-                              child: Text(f, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: sel ? Colors.white : AppColors.textSecondary)),
+                              child: Text(f, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: sel ? Colors.white : c.textSecondary)),
                             ),
                           ),
                         );
@@ -131,7 +131,7 @@ class _CompanyCalendarScreenState extends State<CompanyCalendarScreen> {
                         padding: const EdgeInsets.only(bottom: 10),
                         child: Text(
                           entry.key,
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: c.textPrimary),
                         ),
                       ),
                       ...entry.value.map((e) => Padding(
@@ -157,7 +157,8 @@ class _EventTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (color, bg) = resolveHue(context.colors, event.hue);
+    final c = context.colors;
+    final (color, bg) = resolveHue(c, event.hue);
     return AppCard(
       child: Row(
         children: [
@@ -176,11 +177,11 @@ class _EventTile extends StatelessWidget {
                 const SizedBox(height: 3),
                 Row(
                   children: [
-                    const Icon(Icons.calendar_today_rounded, size: 12, color: AppColors.textMuted),
+                    Icon(Icons.calendar_today_rounded, size: 12, color: c.textMuted),
                     const SizedBox(width: 5),
                     Text(
                       event.endDate != null ? '${event.date} – ${event.endDate}' : event.date,
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                      style: TextStyle(fontSize: 12, color: c.textSecondary, fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
