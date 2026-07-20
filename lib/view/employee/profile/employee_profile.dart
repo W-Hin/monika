@@ -1,19 +1,104 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors_extension.dart';
+import '../../../main.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../core/data/dummy_data.dart';
 import '../../auth/login_screen.dart';
+import '../../shared/company_calendar.dart';
+import '../../shared/settings_placeholder.dart';
 
-class EmployeeProfileScreen extends StatelessWidget {
+class EmployeeProfileScreen extends StatefulWidget {
   const EmployeeProfileScreen({super.key});
 
   @override
+  State<EmployeeProfileScreen> createState() => _EmployeeProfileScreenState();
+}
+
+class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
+  bool _isEditing = false;
+  late TextEditingController _emailController;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: DummyData.employeeUser.email);
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  void _saveEdits() {
+    setState(() {
+      DummyData.employeeUser = DummyData.employeeUser.copyWith(email: _emailController.text.trim());
+      _isEditing = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('✓ Profile updated successfully')),
+    );
+  }
+
+  void _requestDeviceChange() {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Request Device Change', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'This request will be sent to HR for approval before your registered device is reset.',
+              style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              maxLines: 3,
+              decoration: const InputDecoration(hintText: 'Reason, e.g. lost/replaced phone'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('✓ Device change request submitted to HR')),
+              );
+            },
+            child: const Text('Submit Request'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final user = DummyData.employeeUser;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(
+        title: const Text('Profile'),
+        actions: [
+          if (!_isEditing)
+            IconButton(
+              onPressed: () => setState(() => _isEditing = true),
+              icon: const Icon(Icons.edit_outlined),
+            )
+          else
+            TextButton(onPressed: _saveEdits, child: const Text('Save')),
+        ],
+      ),
       body: SafeArea(
         top: false,
         child: ListView(
@@ -26,7 +111,7 @@ class EmployeeProfileScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   Text(user.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
                   const SizedBox(height: 2),
-                  Text('${user.role} · ${user.department}', style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+                  Text('${user.role} · ${user.department}', style: TextStyle(fontSize: 12.5, color: c.textSecondary)),
                   const SizedBox(height: 10),
                   StatusPill.risk(user.riskLevel),
                 ],
@@ -41,7 +126,16 @@ class EmployeeProfileScreen extends StatelessWidget {
                 children: [
                   _InfoRow(icon: Icons.badge_outlined, label: 'Employee ID', value: user.id),
                   const Divider(height: 1, indent: 56),
-                  _InfoRow(icon: Icons.mail_outline_rounded, label: 'Email', value: user.email),
+                  _isEditing
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: TextField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: const InputDecoration(labelText: 'Email', isDense: true),
+                          ),
+                        )
+                      : _InfoRow(icon: Icons.mail_outline_rounded, label: 'Email', value: user.email),
                   const Divider(height: 1, indent: 56),
                   _InfoRow(icon: Icons.apartment_rounded, label: 'Department', value: user.department),
                   const Divider(height: 1, indent: 56),
@@ -57,21 +151,21 @@ class EmployeeProfileScreen extends StatelessWidget {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.phone_iphone_rounded, color: AppColors.primaryDark, size: 20),
+                    decoration: BoxDecoration(color: c.primaryLight, borderRadius: BorderRadius.circular(12)),
+                    child: Icon(Icons.phone_iphone_rounded, color: c.primaryDark, size: 20),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('iPhone 15 Pro', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
-                        SizedBox(height: 2),
-                        Text('Bound since 12 Jan 2025', style: TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
+                        Text(user.registeredDevice, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 2),
+                        Text('Bound since ${user.deviceBoundSince}', style: TextStyle(fontSize: 11.5, color: c.textMuted)),
                       ],
                     ),
                   ),
-                  TextButton(onPressed: () {}, child: const Text('Request Change')),
+                  TextButton(onPressed: _requestDeviceChange, child: const Text('Request Change')),
                 ],
               ),
             ),
@@ -82,13 +176,31 @@ class EmployeeProfileScreen extends StatelessWidget {
               padding: EdgeInsets.zero,
               child: Column(
                 children: [
-                  _MenuRow(icon: Icons.notifications_none_rounded, label: 'Notification Preferences', onTap: () {}),
+                  _DarkModeRow(),
                   const Divider(height: 1, indent: 56),
-                  _MenuRow(icon: Icons.calendar_month_outlined, label: 'Company Calendar', onTap: () {}),
+                  _MenuRow(
+                    icon: Icons.notifications_none_rounded,
+                    label: 'Notification Preferences',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPlaceholderScreen(title: 'Notification Preferences', icon: Icons.notifications_none_rounded))),
+                  ),
                   const Divider(height: 1, indent: 56),
-                  _MenuRow(icon: Icons.lock_outline_rounded, label: 'Change Password', onTap: () {}),
+                  _MenuRow(
+                    icon: Icons.calendar_month_outlined,
+                    label: 'Company Calendar',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CompanyCalendarScreen())),
+                  ),
                   const Divider(height: 1, indent: 56),
-                  _MenuRow(icon: Icons.help_outline_rounded, label: 'Help & Support', onTap: () {}),
+                  _MenuRow(
+                    icon: Icons.lock_outline_rounded,
+                    label: 'Change Password',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPlaceholderScreen(title: 'Change Password', icon: Icons.lock_outline_rounded))),
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _MenuRow(
+                    icon: Icons.help_outline_rounded,
+                    label: 'Help & Support',
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPlaceholderScreen(title: 'Help & Support', icon: Icons.help_outline_rounded))),
+                  ),
                 ],
               ),
             ),
@@ -103,11 +215,11 @@ class EmployeeProfileScreen extends StatelessWidget {
                         (route) => false,
                   );
                 },
-                icon: const Icon(Icons.logout_rounded, size: 18, color: AppColors.riskHigh),
+                icon: Icon(Icons.logout_rounded, size: 18, color: c.riskHigh),
                 label: const Text('Log Out'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.riskHigh,
-                  side: const BorderSide(color: AppColors.riskHigh),
+                  foregroundColor: c.riskHigh,
+                  side: BorderSide(color: c.riskHigh),
                 ),
               ),
             ),
@@ -126,18 +238,19 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: AppColors.textMuted),
+          Icon(icon, size: 18, color: c.textMuted),
           const SizedBox(width: 14),
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
+          Expanded(child: Text(label, style: TextStyle(fontSize: 13, color: c.textSecondary))),
           Flexible(
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -155,16 +268,44 @@ class _MenuRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: AppColors.textSecondary),
+            Icon(icon, size: 18, color: c.textSecondary),
             const SizedBox(width: 14),
             Expanded(child: Text(label, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600))),
-            const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
+            Icon(Icons.chevron_right_rounded, size: 18, color: c.textMuted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DarkModeRow extends StatelessWidget {
+  const _DarkModeRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeController,
+      builder: (context, mode, _) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            Icon(Icons.dark_mode_outlined, size: 18, color: c.textSecondary),
+            const SizedBox(width: 14),
+            Expanded(child: Text('Dark Mode', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: c.textPrimary))),
+            Switch(
+              value: mode == ThemeMode.dark,
+              onChanged: (_) => themeController.toggle(),
+              activeThumbColor: c.primary,
+            ),
           ],
         ),
       ),
