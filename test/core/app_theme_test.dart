@@ -15,6 +15,6 @@ void main() {
   test('OutlinedButton has no visible border (tinted-fill style)', () {
     final style = AppTheme.light.outlinedButtonTheme.style;
     final side = style?.side?.resolve({});
-    expect(side, isNull);
+    expect(side, BorderSide.none);
   });
 }
