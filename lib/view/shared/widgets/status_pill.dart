@@ -2,39 +2,39 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../../model/models.dart';
 
-class StatusPill extends StatelessWidget {
+class _StatusStyle {
   final String label;
   final Color color;
   final Color background;
   final IconData? icon;
+  const _StatusStyle(this.label, this.color, this.background, this.icon);
+}
 
-  const StatusPill({super.key, required this.label, required this.color, required this.background, this.icon});
+class StatusPill extends StatelessWidget {
+  final _StatusStyle Function(AppColorsExtension) _resolve;
 
-  static StatusPill risk(BuildContext context, RiskLevel level) {
-    final c = context.colors;
-    return _riskPill(level, (label, color, background, icon) => StatusPill(label: label, color: color, background: background, icon: icon), c);
-  }
+  const StatusPill._(this._resolve, {super.key});
 
-  static StatusPill leave(BuildContext context, LeaveStatus status) {
-    final c = context.colors;
-    return _leavePill(status, (label, color, background, icon) => StatusPill(label: label, color: color, background: background, icon: icon), c);
-  }
+  static StatusPill risk(RiskLevel level) =>
+      StatusPill._((c) => _riskPill(level, _StatusStyle.new, c));
 
-  static StatusPill attendance(BuildContext context, AttendanceStatus status) {
-    final c = context.colors;
-    return _attendancePill(status, (label, color, background, icon) => StatusPill(label: label, color: color, background: background, icon: icon), c);
-  }
+  static StatusPill leave(LeaveStatus status) =>
+      StatusPill._((c) => _leavePill(status, _StatusStyle.new, c));
+
+  static StatusPill attendance(AttendanceStatus status) =>
+      StatusPill._((c) => _attendancePill(status, _StatusStyle.new, c));
 
   @override
   Widget build(BuildContext context) {
+    final style = _resolve(context.colors);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(100)),
+      decoration: BoxDecoration(color: style.background, borderRadius: BorderRadius.circular(100)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (icon != null) ...[Icon(icon, size: 13, color: color), const SizedBox(width: 4)],
-          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
+          if (style.icon != null) ...[Icon(style.icon, size: 13, color: style.color), const SizedBox(width: 4)],
+          Text(style.label, style: TextStyle(color: style.color, fontSize: 12, fontWeight: FontWeight.w700)),
         ],
       ),
     );
