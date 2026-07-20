@@ -369,7 +369,7 @@ class _AttendanceTile extends StatelessWidget {
               ],
             ),
           ),
-          StatusPill.attendance(record.status),
+          StatusDot.attendance(context, record.status),
         ],
       ),
     );

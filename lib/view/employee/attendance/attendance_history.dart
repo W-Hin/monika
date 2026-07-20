@@ -81,7 +81,7 @@ class _HistoryRow extends StatelessWidget {
           Row(
             children: [
               Expanded(child: Text(record.date, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: c.textPrimary))),
-              StatusPill.attendance(record.status),
+              StatusDot.attendance(context, record.status),
             ],
           ),
           const SizedBox(height: 10),

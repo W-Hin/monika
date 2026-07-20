@@ -131,7 +131,7 @@ class _EmployeeRow extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                StatusPill.risk(emp.risk),
+                StatusDot.risk(context, emp.risk),
                 const SizedBox(height: 4),
                 Text('${(emp.attendanceRate * 100).toInt()}% attendance', style: TextStyle(fontSize: 11, color: c.textMuted, fontFeatures: const [FontFeature.tabularFigures()])),
               ],

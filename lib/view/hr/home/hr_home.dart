@@ -328,7 +328,7 @@ class _AnomalyTile extends StatelessWidget {
               ],
             ),
           ),
-          StatusPill.risk(event.severity),
+          StatusDot.risk(context, event.severity),
         ],
       ),
     );

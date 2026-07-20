@@ -112,7 +112,7 @@ class _LeaveTile extends StatelessWidget {
               Expanded(
                 child: Text(app.leaveType, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800)),
               ),
-              StatusPill.leave(app.status),
+              StatusDot.leave(context, app.status),
             ],
           ),
           const SizedBox(height: 8),

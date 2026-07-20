@@ -330,7 +330,7 @@ class _ProcessedRow extends StatelessWidget {
               ],
             ),
           ),
-          StatusPill.leave(app.status),
+          StatusDot.leave(context, app.status),
         ],
       ),
     );

@@ -175,7 +175,7 @@ class _AnomalyCard extends StatelessWidget {
                   ],
                 ),
               ),
-              StatusPill.risk(event.severity),
+              StatusDot.risk(context, event.severity),
             ],
           ),
           const SizedBox(height: 12),

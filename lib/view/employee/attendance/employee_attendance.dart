@@ -114,7 +114,7 @@ class EmployeeAttendanceScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                    StatusPill.attendance(r.status),
+                    StatusDot.attendance(context, r.status),
                   ],
                 ),
               ),
