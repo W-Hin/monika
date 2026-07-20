@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
@@ -8,15 +8,16 @@ import '../../../model/models.dart';
 import '../analytics/anomaly_detail.dart';
 import '../approvals/hr_approvals.dart';
 import '../analytics/hr_analytics.dart';
-import '../employees/hr_employees.dart';
 import '../employees/add_employee.dart';
 import '../policy/policy_config.dart';
+import '../../shared/notification.dart';
 
 class HrHomeScreen extends StatelessWidget {
   const HrHomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final user = DummyData.hrUser;
 
     return Scaffold(
@@ -25,7 +26,9 @@ class HrHomeScreen extends StatelessWidget {
         name: user.name,
         initials: user.avatarInitials,
         notificationCount: 3,
-        onNotificationTap: () {},
+        onNotificationTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const NotificationScreen()),
+        ),
       ),
       body: SafeArea(
         top: false,
@@ -44,30 +47,30 @@ class HrHomeScreen extends StatelessWidget {
                   label: 'Total Employees',
                   value: '${DummyData.totalEmployees}',
                   icon: Icons.groups_rounded,
-                  iconColor: AppColors.primary,
-                  iconBg: AppColors.primaryLight,
+                  iconColor: c.primary,
+                  iconBg: c.primaryLight,
                 ),
                 StatCard(
                   label: 'Attendance Rate',
                   value: '${(DummyData.overallAttendanceRate * 100).toInt()}%',
                   icon: Icons.event_available_rounded,
-                  iconColor: AppColors.infoBlue,
-                  iconBg: AppColors.infoBlueBg,
+                  iconColor: c.infoBlue,
+                  iconBg: c.infoBlueBg,
                   trend: '+1.2%',
                 ),
                 StatCard(
                   label: 'Pending Approvals',
                   value: '${DummyData.pendingLeaveCount}',
                   icon: Icons.pending_actions_rounded,
-                  iconColor: AppColors.amber,
-                  iconBg: AppColors.amberBg,
+                  iconColor: c.amber,
+                  iconBg: c.amberBg,
                 ),
                 StatCard(
                   label: 'Flagged Today',
                   value: '${DummyData.flaggedEventsToday}',
                   icon: Icons.flag_rounded,
-                  iconColor: AppColors.riskHigh,
-                  iconBg: AppColors.riskHighBg,
+                  iconColor: c.riskHigh,
+                  iconBg: c.riskHighBg,
                 ),
               ],
             ),
@@ -82,15 +85,15 @@ class HrHomeScreen extends StatelessWidget {
                     children: [
                       Expanded(
                         flex: DummyData.riskDistribution[RiskLevel.low]!,
-                        child: Container(height: 10, decoration: const BoxDecoration(color: AppColors.riskLow, borderRadius: BorderRadius.horizontal(left: Radius.circular(6)))),
+                        child: Container(height: 10, decoration: BoxDecoration(color: c.riskLow, borderRadius: const BorderRadius.horizontal(left: Radius.circular(6)))),
                       ),
                       Expanded(
                         flex: DummyData.riskDistribution[RiskLevel.medium]!,
-                        child: Container(height: 10, color: AppColors.riskMedium),
+                        child: Container(height: 10, color: c.riskMedium),
                       ),
                       Expanded(
                         flex: DummyData.riskDistribution[RiskLevel.high]!,
-                        child: Container(height: 10, decoration: const BoxDecoration(color: AppColors.riskHigh, borderRadius: BorderRadius.horizontal(right: Radius.circular(6)))),
+                        child: Container(height: 10, decoration: BoxDecoration(color: c.riskHigh, borderRadius: const BorderRadius.horizontal(right: Radius.circular(6)))),
                       ),
                     ],
                   ),
@@ -98,9 +101,9 @@ class HrHomeScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _LegendDot(color: AppColors.riskLow, label: 'Low', value: '${DummyData.riskDistribution[RiskLevel.low]}'),
-                      _LegendDot(color: AppColors.riskMedium, label: 'Medium', value: '${DummyData.riskDistribution[RiskLevel.medium]}'),
-                      _LegendDot(color: AppColors.riskHigh, label: 'High', value: '${DummyData.riskDistribution[RiskLevel.high]}'),
+                      _LegendDot(color: c.riskLow, label: 'Low', value: '${DummyData.riskDistribution[RiskLevel.low]}'),
+                      _LegendDot(color: c.riskMedium, label: 'Medium', value: '${DummyData.riskDistribution[RiskLevel.medium]}'),
+                      _LegendDot(color: c.riskHigh, label: 'High', value: '${DummyData.riskDistribution[RiskLevel.high]}'),
                     ],
                   ),
                 ],
@@ -115,8 +118,8 @@ class HrHomeScreen extends StatelessWidget {
                   child: _QuickAction(
                     icon: Icons.fact_check_outlined,
                     label: 'Approvals',
-                    color: AppColors.infoBlue,
-                    bg: AppColors.infoBlueBg,
+                    color: c.infoBlue,
+                    bg: c.infoBlueBg,
                     badge: DummyData.pendingLeaveCount,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HrApprovalsScreen())),
                   ),
@@ -126,8 +129,8 @@ class HrHomeScreen extends StatelessWidget {
                   child: _QuickAction(
                     icon: Icons.person_add_alt_outlined,
                     label: 'Add Employee',
-                    color: AppColors.primary,
-                    bg: AppColors.primaryLight,
+                    color: c.primary,
+                    bg: c.primaryLight,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddEmployeeScreen())),
                   ),
                 ),
@@ -136,8 +139,8 @@ class HrHomeScreen extends StatelessWidget {
                   child: _QuickAction(
                     icon: Icons.tune_rounded,
                     label: 'Policies',
-                    color: AppColors.purple,
-                    bg: AppColors.purpleBg,
+                    color: c.purple,
+                    bg: c.purpleBg,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PolicyConfigScreen())),
                   ),
                 ),
@@ -175,18 +178,18 @@ class HrHomeScreen extends StatelessWidget {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('${(v * 100).toInt()}', style: const TextStyle(fontSize: 9, color: AppColors.textMuted, fontWeight: FontWeight.w700)),
+                            Text('${(v * 100).toInt()}', style: TextStyle(fontSize: 9, color: c.textMuted, fontWeight: FontWeight.w700, fontFeatures: const [FontFeature.tabularFigures()])),
                             const SizedBox(height: 4),
                             AnimatedContainer(
                               duration: const Duration(milliseconds: 400),
                               height: 70 * v,
                               decoration: BoxDecoration(
-                                color: i == 4 ? AppColors.primary : AppColors.primary.withOpacity(0.35),
+                                color: i == 4 ? c.primary : c.primary.withValues(alpha: 0.35),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                             ),
                             const SizedBox(height: 6),
-                            Text(DummyData.weekdayLabels[i], style: const TextStyle(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                            Text(DummyData.weekdayLabels[i], style: TextStyle(fontSize: 10, color: c.textMuted, fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
@@ -210,13 +213,14 @@ class _LegendDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 6),
-        Text('$label ', style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-        Text(value, style: const TextStyle(fontSize: 11.5, color: AppColors.textPrimary, fontWeight: FontWeight.w800)),
+        Text('$label ', style: TextStyle(fontSize: 11.5, color: c.textSecondary, fontWeight: FontWeight.w600)),
+        Text(value, style: TextStyle(fontSize: 11.5, color: c.textPrimary, fontWeight: FontWeight.w800)),
       ],
     );
   }
@@ -241,15 +245,16 @@ class _QuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: c.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: c.border),
         ),
         child: Column(
           children: [
@@ -267,7 +272,7 @@ class _QuickAction extends StatelessWidget {
                     right: -6,
                     child: Container(
                       padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(color: AppColors.riskHigh, shape: BoxShape.circle),
+                      decoration: BoxDecoration(color: c.riskHigh, shape: BoxShape.circle),
                       constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
                       child: Text(
                         '$badge',
@@ -279,7 +284,7 @@ class _QuickAction extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: c.textPrimary)),
           ],
         ),
       ),
@@ -293,6 +298,7 @@ class _AnomalyTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return AppCard(
       padding: const EdgeInsets.all(14),
       child: Row(
@@ -302,13 +308,13 @@ class _AnomalyTile extends StatelessWidget {
             height: 38,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: event.severity == RiskLevel.high ? AppColors.riskHighBg : AppColors.riskMediumBg,
+              color: event.severity == RiskLevel.high ? c.riskHighBg : c.riskMediumBg,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               Icons.warning_rounded,
               size: 18,
-              color: event.severity == RiskLevel.high ? AppColors.riskHigh : AppColors.riskMedium,
+              color: event.severity == RiskLevel.high ? c.riskHigh : c.riskMedium,
             ),
           ),
           const SizedBox(width: 12),
@@ -318,7 +324,7 @@ class _AnomalyTile extends StatelessWidget {
               children: [
                 Text(event.type, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 2),
-                Text('${event.employeeName} · ${event.date}', style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
+                Text('${event.employeeName} · ${event.date}', style: TextStyle(fontSize: 11.5, color: c.textMuted)),
               ],
             ),
           ),
