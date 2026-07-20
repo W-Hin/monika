@@ -6,7 +6,7 @@ import '../../model/models.dart';
 class DummyData {
   DummyData._();
 
-  static final AppUser employeeUser = const AppUser(
+  static AppUser employeeUser = const AppUser(
     id: 'EMP-1042',
     name: 'Hin Chen Wei',
     email: 'hin.chenwei@monika-demo.com',
@@ -16,9 +16,11 @@ class DummyData {
     riskLevel: RiskLevel.low,
     avatarInitials: 'HC',
     employmentDuration: '1 yr 8 mo',
+    registeredDevice: 'iPhone 15 Pro',
+    deviceBoundSince: '12 Jan 2025',
   );
 
-  static final AppUser hrUser = const AppUser(
+  static AppUser hrUser = const AppUser(
     id: 'HR-0007',
     name: 'Aisyah Rahman',
     email: 'aisyah.rahman@monika-demo.com',
@@ -28,6 +30,8 @@ class DummyData {
     riskLevel: RiskLevel.low,
     avatarInitials: 'AR',
     employmentDuration: '3 yr 2 mo',
+    registeredDevice: 'Samsung Galaxy S24',
+    deviceBoundSince: '03 Apr 2023',
   );
 
   static final List<AttendanceRecord> attendanceHistory = [
@@ -87,6 +91,7 @@ class DummyData {
       isRecommended: true,
       recommendationReason: 'Low Leadership Initiative KPI score (58/100) in your latest evaluation',
       duration: '4 weeks · Self-paced',
+      department: 'Engineering',
     ),
     const TrainingProgram(
       title: 'Effective Stakeholder Communication',
@@ -106,6 +111,28 @@ class DummyData {
       isMandatory: true,
       progress: 0.6,
       duration: '1 week · Due 30 Jun',
+      department: 'Engineering',
+    ),
+  ];
+
+  static final List<TrainingProgram> completedTrainings = [
+    const TrainingProgram(
+      title: 'Onboarding & Company Policies',
+      category: 'Behavioural',
+      description: 'Introduction to MONIKA workplace policies, code of conduct, and benefits.',
+      progress: 1.0,
+      isCompleted: true,
+      performanceScore: 88,
+      duration: '3 days · Completed 15 Nov 2024',
+    ),
+    const TrainingProgram(
+      title: 'Git & Version Control Basics',
+      category: 'Technical',
+      description: 'Practical Git workflows for collaborative software development.',
+      progress: 1.0,
+      isCompleted: true,
+      performanceScore: 95,
+      duration: '1 week · Completed 02 Feb 2025',
     ),
   ];
 
@@ -126,17 +153,6 @@ class DummyData {
     ...mandatoryTrainings,
   ];
 
-  static final PayrollSummary currentPayroll = const PayrollSummary(
-    month: 'June 2026',
-    baseSalary: 4500.00,
-    deductions: 145.00,
-    netPay: 4355.00,
-    items: [
-      PayrollDeductionItem(label: 'Late arrival (1 day, beyond grace period)', amount: 25.00),
-      PayrollDeductionItem(label: 'Unpaid leave (1 day)', amount: 120.00),
-    ],
-  );
-
   static final List<AnomalyEvent> anomalyFeed = [
     const AnomalyEvent(employeeName: 'Faiz Hidayat', type: 'Shared-device violation', date: 'Today, 09:14 AM', details: 'Device token already bound to another employee account', severity: RiskLevel.high),
     const AnomalyEvent(employeeName: 'Lim Jia Hui', type: 'Out-of-zone clock-in', date: 'Today, 08:51 AM', details: 'GPS coordinates 340m outside geofence radius', severity: RiskLevel.medium),
@@ -145,13 +161,135 @@ class DummyData {
   ];
 
   static final List<TeamMemberSummary> teamOverview = [
-    const TeamMemberSummary(name: 'Hin Chen Wei', department: 'Engineering', risk: RiskLevel.low, attendanceRate: 0.96, avatarInitials: 'HC'),
-    const TeamMemberSummary(name: 'Nur Aina Zulkifli', department: 'Design', risk: RiskLevel.low, attendanceRate: 0.94, avatarInitials: 'NA'),
-    const TeamMemberSummary(name: 'Ramesh Kumar', department: 'Sales', risk: RiskLevel.medium, attendanceRate: 0.85, avatarInitials: 'RK'),
-    const TeamMemberSummary(name: 'Tan Wei Ming', department: 'Engineering', risk: RiskLevel.medium, attendanceRate: 0.81, avatarInitials: 'TW'),
-    const TeamMemberSummary(name: 'Faiz Hidayat', department: 'Operations', risk: RiskLevel.high, attendanceRate: 0.68, avatarInitials: 'FH'),
-    const TeamMemberSummary(name: 'Lim Jia Hui', department: 'Marketing', risk: RiskLevel.medium, attendanceRate: 0.83, avatarInitials: 'LJ'),
+    const TeamMemberSummary(id: 'EMP-1042', name: 'Hin Chen Wei', email: 'hin.chenwei@monika-demo.com', jobTitle: 'Mobile Developer', department: 'Engineering', risk: RiskLevel.low, attendanceRate: 0.96, avatarInitials: 'HC', registeredDevice: 'iPhone 15 Pro'),
+    const TeamMemberSummary(id: 'EMP-1088', name: 'Nur Aina Zulkifli', email: 'nur.aina@monika-demo.com', jobTitle: 'UI/UX Designer', department: 'Design', risk: RiskLevel.low, attendanceRate: 0.94, avatarInitials: 'NA', registeredDevice: 'iPhone 14'),
+    const TeamMemberSummary(id: 'EMP-1023', name: 'Ramesh Kumar', email: 'ramesh.kumar@monika-demo.com', jobTitle: 'Sales Executive', department: 'Sales', risk: RiskLevel.medium, attendanceRate: 0.85, avatarInitials: 'RK', registeredDevice: 'Samsung Galaxy A54'),
+    const TeamMemberSummary(id: 'EMP-1067', name: 'Tan Wei Ming', email: 'tan.weiming@monika-demo.com', jobTitle: 'Backend Engineer', department: 'Engineering', risk: RiskLevel.medium, attendanceRate: 0.81, avatarInitials: 'TW', registeredDevice: 'Google Pixel 8'),
+    const TeamMemberSummary(id: 'EMP-1099', name: 'Faiz Hidayat', email: 'faiz.hidayat@monika-demo.com', jobTitle: 'Operations Executive', department: 'Operations', risk: RiskLevel.high, attendanceRate: 0.68, avatarInitials: 'FH', registeredDevice: 'Xiaomi Redmi Note 12', isActive: true),
+    const TeamMemberSummary(id: 'EMP-1075', name: 'Lim Jia Hui', email: 'lim.jiahui@monika-demo.com', jobTitle: 'Marketing Executive', department: 'Marketing', risk: RiskLevel.medium, attendanceRate: 0.83, avatarInitials: 'LJ', registeredDevice: 'iPhone 13'),
   ];
+
+  static final List<KpiTemplate> kpiTemplates = [
+    const KpiTemplate(
+      name: 'Standard Engineering KPI Set',
+      department: 'Engineering',
+      items: [
+        KpiTemplateItem(name: 'Attendance Rate', weightage: 20),
+        KpiTemplateItem(name: 'Task Delivery Quality', weightage: 30),
+        KpiTemplateItem(name: 'Project Output', weightage: 25),
+        KpiTemplateItem(name: 'Teamwork & Communication', weightage: 15),
+        KpiTemplateItem(name: 'Leadership Initiative', weightage: 10),
+      ],
+    ),
+    const KpiTemplate(
+      name: 'Sales KPI Set',
+      department: 'Sales',
+      items: [
+        KpiTemplateItem(name: 'Attendance Rate', weightage: 20),
+        KpiTemplateItem(name: 'Sales Target Achievement', weightage: 40),
+        KpiTemplateItem(name: 'Customer Satisfaction', weightage: 20),
+        KpiTemplateItem(name: 'Teamwork & Communication', weightage: 20),
+      ],
+    ),
+    const KpiTemplate(
+      name: 'General Staff KPI Set',
+      department: 'All Departments',
+      items: [
+        KpiTemplateItem(name: 'Attendance Rate', weightage: 25),
+        KpiTemplateItem(name: 'Work Quality', weightage: 35),
+        KpiTemplateItem(name: 'Teamwork & Communication', weightage: 25),
+        KpiTemplateItem(name: 'Leadership Initiative', weightage: 15),
+      ],
+    ),
+  ];
+
+  static final List<TrainingCompletionRecord> trainingCompletionRecords = [
+    const TrainingCompletionRecord(employeeName: 'Hin Chen Wei', department: 'Engineering', programTitle: 'Workplace Data Privacy & Security', progress: 0.6),
+    const TrainingCompletionRecord(employeeName: 'Nur Aina Zulkifli', department: 'Design', programTitle: 'Leadership Fundamentals', progress: 1.0, performanceScore: 91),
+    const TrainingCompletionRecord(employeeName: 'Ramesh Kumar', department: 'Sales', programTitle: 'Effective Stakeholder Communication', progress: 0.3),
+    const TrainingCompletionRecord(employeeName: 'Tan Wei Ming', department: 'Engineering', programTitle: 'Advanced Flutter Architecture', progress: 0.0),
+    const TrainingCompletionRecord(employeeName: 'Faiz Hidayat', department: 'Operations', programTitle: 'Time Management Essentials', progress: 0.85),
+  ];
+
+  static final List<LeaveBalance> leaveBalances = [
+    const LeaveBalance(employeeName: 'Hin Chen Wei', annualTotal: 14, annualUsed: 5, medicalTotal: 14, medicalUsed: 3, emergencyTotal: 3, emergencyUsed: 0),
+    const LeaveBalance(employeeName: 'Nur Aina Zulkifli', annualTotal: 14, annualUsed: 6, medicalTotal: 14, medicalUsed: 1, emergencyTotal: 3, emergencyUsed: 1),
+    const LeaveBalance(employeeName: 'Ramesh Kumar', annualTotal: 14, annualUsed: 9, medicalTotal: 14, medicalUsed: 4, emergencyTotal: 3, emergencyUsed: 2),
+    const LeaveBalance(employeeName: 'Tan Wei Ming', annualTotal: 14, annualUsed: 3, medicalTotal: 14, medicalUsed: 2, emergencyTotal: 3, emergencyUsed: 0),
+    const LeaveBalance(employeeName: 'Faiz Hidayat', annualTotal: 14, annualUsed: 11, medicalTotal: 14, medicalUsed: 6, emergencyTotal: 3, emergencyUsed: 3),
+    const LeaveBalance(employeeName: 'Lim Jia Hui', annualTotal: 14, annualUsed: 7, medicalTotal: 14, medicalUsed: 3, emergencyTotal: 3, emergencyUsed: 1),
+  ];
+
+  static LeaveBalance get myLeaveBalance =>
+      leaveBalances.firstWhere((b) => b.employeeName == employeeUser.name);
+
+  static final List<PayrollSummary> payrollByEmployee = [
+    const PayrollSummary(
+      employeeName: 'Hin Chen Wei',
+      month: 'June 2026',
+      baseSalary: 4500.00,
+      deductions: 145.00,
+      netPay: 4355.00,
+      items: [
+        PayrollDeductionItem(label: 'Late arrival (1 day, beyond grace period)', amount: 25.00),
+        PayrollDeductionItem(label: 'Unpaid leave (1 day)', amount: 120.00),
+      ],
+    ),
+    const PayrollSummary(
+      employeeName: 'Nur Aina Zulkifli',
+      month: 'June 2026',
+      baseSalary: 4200.00,
+      deductions: 0.00,
+      netPay: 4200.00,
+      items: [],
+    ),
+    const PayrollSummary(
+      employeeName: 'Ramesh Kumar',
+      month: 'June 2026',
+      baseSalary: 3800.00,
+      deductions: 220.00,
+      netPay: 3580.00,
+      items: [
+        PayrollDeductionItem(label: 'Late arrival (4 occurrences)', amount: 100.00),
+        PayrollDeductionItem(label: 'Unauthorised absence (1 day)', amount: 120.00),
+      ],
+    ),
+    const PayrollSummary(
+      employeeName: 'Tan Wei Ming',
+      month: 'June 2026',
+      baseSalary: 4600.00,
+      deductions: 75.00,
+      netPay: 4525.00,
+      items: [
+        PayrollDeductionItem(label: 'Late arrival (3 occurrences)', amount: 75.00),
+      ],
+    ),
+    const PayrollSummary(
+      employeeName: 'Faiz Hidayat',
+      month: 'June 2026',
+      baseSalary: 3600.00,
+      deductions: 340.00,
+      netPay: 3260.00,
+      items: [
+        PayrollDeductionItem(label: 'Late arrival (3 occurrences)', amount: 75.00),
+        PayrollDeductionItem(label: 'Shared-device violation penalty', amount: 145.00),
+        PayrollDeductionItem(label: 'Unauthorised absence (1 day)', amount: 120.00),
+      ],
+    ),
+    const PayrollSummary(
+      employeeName: 'Lim Jia Hui',
+      month: 'June 2026',
+      baseSalary: 4000.00,
+      deductions: 25.00,
+      netPay: 3975.00,
+      items: [
+        PayrollDeductionItem(label: 'WiFi SSID mismatch (1 occurrence)', amount: 25.00),
+      ],
+    ),
+  ];
+
+  static PayrollSummary get currentPayroll =>
+      payrollByEmployee.firstWhere((p) => p.employeeName == employeeUser.name);
 
   // Dashboard quick stats (HR)
   static const int totalEmployees = 86;

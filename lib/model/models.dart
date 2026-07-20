@@ -16,6 +16,8 @@ class AppUser {
   final RiskLevel riskLevel;
   final String avatarInitials;
   final String employmentDuration;
+  final String registeredDevice;
+  final String deviceBoundSince;
 
   const AppUser({
     required this.id,
@@ -27,7 +29,23 @@ class AppUser {
     required this.riskLevel,
     required this.avatarInitials,
     required this.employmentDuration,
+    required this.registeredDevice,
+    required this.deviceBoundSince,
   });
+
+  AppUser copyWith({String? email, String? registeredDevice, String? deviceBoundSince}) => AppUser(
+        id: id,
+        name: name,
+        email: email ?? this.email,
+        department: department,
+        role: role,
+        userRole: userRole,
+        riskLevel: riskLevel,
+        avatarInitials: avatarInitials,
+        employmentDuration: employmentDuration,
+        registeredDevice: registeredDevice ?? this.registeredDevice,
+        deviceBoundSince: deviceBoundSince ?? this.deviceBoundSince,
+      );
 }
 
 class AttendanceRecord {
@@ -104,6 +122,9 @@ class TrainingProgram {
   final String? recommendationReason;
   final double progress; // 0..1
   final String duration;
+  final bool isCompleted;
+  final double? performanceScore; // out of 100, set once completed
+  final String? department; // null = all departments
 
   const TrainingProgram({
     required this.title,
@@ -114,7 +135,30 @@ class TrainingProgram {
     this.recommendationReason,
     this.progress = 0,
     required this.duration,
+    this.isCompleted = false,
+    this.performanceScore,
+    this.department,
   });
+
+  TrainingProgram copyWith({
+    double? progress,
+    bool? isCompleted,
+    double? performanceScore,
+    String? department,
+  }) =>
+      TrainingProgram(
+        title: title,
+        category: category,
+        description: description,
+        isMandatory: isMandatory,
+        isRecommended: isRecommended,
+        recommendationReason: recommendationReason,
+        progress: progress ?? this.progress,
+        duration: duration,
+        isCompleted: isCompleted ?? this.isCompleted,
+        performanceScore: performanceScore ?? this.performanceScore,
+        department: department ?? this.department,
+      );
 }
 
 class PayrollSummary {
@@ -123,6 +167,7 @@ class PayrollSummary {
   final double deductions;
   final double netPay;
   final List<PayrollDeductionItem> items;
+  final String employeeName;
 
   const PayrollSummary({
     required this.month,
@@ -130,6 +175,7 @@ class PayrollSummary {
     required this.deductions,
     required this.netPay,
     required this.items,
+    this.employeeName = '',
   });
 }
 
@@ -145,6 +191,7 @@ class AnomalyEvent {
   final String date;
   final String details;
   final RiskLevel severity;
+  final bool reviewed;
 
   const AnomalyEvent({
     required this.employeeName,
@@ -152,20 +199,113 @@ class AnomalyEvent {
     required this.date,
     required this.details,
     required this.severity,
+    this.reviewed = false,
   });
+
+  AnomalyEvent copyWith({bool? reviewed}) => AnomalyEvent(
+        employeeName: employeeName,
+        type: type,
+        date: date,
+        details: details,
+        severity: severity,
+        reviewed: reviewed ?? this.reviewed,
+      );
 }
 
 class TeamMemberSummary {
+  final String id;
   final String name;
+  final String email;
+  final String jobTitle;
   final String department;
   final RiskLevel risk;
   final double attendanceRate;
   final String avatarInitials;
+  final String registeredDevice;
+  final bool isActive;
+
   const TeamMemberSummary({
+    required this.id,
     required this.name,
+    required this.email,
+    required this.jobTitle,
     required this.department,
     required this.risk,
     required this.attendanceRate,
     required this.avatarInitials,
+    required this.registeredDevice,
+    this.isActive = true,
   });
+
+  TeamMemberSummary copyWith({
+    String? jobTitle,
+    String? department,
+    bool? isActive,
+    String? registeredDevice,
+  }) =>
+      TeamMemberSummary(
+        id: id,
+        name: name,
+        email: email,
+        jobTitle: jobTitle ?? this.jobTitle,
+        department: department ?? this.department,
+        risk: risk,
+        attendanceRate: attendanceRate,
+        avatarInitials: avatarInitials,
+        registeredDevice: registeredDevice ?? this.registeredDevice,
+        isActive: isActive ?? this.isActive,
+      );
+}
+
+class KpiTemplateItem {
+  final String name;
+  final double weightage;
+  const KpiTemplateItem({required this.name, required this.weightage});
+}
+
+class KpiTemplate {
+  final String name;
+  final String department; // 'All Departments' if not department-specific
+  final List<KpiTemplateItem> items;
+  const KpiTemplate({required this.name, required this.department, required this.items});
+}
+
+class TrainingCompletionRecord {
+  final String employeeName;
+  final String department;
+  final String programTitle;
+  final double progress;
+  final double? performanceScore;
+
+  const TrainingCompletionRecord({
+    required this.employeeName,
+    required this.department,
+    required this.programTitle,
+    required this.progress,
+    this.performanceScore,
+  });
+}
+
+class LeaveBalance {
+  final String employeeName;
+  final int annualTotal;
+  final int annualUsed;
+  final int medicalTotal;
+  final int medicalUsed;
+  final int emergencyTotal;
+  final int emergencyUsed;
+
+  const LeaveBalance({
+    required this.employeeName,
+    required this.annualTotal,
+    required this.annualUsed,
+    required this.medicalTotal,
+    required this.medicalUsed,
+    required this.emergencyTotal,
+    required this.emergencyUsed,
+  });
+
+  int get annualRemaining => annualTotal - annualUsed;
+  int get medicalRemaining => medicalTotal - medicalUsed;
+  int get emergencyRemaining => emergencyTotal - emergencyUsed;
 }
