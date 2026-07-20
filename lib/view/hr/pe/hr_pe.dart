@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
@@ -108,6 +107,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
     Future.delayed(const Duration(milliseconds: 900), () {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
+      final c = context.colors;
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
@@ -120,13 +120,13 @@ class _HrPeScreenState extends State<HrPeScreen> {
               Container(
                 width: 60,
                 height: 60,
-                decoration: const BoxDecoration(
-                  color: AppColors.primaryLight,
+                decoration: BoxDecoration(
+                  color: c.primaryLight,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.check_circle_rounded,
-                  color: AppColors.primary,
+                  color: c.primary,
                   size: 34,
                 ),
               ),
@@ -139,9 +139,9 @@ class _HrPeScreenState extends State<HrPeScreen> {
               Text(
                 'Performance evaluation for $_year has been saved. Training recommendations have been updated.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12.5,
-                  color: AppColors.textSecondary,
+                  color: c.textSecondary,
                   height: 1.4,
                 ),
               ),
@@ -212,10 +212,10 @@ class _HrPeScreenState extends State<HrPeScreen> {
                     ),
                     child: Text(
                       _year,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.primaryDark,
+                        color: c.primaryDark,
                       ),
                     ),
                   ),

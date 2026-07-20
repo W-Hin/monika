@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
@@ -39,6 +38,7 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
   }
 
   void _assignDepartment(TrainingProgram program) {
+    final c = context.colors;
     showModalBottomSheet(
       context: context,
       builder: (_) => SafeArea(
@@ -51,7 +51,7 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
             ),
             ..._departments.map((d) => ListTile(
                   title: Text(d),
-                  trailing: program.department == d ? const Icon(Icons.check_rounded, color: AppColors.primary) : null,
+                  trailing: program.department == d ? Icon(Icons.check_rounded, color: c.primary) : null,
                   onTap: () {
                     _replaceProgram(program, program.copyWith(department: d));
                     Navigator.of(context).pop();
