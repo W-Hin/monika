@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors_extension.dart';
 
 /// Full-width primary action button with consistent height & loading state
 class PrimaryButton extends StatelessWidget {
@@ -9,53 +9,35 @@ class PrimaryButton extends StatelessWidget {
   final bool isLoading;
   final bool expand;
 
-  const PrimaryButton({
-    super.key,
-    required this.label,
-    required this.onPressed,
-    this.icon,
-    this.isLoading = false,
-    this.expand = true,
-  });
+  const PrimaryButton({super.key, required this.label, required this.onPressed, this.icon, this.isLoading = false, this.expand = true});
 
   @override
   Widget build(BuildContext context) {
     final button = ElevatedButton(
       onPressed: isLoading ? null : onPressed,
       child: isLoading
-          ? const SizedBox(
-        height: 18,
-        width: 18,
-        child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
-      )
+          ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white))
           : Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (icon != null) ...[Icon(icon, size: 18), const SizedBox(width: 8)],
-          Text(label),
-        ],
-      ),
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (icon != null) ...[Icon(icon, size: 18), const SizedBox(width: 8)],
+                Text(label),
+              ],
+            ),
     );
-
     return expand ? SizedBox(width: double.infinity, child: button) : button;
   }
 }
 
-/// Secondary (outlined) button
+/// Secondary (tinted-fill) button
 class SecondaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
   final bool expand;
 
-  const SecondaryButton({
-    super.key,
-    required this.label,
-    required this.onPressed,
-    this.icon,
-    this.expand = true,
-  });
+  const SecondaryButton({super.key, required this.label, required this.onPressed, this.icon, this.expand = true});
 
   @override
   Widget build(BuildContext context) {
@@ -83,21 +65,14 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onAvatarTap;
   final int notificationCount;
 
-  const HomeAppBar({
-    super.key,
-    required this.greeting,
-    required this.name,
-    required this.initials,
-    this.onNotificationTap,
-    this.onAvatarTap,
-    this.notificationCount = 0,
-  });
+  const HomeAppBar({super.key, required this.greeting, required this.name, required this.initials, this.onNotificationTap, this.onAvatarTap, this.notificationCount = 0});
 
   @override
   Size get preferredSize => const Size.fromHeight(64);
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
@@ -107,15 +82,8 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
               onTap: onAvatarTap,
               child: CircleAvatar(
                 radius: 21,
-                backgroundColor: AppColors.primaryLight,
-                child: Text(
-                  initials,
-                  style: const TextStyle(
-                    color: AppColors.primaryDark,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                  ),
-                ),
+                backgroundColor: c.primaryLight,
+                child: Text(initials, style: TextStyle(color: c.primaryDark, fontWeight: FontWeight.w800, fontSize: 14)),
               ),
             ),
             const SizedBox(width: 12),
@@ -123,16 +91,8 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    greeting,
-                    style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted, fontWeight: FontWeight.w500),
-                  ),
-                  Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 16.5, color: AppColors.textPrimary, fontWeight: FontWeight.w800),
-                  ),
+                  Text(greeting, style: TextStyle(fontSize: 12.5, color: c.textMuted, fontWeight: FontWeight.w500)),
+                  Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 16.5, color: c.textPrimary, fontWeight: FontWeight.w800)),
                 ],
               ),
             ),
@@ -141,26 +101,16 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
               child: Container(
                 width: 42,
                 height: 42,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceMuted,
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    const Icon(Icons.notifications_none_rounded, color: AppColors.textPrimary, size: 22),
+                    Icon(Icons.notifications_none_rounded, color: c.textPrimary, size: 22),
                     if (notificationCount > 0)
                       Positioned(
                         top: 9,
                         right: 10,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: AppColors.riskHigh,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
+                        child: Container(width: 8, height: 8, decoration: BoxDecoration(color: c.riskHigh, shape: BoxShape.circle)),
                       ),
                   ],
                 ),
@@ -185,6 +135,7 @@ class SimpleAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return AppBar(
       title: Text(title),
       actions: actions,
@@ -192,10 +143,7 @@ class SimpleAppBar extends StatelessWidget implements PreferredSizeWidget {
         icon: Container(
           width: 36,
           height: 36,
-          decoration: BoxDecoration(
-            color: AppColors.surfaceMuted,
-            borderRadius: BorderRadius.circular(10),
-          ),
+          decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(10)),
           child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
         ),
         onPressed: () => Navigator.of(context).maybePop(),
