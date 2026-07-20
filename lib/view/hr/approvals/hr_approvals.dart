@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
+import '../leave/leave_balances.dart';
 
 class HrApprovalsScreen extends StatefulWidget {
   const HrApprovalsScreen({super.key});
@@ -50,7 +51,7 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
                     ? '✓ Leave approved for ${_applications[index].employeeName}'
                     : '✗ Leave rejected for ${_applications[index].employeeName}',
               ),
-              backgroundColor: approve ? AppColors.primary : AppColors.riskHigh,
+              backgroundColor: approve ? context.colors.primary : context.colors.riskHigh,
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -61,11 +62,21 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final pending = _applications.where((a) => a.status == LeaveStatus.pending).toList();
     final processed = _applications.where((a) => a.status != LeaveStatus.pending).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Leave Approvals')),
+      appBar: AppBar(
+        title: const Text('Leave Approvals'),
+        actions: [
+          IconButton(
+            tooltip: 'Leave Balances',
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HrLeaveBalancesScreen())),
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+          ),
+        ],
+      ),
       body: SafeArea(
         top: false,
         child: ListView(
@@ -78,8 +89,8 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
                     label: 'Pending',
                     value: '${pending.length}',
                     icon: Icons.pending_actions_rounded,
-                    iconColor: AppColors.amber,
-                    iconBg: AppColors.amberBg,
+                    iconColor: c.amber,
+                    iconBg: c.amberBg,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -88,8 +99,8 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
                     label: 'Approved Today',
                     value: '${processed.where((a) => a.status == LeaveStatus.approved).length}',
                     icon: Icons.check_circle_outline_rounded,
-                    iconColor: AppColors.primary,
-                    iconBg: AppColors.primaryLight,
+                    iconColor: c.primary,
+                    iconBg: c.primaryLight,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -98,8 +109,8 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
                     label: 'Rejected',
                     value: '${processed.where((a) => a.status == LeaveStatus.rejected).length}',
                     icon: Icons.cancel_outlined,
-                    iconColor: AppColors.riskHigh,
-                    iconBg: AppColors.riskHighBg,
+                    iconColor: c.riskHigh,
+                    iconBg: c.riskHighBg,
                   ),
                 ),
               ],
@@ -129,30 +140,7 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
 
             if (processed.isNotEmpty) ...[
               const SectionHeader(title: 'Recently Processed'),
-              ...processed.map((a) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: AppCard(
-                  child: Row(
-                    children: [
-                      InitialsAvatar(
-                        initials: a.employeeName.split(' ').map((w) => w[0]).take(2).join(),
-                        size: 36,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(a.employeeName, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
-                            Text('${a.leaveType} · ${a.days} day(s)', style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
-                          ],
-                        ),
-                      ),
-                      StatusPill.leave(a.status),
-                    ],
-                  ),
-                ),
-              )),
+              ListRow(children: processed.map((a) => _ProcessedRow(app: a)).toList()),
             ],
           ],
         ),
@@ -170,6 +158,7 @@ class _ApprovalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     final initials = app.employeeName.split(' ').map((w) => w[0]).take(2).join();
     return AppCard(
       child: Column(
@@ -184,21 +173,21 @@ class _ApprovalCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(app.employeeName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
-                    Text(app.leaveType, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                    Text(app.leaveType, style: TextStyle(fontSize: 12, color: c.textSecondary, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(color: AppColors.amberBg, borderRadius: BorderRadius.circular(100)),
-                child: const Text('Pending', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.amber)),
+                decoration: BoxDecoration(color: c.amberBg, borderRadius: BorderRadius.circular(100)),
+                child: Text('Pending', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: c.amber)),
               ),
             ],
           ),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: AppColors.surfaceMuted, borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(10)),
             child: Column(
               children: [
                 _InfoRow(icon: Icons.date_range_rounded, label: '${app.startDate} – ${app.endDate}  (${app.days} day${app.days > 1 ? 's' : ''})'),
@@ -240,12 +229,13 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 14, color: AppColors.textMuted),
+        Icon(icon, size: 14, color: c.textMuted),
         const SizedBox(width: 8),
-        Expanded(child: Text(label, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary))),
+        Expanded(child: Text(label, style: TextStyle(fontSize: 12.5, color: c.textSecondary))),
       ],
     );
   }
@@ -267,12 +257,13 @@ class _DecisionDialogState extends State<_DecisionDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Text(
         widget.approve ? 'Approve Leave' : 'Reject Leave',
         style: TextStyle(
-          color: widget.approve ? AppColors.primary : AppColors.riskHigh,
+          color: widget.approve ? c.primary : c.riskHigh,
           fontWeight: FontWeight.w800,
           fontSize: 17,
         ),
@@ -283,7 +274,7 @@ class _DecisionDialogState extends State<_DecisionDialog> {
         children: [
           Text(
             '${widget.app.employeeName} · ${widget.app.leaveType} · ${widget.app.days} day(s)',
-            style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 12.5, color: c.textSecondary),
           ),
           const SizedBox(height: 16),
           Text(
@@ -307,11 +298,41 @@ class _DecisionDialogState extends State<_DecisionDialog> {
         ElevatedButton(
           onPressed: () => widget.onConfirm(_reasonController.text),
           style: ElevatedButton.styleFrom(
-            backgroundColor: widget.approve ? AppColors.primary : AppColors.riskHigh,
+            backgroundColor: widget.approve ? c.primary : c.riskHigh,
           ),
           child: Text(widget.approve ? 'Confirm Approval' : 'Confirm Rejection'),
         ),
       ],
+    );
+  }
+}
+
+class _ProcessedRow extends StatelessWidget {
+  final LeaveApplication app;
+  const _ProcessedRow({required this.app});
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = app.employeeName.split(' ').map((w) => w[0]).take(2).join();
+    final c = context.colors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          InitialsAvatar(initials: initials, size: 36),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(app.employeeName, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: c.textPrimary)),
+                Text('${app.leaveType} · ${app.days} day(s)', style: TextStyle(fontSize: 11.5, color: c.textMuted)),
+              ],
+            ),
+          ),
+          StatusPill.leave(app.status),
+        ],
+      ),
     );
   }
 }
