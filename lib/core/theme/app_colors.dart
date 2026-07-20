@@ -16,6 +16,7 @@ class AppColors {
   static const Color background = Color(0xFFF7F9F8);
   static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceMuted = Color(0xFFF1F4F2);
+  static const Color surfaceElevated = surface; // light mode: shadows convey elevation, not a fill swap
   static const Color border = Color(0xFFE3E8E5);
 
   // Text
@@ -46,6 +47,54 @@ class AppColors {
   static const Color amberBg = Color(0xFFFDF3E3);
 
   static const List<Color> kpiGradient = [Color(0xFF1DB954), Color(0xFF14834A)];
+}
+
+/// Dark-mode counterpart to [AppColors]. Same member names/order so every
+/// screen's `AppColors.<member>` reference maps 1:1 to `AppColorsDark.<member>`
+/// when building the dark AppColorsExtension instance in app_theme.dart.
+class AppColorsDark {
+  AppColorsDark._();
+
+  // Brand — primary green is unchanged across themes on purpose.
+  static const Color primary = Color(0xFF1DB954);
+  static const Color primaryDark = Color(0xFF3DDB6E);
+  static const Color primaryLight = Color(0xFF16301F);
+
+  // Neutrals / Surfaces
+  static const Color background = Color(0xFF0E1512);
+  static const Color surface = Color(0xFF161F19);
+  static const Color surfaceMuted = Color(0xFF1D2922);
+  static const Color surfaceElevated = Color(0xFF1C2721);
+  static const Color border = Color(0xFF26332C);
+
+  // Text
+  static const Color textPrimary = Color(0xFFF2F5F3);
+  static const Color textSecondary = Color(0xFF9FB0A8);
+  static const Color textMuted = Color(0xFF6B7A72);
+  static const Color onPrimary = Color(0xFFFFFFFF);
+
+  // Status — Risk Classification
+  static const Color riskLow = Color(0xFF3DDB6E);
+  static const Color riskLowBg = Color(0xFF16301F);
+  static const Color riskMedium = Color(0xFFF0B961);
+  static const Color riskMediumBg = Color(0xFF352910);
+  static const Color riskHigh = Color(0xFFEF6A6E);
+  static const Color riskHighBg = Color(0xFF361718);
+
+  // Status — Leave / Approval
+  static const Color statusApproved = Color(0xFF3DDB6E);
+  static const Color statusPending = Color(0xFFF0B961);
+  static const Color statusRejected = Color(0xFFEF6A6E);
+
+  // Misc accents
+  static const Color infoBlue = Color(0xFF6AA6FF);
+  static const Color infoBlueBg = Color(0xFF16233B);
+  static const Color purple = Color(0xFFAD8CF7);
+  static const Color purpleBg = Color(0xFF261C3B);
+  static const Color amber = Color(0xFFF0B961);
+  static const Color amberBg = Color(0xFF352910);
+
+  static const List<Color> kpiGradient = [Color(0xFF1DB954), Color(0xFF12622D)];
 }
 
 class AppRadius {
