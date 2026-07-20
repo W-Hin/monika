@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_colors_extension.dart';
 import '../shared/widgets/common_widgets.dart';
 
 class _CalendarEvent {
@@ -8,8 +9,7 @@ class _CalendarEvent {
   final String? endDate;
   final String type; // Holiday, Event, Meeting
   final IconData icon;
-  final Color color;
-  final Color bg;
+  final AppHue hue;
 
   const _CalendarEvent({
     required this.title,
@@ -17,24 +17,23 @@ class _CalendarEvent {
     this.endDate,
     required this.type,
     required this.icon,
-    required this.color,
-    required this.bg,
+    required this.hue,
   });
 }
 
 const _events = [
-  _CalendarEvent(title: 'Hari Raya Aidiladha', date: '7 Jun 2026', type: 'Public Holiday', icon: Icons.celebration_rounded, color: AppColors.primary, bg: AppColors.primaryLight),
-  _CalendarEvent(title: 'Q2 Company Town Hall', date: '15 Jun 2026', type: 'Company Event', icon: Icons.groups_rounded, color: AppColors.infoBlue, bg: AppColors.infoBlueBg),
-  _CalendarEvent(title: 'Yang Di-Pertuan Agong Birthday', date: '6 Jul 2026', type: 'Public Holiday', icon: AppIcons.flag, color: AppColors.primary, bg: AppColors.primaryLight),
-  _CalendarEvent(title: 'Mid-Year Performance Reviews', date: '14 Jul 2026', endDate: '18 Jul 2026', type: 'Company Event', icon: Icons.assessment_rounded, color: AppColors.amber, bg: AppColors.amberBg),
-  _CalendarEvent(title: 'National Day', date: '31 Aug 2026', type: 'Public Holiday', icon: AppIcons.flag, color: AppColors.primary, bg: AppColors.primaryLight),
-  _CalendarEvent(title: 'Annual Team Building', date: '5 Sep 2026', endDate: '6 Sep 2026', type: 'Company Event', icon: Icons.emoji_events_rounded, color: AppColors.purple, bg: AppColors.purpleBg),
-  _CalendarEvent(title: 'Malaysia Day', date: '16 Sep 2026', type: 'Public Holiday', icon: AppIcons.flag, color: AppColors.primary, bg: AppColors.primaryLight),
-  _CalendarEvent(title: 'Q3 Department Reviews', date: '28 Sep 2026', type: 'Company Event', icon: Icons.bar_chart_rounded, color: AppColors.amber, bg: AppColors.amberBg),
-  _CalendarEvent(title: 'Deepavali', date: '20 Oct 2026', type: 'Public Holiday', icon: Icons.celebration_rounded, color: AppColors.primary, bg: AppColors.primaryLight),
-  _CalendarEvent(title: 'Annual PE Cycle Begins', date: '1 Nov 2026', type: 'HR Event', icon: Icons.insights_rounded, color: AppColors.riskMedium, bg: AppColors.riskMediumBg),
-  _CalendarEvent(title: 'Christmas Day', date: '25 Dec 2026', type: 'Public Holiday', icon: Icons.celebration_rounded, color: AppColors.primary, bg: AppColors.primaryLight),
-  _CalendarEvent(title: 'Q4 Annual Review Deadline', date: '30 Dec 2026', type: 'HR Event', icon: Icons.assessment_rounded, color: AppColors.riskMedium, bg: AppColors.riskMediumBg),
+  _CalendarEvent(title: 'Hari Raya Aidiladha', date: '7 Jun 2026', type: 'Public Holiday', icon: Icons.celebration_rounded, hue: AppHue.primary),
+  _CalendarEvent(title: 'Q2 Company Town Hall', date: '15 Jun 2026', type: 'Company Event', icon: Icons.groups_rounded, hue: AppHue.infoBlue),
+  _CalendarEvent(title: 'Yang Di-Pertuan Agong Birthday', date: '6 Jul 2026', type: 'Public Holiday', icon: AppIcons.flag, hue: AppHue.primary),
+  _CalendarEvent(title: 'Mid-Year Performance Reviews', date: '14 Jul 2026', endDate: '18 Jul 2026', type: 'Company Event', icon: Icons.assessment_rounded, hue: AppHue.amber),
+  _CalendarEvent(title: 'National Day', date: '31 Aug 2026', type: 'Public Holiday', icon: AppIcons.flag, hue: AppHue.primary),
+  _CalendarEvent(title: 'Annual Team Building', date: '5 Sep 2026', endDate: '6 Sep 2026', type: 'Company Event', icon: Icons.emoji_events_rounded, hue: AppHue.purple),
+  _CalendarEvent(title: 'Malaysia Day', date: '16 Sep 2026', type: 'Public Holiday', icon: AppIcons.flag, hue: AppHue.primary),
+  _CalendarEvent(title: 'Q3 Department Reviews', date: '28 Sep 2026', type: 'Company Event', icon: Icons.bar_chart_rounded, hue: AppHue.amber),
+  _CalendarEvent(title: 'Deepavali', date: '20 Oct 2026', type: 'Public Holiday', icon: Icons.celebration_rounded, hue: AppHue.primary),
+  _CalendarEvent(title: 'Annual PE Cycle Begins', date: '1 Nov 2026', type: 'HR Event', icon: Icons.insights_rounded, hue: AppHue.riskMedium),
+  _CalendarEvent(title: 'Christmas Day', date: '25 Dec 2026', type: 'Public Holiday', icon: Icons.celebration_rounded, hue: AppHue.primary),
+  _CalendarEvent(title: 'Q4 Annual Review Deadline', date: '30 Dec 2026', type: 'HR Event', icon: Icons.assessment_rounded, hue: AppHue.riskMedium),
 ];
 
 // Simple alias since Icons.flag isn't a const issue — use a workaround
@@ -158,14 +157,15 @@ class _EventTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final (color, bg) = resolveHue(context.colors, event.hue);
     return AppCard(
       child: Row(
         children: [
           Container(
             width: 48, height: 48,
             alignment: Alignment.center,
-            decoration: BoxDecoration(color: event.bg, borderRadius: BorderRadius.circular(14)),
-            child: Icon(event.icon, color: event.color, size: 22),
+            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
+            child: Icon(event.icon, color: color, size: 22),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -187,8 +187,8 @@ class _EventTile extends StatelessWidget {
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: event.bg, borderRadius: BorderRadius.circular(100)),
-                  child: Text(event.type, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: event.color)),
+                  decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(100)),
+                  child: Text(event.type, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color)),
                 ),
               ],
             ),

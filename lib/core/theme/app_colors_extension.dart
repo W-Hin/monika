@@ -1,6 +1,19 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
+enum AppHue { primary, infoBlue, amber, purple, riskMedium, riskHigh }
+
+(Color, Color) resolveHue(AppColorsExtension c, AppHue hue) {
+  switch (hue) {
+    case AppHue.primary: return (c.primary, c.primaryLight);
+    case AppHue.infoBlue: return (c.infoBlue, c.infoBlueBg);
+    case AppHue.amber: return (c.amber, c.amberBg);
+    case AppHue.purple: return (c.purple, c.purpleBg);
+    case AppHue.riskMedium: return (c.riskMedium, c.riskMediumBg);
+    case AppHue.riskHigh: return (c.riskHigh, c.riskHighBg);
+  }
+}
+
 class AppColorsExtension extends ThemeExtension<AppColorsExtension> {
   final bool isDark;
   final Color primary;

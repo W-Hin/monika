@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_colors_extension.dart';
 import 'widgets/common_widgets.dart';
 
 class _Notif {
@@ -7,8 +8,7 @@ class _Notif {
   final String body;
   final String time;
   final IconData icon;
-  final Color color;
-  final Color bg;
+  final AppHue hue;
   final bool read;
 
   const _Notif({
@@ -16,8 +16,7 @@ class _Notif {
     required this.body,
     required this.time,
     required this.icon,
-    required this.color,
-    required this.bg,
+    required this.hue,
     this.read = false,
   });
 }
@@ -37,8 +36,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           'Your Annual Leave application (02 Jul – 04 Jul) has been approved by HR.',
       time: '10 min ago',
       icon: Icons.check_circle_outline_rounded,
-      color: AppColors.primary,
-      bg: AppColors.primaryLight,
+      hue: AppHue.primary,
     ),
     const _Notif(
       title: 'Training Recommendation',
@@ -46,8 +44,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           'A new training programme has been recommended for you: Leadership Fundamentals.',
       time: '1 hour ago',
       icon: Icons.auto_awesome_rounded,
-      color: AppColors.amber,
-      bg: AppColors.amberBg,
+      hue: AppHue.amber,
     ),
     const _Notif(
       title: 'Attendance Flag',
@@ -55,8 +52,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           'Your clock-in on Mon 15 Jun was flagged: GPS outside geofence radius.',
       time: '2 days ago',
       icon: Icons.flag_rounded,
-      color: AppColors.riskHigh,
-      bg: AppColors.riskHighBg,
+      hue: AppHue.riskHigh,
     ),
     const _Notif(
       title: 'Payroll Summary Available',
@@ -64,8 +60,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           'Your June 2026 payroll summary is now available. Net pay: RM 4,355.00.',
       time: '3 days ago',
       icon: Icons.receipt_long_outlined,
-      color: AppColors.purple,
-      bg: AppColors.purpleBg,
+      hue: AppHue.purple,
       read: true,
     ),
     const _Notif(
@@ -74,8 +69,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           'Workplace Data Privacy & Security training is due in 7 days. 60% completed.',
       time: '5 days ago',
       icon: Icons.school_outlined,
-      color: AppColors.infoBlue,
-      bg: AppColors.infoBlueBg,
+      hue: AppHue.infoBlue,
       read: true,
     ),
     const _Notif(
@@ -84,8 +78,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           'Your 2025 Performance Evaluation results are now available. View your KPI scores.',
       time: '1 week ago',
       icon: Icons.insights_outlined,
-      color: AppColors.amber,
-      bg: AppColors.amberBg,
+      hue: AppHue.amber,
       read: true,
     ),
   ];
@@ -156,6 +149,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 itemBuilder: (_, i) {
                   final n = _notifs[i];
                   final isRead = _readState[i];
+                  final (color, bg) = resolveHue(context.colors, n.hue);
                   return GestureDetector(
                     onTap: () => setState(() => _readState[i] = true),
                     child: Container(
@@ -165,7 +159,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                         border: Border.all(
                           color: isRead
                               ? AppColors.border
-                              : n.color.withOpacity(0.3),
+                              : color.withOpacity(0.3),
                         ),
                       ),
                       child: Stack(
@@ -180,10 +174,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                   height: 42,
                                   alignment: Alignment.center,
                                   decoration: BoxDecoration(
-                                    color: n.bg,
+                                    color: bg,
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: Icon(n.icon, size: 20, color: n.color),
+                                  child: Icon(n.icon, size: 20, color: color),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
@@ -233,7 +227,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                 width: 8,
                                 height: 8,
                                 decoration: BoxDecoration(
-                                  color: n.color,
+                                  color: color,
                                   shape: BoxShape.circle,
                                 ),
                               ),
