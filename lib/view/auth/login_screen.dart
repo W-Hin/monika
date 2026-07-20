@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_colors_extension.dart';
 import '../shared/widgets/buttons.dart';
 import '../../model/models.dart';
 import '../employee/employee_shell.dart';
 import '../hr/hr_shell.dart';
+import 'forgot_password.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -44,8 +45,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: c.background,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -57,20 +59,20 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: 60,
                 height: 60,
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: c.primary,
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: const Icon(Icons.shield_moon_rounded, color: Colors.white, size: 30),
               ),
               const SizedBox(height: 24),
-              const Text(
+              Text(
                 'Welcome back',
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: c.textPrimary),
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Log in to continue to MONIKA',
-                style: TextStyle(fontSize: 14.5, color: AppColors.textSecondary),
+                style: TextStyle(fontSize: 14.5, color: c.textSecondary),
               ),
               const SizedBox(height: 28),
 
@@ -78,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceMuted,
+                  color: c.surfaceMuted,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Row(
@@ -104,31 +106,31 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 28),
 
-              const Text('Email Address', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              Text('Email Address', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
               const SizedBox(height: 8),
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'you@company.com',
-                  prefixIcon: Icon(Icons.mail_outline_rounded, size: 20, color: AppColors.textMuted),
+                  prefixIcon: Icon(Icons.mail_outline_rounded, size: 20, color: c.textMuted),
                 ),
               ),
               const SizedBox(height: 18),
 
-              const Text('Password', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              Text('Password', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
               const SizedBox(height: 8),
               TextField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   hintText: 'Enter your password',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20, color: AppColors.textMuted),
+                  prefixIcon: Icon(Icons.lock_outline_rounded, size: 20, color: c.textMuted),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                       size: 20,
-                      color: AppColors.textMuted,
+                      color: c.textMuted,
                     ),
                     onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                   ),
@@ -138,7 +140,9 @@ class _LoginScreenState extends State<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                  ),
                   child: const Text('Forgot password?'),
                 ),
               ),
@@ -154,18 +158,18 @@ class _LoginScreenState extends State<LoginScreen> {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
+                  color: c.wash(c.primary),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.info_outline_rounded, size: 18, color: AppColors.primaryDark),
+                    Icon(Icons.info_outline_rounded, size: 18, color: c.primaryDark),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'Phase 1 Prototype — credentials are pre-filled with dummy data. Use the toggle above to preview either role.',
-                        style: TextStyle(fontSize: 12, color: AppColors.primaryDark.withOpacity(0.9), height: 1.4),
+                        style: TextStyle(fontSize: 12, color: c.primaryDark.withOpacity(0.9), height: 1.4),
                       ),
                     ),
                   ],
@@ -195,13 +199,14 @@ class _RoleTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? Colors.white : Colors.transparent,
+          color: selected ? c.surface : Colors.transparent,
           borderRadius: BorderRadius.circular(11),
           boxShadow: selected
               ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 2))]
@@ -210,14 +215,14 @@ class _RoleTab extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 17, color: selected ? AppColors.primary : AppColors.textMuted),
+            Icon(icon, size: 17, color: selected ? c.primary : c.textMuted),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w700,
-                color: selected ? AppColors.textPrimary : AppColors.textMuted,
+                color: selected ? c.textPrimary : c.textMuted,
               ),
             ),
           ],

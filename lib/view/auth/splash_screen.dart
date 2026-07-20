@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_colors_extension.dart';
 import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -27,8 +27,9 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return Scaffold(
-      backgroundColor: AppColors.primary,
+      backgroundColor: c.primary,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -47,7 +48,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   ),
                 ],
               ),
-              child: const Icon(Icons.shield_moon_rounded, color: AppColors.primary, size: 44),
+              child: Icon(Icons.shield_moon_rounded, color: c.primary, size: 44),
             ),
             const SizedBox(height: 24),
             const Text(
