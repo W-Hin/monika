@@ -2,10 +2,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:monika/core/theme/app_theme.dart';
+import 'package:monika/core/theme/app_colors_extension.dart';
 
 void main() {
   test('light and dark themes register the matching AppColorsExtension', () {
-    final lightExt = AppTheme.light.extension<ThemeExtension>();
+    final lightExt = AppTheme.light.extension<AppColorsExtension>();
+    expect(lightExt?.isDark, false);
     expect(AppTheme.light.brightness, Brightness.light);
     expect(AppTheme.dark.brightness, Brightness.dark);
     expect(AppTheme.light.textTheme.bodyMedium?.fontFamily, 'Inter');

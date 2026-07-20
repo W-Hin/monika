@@ -13,7 +13,7 @@ class _StatusStyle {
 class StatusPill extends StatelessWidget {
   final _StatusStyle Function(AppColorsExtension) _resolve;
 
-  const StatusPill._(this._resolve, {super.key});
+  const StatusPill._(this._resolve);
 
   static StatusPill risk(RiskLevel level) =>
       StatusPill._((c) => _riskPill(level, _StatusStyle.new, c));
