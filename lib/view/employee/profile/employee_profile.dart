@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../../main.dart';
 import '../../shared/widgets/common_widgets.dart';
@@ -44,6 +43,7 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
 
   void _requestDeviceChange() {
     final reasonController = TextEditingController();
+    final c = context.colors;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -53,9 +53,9 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'This request will be sent to HR for approval before your registered device is reset.',
-              style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.4),
+              style: TextStyle(fontSize: 12.5, color: c.textSecondary, height: 1.4),
             ),
             const SizedBox(height: 12),
             TextField(
