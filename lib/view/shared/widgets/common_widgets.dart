@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_colors_extension.dart';
 
 /// Section header used throughout dashboards: "Title" + optional "See all" action
@@ -24,13 +25,17 @@ class SectionHeader extends StatelessWidget {
         children: [
           Text(title, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: c.textPrimary)),
           if (actionLabel != null)
-            GestureDetector(
+            InkWell(
               onTap: onAction,
-              child: Row(
-                children: [
-                  Text(actionLabel!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.primary)),
-                  Icon(Icons.chevron_right_rounded, size: 18, color: c.primary),
-                ],
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                child: Row(
+                  children: [
+                    Text(actionLabel!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.primary)),
+                    Icon(Icons.chevron_right_rounded, size: 18, color: c.primary),
+                  ],
+                ),
               ),
             ),
         ],
