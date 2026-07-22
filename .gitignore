@@ -1,4 +1,10 @@
 # Miscellaneous
+.superpowers/
+docs/superpowers/
+graphify-out/
+
+# Backend secrets — commit backend/config.example.php, never backend/config.php
+backend/config.php
 *.class
 *.log
 *.pyc
