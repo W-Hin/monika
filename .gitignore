@@ -5,6 +5,13 @@ graphify-out/
 
 # Backend secrets — commit backend/config.example.php, never backend/config.php
 backend/config.php
+
+# Backend PHP dependencies — commit composer.json/composer.lock, not these
+backend/vendor/
+backend/composer.phar
+
+# Dev-mode password reset token log (stand-in until real email is wired up)
+backend/storage/
 *.class
 *.log
 *.pyc
