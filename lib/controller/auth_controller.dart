@@ -14,6 +14,7 @@ enum AuthStatus { unknown, signedOut, signedIn }
 class AuthController extends ChangeNotifier {
   AuthStatus status = AuthStatus.unknown;
   UserRole? role;
+  bool mustChangePassword = false;
   String? errorMessage;
 
   /// Call once at app startup. If Supabase already has a persisted session
@@ -60,6 +61,7 @@ class AuthController extends ChangeNotifier {
 
     final user = _mapToAppUser(row);
     role = user.userRole;
+    mustChangePassword = row['must_change_password'] as bool? ?? false;
     // Every account is "an employee" first — HR admins can use the
     // shell-switcher to view their own self-service tools (clock in, leave,
     // training), so employeeUser must reflect their real profile too, not
