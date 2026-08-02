@@ -12,6 +12,7 @@ import '../../shared/company_calendar.dart';
 import '../../shared/settings_placeholder.dart';
 import '../leave/leave_balances.dart';
 import '../payroll/hr_payroll.dart';
+import '../../employee/employee_shell.dart';
 
 class HrProfileScreen extends StatelessWidget {
   const HrProfileScreen({super.key});
@@ -120,6 +121,13 @@ class HrProfileScreen extends StatelessWidget {
                     label: 'Company Calendar',
                     color: c.primary,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CompanyCalendarScreen())),
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _MenuRow(
+                    icon: Icons.badge_outlined,
+                    label: 'Switch to My Employee View',
+                    color: c.primary,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EmployeeShell(viewingAsHr: true))),
                   ),
                 ],
               ),

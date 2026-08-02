@@ -7,7 +7,13 @@ import 'training/employee_training.dart';
 import 'profile/employee_profile.dart';
 
 class EmployeeShell extends StatefulWidget {
-  const EmployeeShell({super.key});
+  /// True when an HR admin reached this shell via the "Switch to My
+  /// Employee View" entry point rather than logging in as a plain
+  /// employee. Shows a small exit banner, since this shell has no back
+  /// button of its own otherwise (each tab manages its own AppBar).
+  final bool viewingAsHr;
+
+  const EmployeeShell({super.key, this.viewingAsHr = false});
 
   @override
   State<EmployeeShell> createState() => _EmployeeShellState();
@@ -29,7 +35,37 @@ class _EmployeeShellState extends State<EmployeeShell> {
     final c = context.colors;
     return Scaffold(
       backgroundColor: c.background,
-      body: IndexedStack(index: _index, children: _screens),
+      body: Column(
+        children: [
+          if (widget.viewingAsHr)
+            SafeArea(
+              bottom: false,
+              child: Container(
+                width: double.infinity,
+                color: c.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Row(
+                  children: [
+                    const Icon(Icons.visibility_outlined, color: Colors.white, size: 16),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Viewing as employee (your own account)',
+                        style: TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: TextButton.styleFrom(foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 10)),
+                      child: const Text('Back to HR', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          Expanded(child: IndexedStack(index: _index, children: _screens)),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),

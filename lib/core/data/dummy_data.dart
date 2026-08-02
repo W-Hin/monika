@@ -220,8 +220,22 @@ class DummyData {
     const LeaveBalance(employeeName: 'Lim Jia Hui', annualTotal: 14, annualUsed: 7, medicalTotal: 14, medicalUsed: 3, emergencyTotal: 3, emergencyUsed: 1),
   ];
 
-  static LeaveBalance get myLeaveBalance =>
-      leaveBalances.firstWhere((b) => b.employeeName == employeeUser.name);
+  static LeaveBalance get myLeaveBalance => leaveBalances.firstWhere(
+        (b) => b.employeeName == employeeUser.name,
+        // Leave is still dummy-data-backed on the employee side — this
+        // list only has the 6 seed names, so any other real signed-in
+        // user (e.g. an HR admin viewing their own employee tab) needs a
+        // safe fallback instead of a crash.
+        orElse: () => LeaveBalance(
+          employeeName: employeeUser.name,
+          annualTotal: 14,
+          annualUsed: 0,
+          medicalTotal: 14,
+          medicalUsed: 0,
+          emergencyTotal: 3,
+          emergencyUsed: 0,
+        ),
+      );
 
   static final List<PayrollSummary> payrollByEmployee = [
     const PayrollSummary(
@@ -288,8 +302,19 @@ class DummyData {
     ),
   ];
 
-  static PayrollSummary get currentPayroll =>
-      payrollByEmployee.firstWhere((p) => p.employeeName == employeeUser.name);
+  static PayrollSummary get currentPayroll => payrollByEmployee.firstWhere(
+        (p) => p.employeeName == employeeUser.name,
+        // Same fallback reasoning as myLeaveBalance above — Payroll is
+        // still dummy-data-backed on the employee side.
+        orElse: () => PayrollSummary(
+          employeeName: employeeUser.name,
+          month: 'June 2026',
+          baseSalary: 0,
+          deductions: 0,
+          netPay: 0,
+          items: const [],
+        ),
+      );
 
   // Dashboard quick stats (HR)
   static const int totalEmployees = 86;

@@ -60,10 +60,13 @@ class AuthController extends ChangeNotifier {
 
     final user = _mapToAppUser(row);
     role = user.userRole;
+    // Every account is "an employee" first — HR admins can use the
+    // shell-switcher to view their own self-service tools (clock in, leave,
+    // training), so employeeUser must reflect their real profile too, not
+    // stay on leftover dummy placeholder data.
+    DummyData.employeeUser = user;
     if (role == UserRole.hrAdmin) {
       DummyData.hrUser = user;
-    } else {
-      DummyData.employeeUser = user;
     }
     status = AuthStatus.signedIn;
     notifyListeners();

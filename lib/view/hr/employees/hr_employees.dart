@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
-import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
+import '../../../controller/employee_controller.dart';
 import 'add_employee.dart';
 import 'employee_detail.dart';
 
@@ -14,29 +14,21 @@ class HrEmployeesScreen extends StatefulWidget {
   State<HrEmployeesScreen> createState() => _HrEmployeesScreenState();
 }
 
+enum _StatusFilter { all, active, deactivated }
+
 class _HrEmployeesScreenState extends State<HrEmployeesScreen> {
-  late List<TeamMemberSummary> _employees;
   String _query = '';
+  _StatusFilter _statusFilter = _StatusFilter.all;
 
   @override
   void initState() {
     super.initState();
-    _employees = List.from(DummyData.teamOverview);
-  }
-
-  void _updateEmployee(TeamMemberSummary updated) {
-    setState(() {
-      final i = _employees.indexWhere((e) => e.id == updated.id);
-      if (i != -1) _employees[i] = updated;
-    });
+    employeeController.loadEmployees();
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final filtered = _query.isEmpty
-        ? _employees
-        : _employees.where((e) => e.name.toLowerCase().contains(_query.toLowerCase()) || e.department.toLowerCase().contains(_query.toLowerCase())).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -45,7 +37,10 @@ class _HrEmployeesScreenState extends State<HrEmployeesScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: IconButton(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddEmployeeScreen())),
+              onPressed: () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => const AddEmployeeScreen()));
+                employeeController.loadEmployees();
+              },
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(color: c.primary, borderRadius: BorderRadius.circular(10)),
@@ -69,18 +64,79 @@ class _HrEmployeesScreenState extends State<HrEmployeesScreen> {
                 ),
               ),
             ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                children: [
-                  ListRow(children: filtered.map((emp) => _EmployeeRow(
-                    emp: emp,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => EmployeeDetailScreen(employee: emp, onUpdate: _updateEmployee)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Row(
+                children: _StatusFilter.values.map((f) {
+                  final selected = _statusFilter == f;
+                  final label = switch (f) {
+                    _StatusFilter.all => 'All',
+                    _StatusFilter.active => 'Active',
+                    _StatusFilter.deactivated => 'Deactivated',
+                  };
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: GestureDetector(
+                      onTap: () => setState(() => _statusFilter = f),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: selected ? c.primary : c.surfaceMuted,
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: selected ? Colors.white : c.textMuted,
+                          ),
+                        ),
+                      ),
                     ),
-                  )).toList()),
-                ],
+                  );
+                }).toList(),
+              ),
+            ),
+            Expanded(
+              child: ListenableBuilder(
+                listenable: employeeController,
+                builder: (context, _) {
+                  if (employeeController.loading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final all = employeeController.employees;
+                  final filtered = all.where((e) {
+                    final matchesQuery = _query.isEmpty ||
+                        e.name.toLowerCase().contains(_query.toLowerCase()) ||
+                        e.department.toLowerCase().contains(_query.toLowerCase());
+                    final matchesStatus = switch (_statusFilter) {
+                      _StatusFilter.all => true,
+                      _StatusFilter.active => e.isActive,
+                      _StatusFilter.deactivated => !e.isActive,
+                    };
+                    return matchesQuery && matchesStatus;
+                  }).toList();
+                  if (filtered.isEmpty) {
+                    return const EmptyState(
+                      icon: Icons.people_outline_rounded,
+                      title: 'No employees found',
+                      subtitle: 'Try a different search, or add a new employee.',
+                    );
+                  }
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                    children: [
+                      ListRow(children: filtered.map((emp) => _EmployeeRow(
+                        emp: emp,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => EmployeeDetailScreen(employee: emp, onUpdate: employeeController.updateLocal)),
+                        ),
+                      )).toList()),
+                    ],
+                  );
+                },
               ),
             ),
           ],

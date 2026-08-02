@@ -13,6 +13,11 @@ import '../employees/add_employee.dart';
 import '../policy/policy_config.dart';
 import '../../shared/notification.dart';
 
+// Fixed so all 4 stat cards line up evenly — Attendance Rate carries an
+// extra trend row (increase/decrease indicator) the other 3 don't, so
+// letting each card size to its own content leaves a ragged bottom edge.
+const double _kStatCardHeight = 150;
+
 class HrHomeScreen extends StatefulWidget {
   const HrHomeScreen({super.key});
 
@@ -53,23 +58,29 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: StatCard(
-                    label: 'Total Employees',
-                    value: '${DummyData.totalEmployees}',
-                    icon: Icons.groups_rounded,
-                    iconColor: c.primary,
-                    iconBg: c.primaryLight,
+                  child: SizedBox(
+                    height: _kStatCardHeight,
+                    child: StatCard(
+                      label: 'Total Employees',
+                      value: '${DummyData.totalEmployees}',
+                      icon: Icons.groups_rounded,
+                      iconColor: c.primary,
+                      iconBg: c.primaryLight,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: StatCard(
-                    label: 'Attendance Rate',
-                    value: '${(DummyData.overallAttendanceRate * 100).toInt()}%',
-                    icon: Icons.event_available_rounded,
-                    iconColor: c.infoBlue,
-                    iconBg: c.infoBlueBg,
-                    trend: '+1.2%',
+                  child: SizedBox(
+                    height: _kStatCardHeight,
+                    child: StatCard(
+                      label: 'Attendance Rate',
+                      value: '${(DummyData.overallAttendanceRate * 100).toInt()}%',
+                      icon: Icons.event_available_rounded,
+                      iconColor: c.infoBlue,
+                      iconBg: c.infoBlueBg,
+                      trend: '+1.2%',
+                    ),
                   ),
                 ),
               ],
@@ -79,22 +90,28 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: StatCard(
-                    label: 'Pending Approvals',
-                    value: '${DummyData.pendingLeaveCount}',
-                    icon: Icons.pending_actions_rounded,
-                    iconColor: c.amber,
-                    iconBg: c.amberBg,
+                  child: SizedBox(
+                    height: _kStatCardHeight,
+                    child: StatCard(
+                      label: 'Pending Approvals',
+                      value: '${DummyData.pendingLeaveCount}',
+                      icon: Icons.pending_actions_rounded,
+                      iconColor: c.amber,
+                      iconBg: c.amberBg,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: StatCard(
-                    label: 'Flagged Today',
-                    value: '${DummyData.flaggedEventsToday}',
-                    icon: Icons.flag_rounded,
-                    iconColor: c.riskHigh,
-                    iconBg: c.riskHighBg,
+                  child: SizedBox(
+                    height: _kStatCardHeight,
+                    child: StatCard(
+                      label: 'Flagged Today',
+                      value: '${DummyData.flaggedEventsToday}',
+                      icon: Icons.flag_rounded,
+                      iconColor: c.riskHigh,
+                      iconBg: c.riskHighBg,
+                    ),
                   ),
                 ),
               ],
