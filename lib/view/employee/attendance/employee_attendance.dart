@@ -26,7 +26,7 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
     final user = DummyData.employeeUser;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Attendance')),
+      appBar: AppBar(automaticallyImplyLeading: false, title: const Text('Attendance')),
       body: SafeArea(
         top: false,
         child: ListenableBuilder(

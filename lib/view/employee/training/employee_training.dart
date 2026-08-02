@@ -61,7 +61,7 @@ class _EmployeeTrainingScreenState extends State<EmployeeTrainingScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Training & Development')),
+      appBar: AppBar(automaticallyImplyLeading: false, title: const Text('Training & Development')),
       body: SafeArea(
         top: false,
         child: Column(

@@ -92,6 +92,7 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('Profile'),
         actions: [
           if (!_isEditing)

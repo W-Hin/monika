@@ -115,9 +115,20 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorText = 'Could not update password: $e';
+        _errorText = _friendlyErrorMessage(e);
       });
     }
+  }
+
+  String _friendlyErrorMessage(Object e) {
+    final message = e.toString().toLowerCase();
+    if (message.contains('different from the old password') || message.contains('should be different')) {
+      return 'Your new password cannot be the same as your current password';
+    }
+    if (message.contains('at least') && message.contains('character')) {
+      return 'Password must be at least 8 characters';
+    }
+    return 'Could not update password. Please try again.';
   }
 
   @override

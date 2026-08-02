@@ -13,6 +13,7 @@ import '../../shared/settings_placeholder.dart';
 import '../leave/leave_balances.dart';
 import '../payroll/hr_payroll.dart';
 import '../../auth/set_password_screen.dart';
+import '../../employee/employee_shell.dart';
 
 class HrProfileScreen extends StatelessWidget {
   const HrProfileScreen({super.key});
@@ -71,6 +72,17 @@ class HrProfileScreen extends StatelessWidget {
                   const Divider(height: 1, indent: 56),
                   _InfoRow(icon: Icons.schedule_rounded, label: 'Employment Duration', value: user.employmentDuration),
                 ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            const SectionHeader(title: 'My Account'),
+            AppCard(
+              padding: EdgeInsets.zero,
+              child: _MenuRow(
+                icon: Icons.badge_outlined,
+                label: 'Switch to Employee View',
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EmployeeShell())),
               ),
             ),
             const SizedBox(height: 24),

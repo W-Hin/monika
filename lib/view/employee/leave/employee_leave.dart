@@ -18,6 +18,7 @@ class EmployeeLeaveScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('Leave'),
         actions: [
           Padding(
