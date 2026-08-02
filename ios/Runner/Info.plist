@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>MONIKA needs your location to verify you're within the office geofence when clocking in or out.</string>
 </dict>
 </plist>

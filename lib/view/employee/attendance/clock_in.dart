@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
+import '../../../controller/attendance_controller.dart';
+import '../../../model/models.dart';
 
 enum _StepState { pending, checking, success, failed }
 
@@ -13,41 +14,80 @@ class ClockInScreen extends StatefulWidget {
 }
 
 class _ClockInScreenState extends State<ClockInScreen> {
-  _StepState _gps = _StepState.pending;
-  _StepState _wifi = _StepState.pending;
-  _StepState _device = _StepState.pending;
+  _StepState _gpsState = _StepState.pending;
+  _StepState _wifiState = _StepState.pending;
+  _StepState _deviceState = _StepState.pending;
+  String _gpsDetail = 'Confirming you are within the office geofence';
+  String _wifiDetail = 'Matching against registered office network';
+  String _deviceDetail = 'Verifying this is your registered device';
+
   bool _isRunning = false;
   bool _isComplete = false;
   String _recordedTime = '';
+  bool _flagged = false;
+  String? _flagReason;
+  String? _submitError;
 
   Future<void> _runValidation() async {
     setState(() {
       _isRunning = true;
-      _gps = _StepState.checking;
+      _submitError = null;
+      _gpsState = _StepState.checking;
     });
 
-    await Future.delayed(const Duration(milliseconds: 900));
+    final gpsDelay = Future.delayed(const Duration(milliseconds: 500));
+    final gpsResult = await attendanceController.runGpsCheck();
+    await gpsDelay;
     if (!mounted) return;
     setState(() {
-      _gps = _StepState.success;
-      _wifi = _StepState.checking;
+      _gpsState = gpsResult.passed ? _StepState.success : _StepState.failed;
+      _gpsDetail = gpsResult.detail;
+      _wifiState = _StepState.checking;
     });
 
-    await Future.delayed(const Duration(milliseconds: 900));
+    final wifiDelay = Future.delayed(const Duration(milliseconds: 500));
+    final wifiResult = await attendanceController.runWifiCheck();
+    await wifiDelay;
     if (!mounted) return;
     setState(() {
-      _wifi = _StepState.success;
-      _device = _StepState.checking;
+      _wifiState = wifiResult.passed ? _StepState.success : _StepState.failed;
+      _wifiDetail = wifiResult.detail;
+      _deviceState = _StepState.checking;
     });
 
-    await Future.delayed(const Duration(milliseconds: 900));
+    final deviceDelay = Future.delayed(const Duration(milliseconds: 500));
+    final deviceResult = await attendanceController.runDeviceCheck();
+    await deviceDelay;
     if (!mounted) return;
     setState(() {
-      _device = _StepState.success;
-      _isRunning = false;
-      _isComplete = true;
-      _recordedTime = DateFormat('hh:mm a').format(DateTime.now());
+      _deviceState = deviceResult.passed ? _StepState.success : _StepState.failed;
+      _deviceDetail = deviceResult.detail;
     });
+
+    try {
+      final record = await attendanceController.submitClockIn(
+        gpsPassed: gpsResult.passed,
+        gpsLat: gpsResult.lat,
+        gpsLng: gpsResult.lng,
+        wifiPassed: wifiResult.passed,
+        wifiSsid: wifiResult.ssid,
+        devicePassed: deviceResult.passed,
+      );
+      if (!mounted) return;
+      setState(() {
+        _isRunning = false;
+        _isComplete = true;
+        _recordedTime = record.clockIn;
+        _flagged = record.status == AttendanceStatus.flagged;
+        _flagReason = record.flagReason;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isRunning = false;
+        _submitError = 'Could not save your attendance — check your connection and try again.';
+      });
+    }
   }
 
   @override
@@ -67,7 +107,7 @@ class _ClockInScreenState extends State<ClockInScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'MONIKA validates your location, network, and device simultaneously to prevent proxy attendance.',
+                'MONIKA validates your location, network, and device to prevent proxy attendance.',
                 style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4),
               ),
               const SizedBox(height: 28),
@@ -78,22 +118,22 @@ class _ClockInScreenState extends State<ClockInScreen> {
                     _ValidationStep(
                       icon: Icons.my_location_rounded,
                       title: 'GPS Geofence Validation',
-                      subtitle: 'Confirming you are within 100m of the office',
-                      state: _gps,
+                      subtitle: _gpsDetail,
+                      state: _gpsState,
                     ),
-                    _ConnectorLine(active: _gps == _StepState.success),
+                    _ConnectorLine(active: _gpsState != _StepState.pending),
                     _ValidationStep(
                       icon: Icons.wifi_rounded,
                       title: 'WiFi SSID Verification',
-                      subtitle: 'Matching against registered office network',
-                      state: _wifi,
+                      subtitle: _wifiDetail,
+                      state: _wifiState,
                     ),
-                    _ConnectorLine(active: _wifi == _StepState.success),
+                    _ConnectorLine(active: _wifiState != _StepState.pending),
                     _ValidationStep(
                       icon: Icons.phone_android_rounded,
                       title: 'Device Token Binding',
-                      subtitle: 'Verifying this is your registered device',
-                      state: _device,
+                      subtitle: _deviceDetail,
+                      state: _deviceState,
                     ),
 
                     if (_isComplete) ...[
@@ -101,7 +141,7 @@ class _ClockInScreenState extends State<ClockInScreen> {
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: c.riskLowBg,
+                          color: _flagged ? c.riskHighBg : c.riskLowBg,
                           borderRadius: BorderRadius.circular(18),
                           boxShadow: [c.shadowTinted()],
                         ),
@@ -110,21 +150,38 @@ class _ClockInScreenState extends State<ClockInScreen> {
                             Container(
                               width: 56,
                               height: 56,
-                              decoration: BoxDecoration(color: c.primary, shape: BoxShape.circle),
-                              child: const Icon(Icons.check_rounded, color: Colors.white, size: 30),
+                              decoration: BoxDecoration(color: _flagged ? c.riskHigh : c.primary, shape: BoxShape.circle),
+                              child: Icon(_flagged ? Icons.flag_rounded : Icons.check_rounded, color: Colors.white, size: 30),
                             ),
                             const SizedBox(height: 14),
                             Text(
-                              'Clock-In Successful',
+                              _flagged ? 'Clock-In Recorded — Flagged for Review' : 'Clock-In Successful',
+                              textAlign: TextAlign.center,
                               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: c.textPrimary),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Recorded at $_recordedTime, ${DateFormat('EEE d MMMM yyyy').format(DateTime.now())}',
+                              'Recorded at $_recordedTime',
                               style: TextStyle(fontSize: 12.5, color: c.textSecondary),
                             ),
+                            if (_flagged && _flagReason != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                _flagReason!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 12, color: c.riskHigh, fontWeight: FontWeight.w600),
+                              ),
+                            ],
                           ],
                         ),
+                      ),
+                    ],
+                    if (_submitError != null) ...[
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(color: c.riskHighBg, borderRadius: BorderRadius.circular(12)),
+                        child: Text(_submitError!, style: TextStyle(fontSize: 12.5, color: c.riskHigh, fontWeight: FontWeight.w600)),
                       ),
                     ],
                   ],

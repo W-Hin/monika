@@ -6,6 +6,7 @@ import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
+import '../../../controller/attendance_controller.dart';
 import '../attendance/clock_in.dart';
 import '../attendance/clock_out.dart';
 import '../leave/leave_apply.dart';
@@ -22,23 +23,19 @@ class EmployeeHomeScreen extends StatefulWidget {
 }
 
 class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
-  String? _clockInTime;
-  String? _clockOutTime;
+  @override
+  void initState() {
+    super.initState();
+    attendanceController.loadToday();
+    attendanceController.loadHistory();
+  }
 
   Future<void> _handleClockIn() async {
-    final result = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const ClockInScreen()),
-    );
-    if (result != null) setState(() => _clockInTime = result);
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => const ClockInScreen()));
   }
 
   Future<void> _handleClockOut() async {
-    final result = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const ClockOutScreen()),
-    );
-    if (result != null) setState(() => _clockOutTime = result);
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => const ClockOutScreen()));
   }
 
   @override
@@ -58,12 +55,14 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: ListView(
+        child: ListenableBuilder(
+          listenable: attendanceController,
+          builder: (context, _) => ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
             _ClockInCard(
-              clockInTime: _clockInTime,
-              clockOutTime: _clockOutTime,
+              clockInTime: attendanceController.todayRecord?.clockIn,
+              clockOutTime: attendanceController.todayRecord?.clockOut,
               onClockIn: _handleClockIn,
               onClockOut: _handleClockOut,
             ),
@@ -161,7 +160,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
               actionLabel: 'See all',
               onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AttendanceHistoryScreen())),
             ),
-            ...DummyData.attendanceHistory.take(3).map((r) => Padding(
+            ...attendanceController.history.take(3).map((r) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: _AttendanceTile(record: r),
             )),
@@ -188,6 +187,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
               ),
             ),
           ],
+          ),
         ),
       ),
     );

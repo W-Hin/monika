@@ -3,9 +3,22 @@ import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../core/data/dummy_data.dart';
+import '../../../controller/attendance_controller.dart';
 
-class EmployeeAttendanceScreen extends StatelessWidget {
+class EmployeeAttendanceScreen extends StatefulWidget {
   const EmployeeAttendanceScreen({super.key});
+
+  @override
+  State<EmployeeAttendanceScreen> createState() => _EmployeeAttendanceScreenState();
+}
+
+class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
+  @override
+  void initState() {
+    super.initState();
+    attendanceController.loadPolicy().then((_) => setState(() {}));
+    attendanceController.loadHistory();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +29,9 @@ class EmployeeAttendanceScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('Attendance')),
       body: SafeArea(
         top: false,
-        child: ListView(
+        child: ListenableBuilder(
+          listenable: attendanceController,
+          builder: (context, _) => ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
             AppCard(
@@ -76,17 +91,17 @@ class EmployeeAttendanceScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             const SectionHeader(title: 'IoT Verification Layers'),
-            const _VerificationInfoCard(
+            _VerificationInfoCard(
               icon: Icons.my_location_rounded,
               title: 'GPS Geofencing',
-              desc: 'Active · 100m radius around Main Office',
+              desc: 'Active · ${attendanceController.geofenceRadius}m radius around Main Office',
               ok: true,
             ),
             const SizedBox(height: 10),
-            const _VerificationInfoCard(
+            _VerificationInfoCard(
               icon: Icons.wifi_rounded,
               title: 'WiFi SSID Verification',
-              desc: 'Active · Connected to MONIKA-OFFICE-5G',
+              desc: 'Active · Connected to ${attendanceController.officeWifiSsid}',
               ok: true,
             ),
             const SizedBox(height: 10),
@@ -98,28 +113,36 @@ class EmployeeAttendanceScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             const SectionHeader(title: 'Recent Records'),
-            ...DummyData.attendanceHistory.map((r) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: AppCard(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(r.date, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 2),
-                          Text('${r.clockIn}${r.clockOut != null ? " → ${r.clockOut}" : ""}', style: TextStyle(fontSize: 12, color: c.textMuted)),
-                        ],
+            if (attendanceController.history.isEmpty)
+              const EmptyState(
+                icon: Icons.event_busy_rounded,
+                title: 'No attendance records yet',
+                subtitle: 'Clock in from the Home tab to start building your history.',
+              )
+            else
+              ...attendanceController.history.map((r) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: AppCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(r.date, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 2),
+                            Text('${r.clockIn}${r.clockOut != null ? " → ${r.clockOut}" : ""}', style: TextStyle(fontSize: 12, color: c.textMuted)),
+                          ],
+                        ),
                       ),
-                    ),
-                    StatusDot.attendance(context, r.status),
-                  ],
+                      StatusDot.attendance(context, r.status),
+                    ],
+                  ),
                 ),
-              ),
-            )),
+              )),
           ],
+          ),
         ),
       ),
     );

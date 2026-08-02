@@ -1,4 +1,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for all Supabase network calls (auth, REST, realtime) -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Required by geolocator for GPS geofence validation -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+
+    <!-- Required by network_info_plus to read the connected WiFi SSID.
+         Android also requires location permission (above) to be granted
+         at runtime before it will return a real SSID, not just these. -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+
     <application
         android:label="monika"
         android:name="${applicationName}"

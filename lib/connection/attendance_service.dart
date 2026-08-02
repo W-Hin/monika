@@ -1,0 +1,105 @@
+import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// Thin wrapper over the `attendance_records` / `policy_settings` tables.
+/// Holds no state of its own — AttendanceController owns app-facing state.
+class AttendanceService {
+  AttendanceService._();
+  static final _client = Supabase.instance.client;
+
+  static String get _todayDate => DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+  static Future<Map<String, dynamic>?> fetchTodayRecord() async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return null;
+    return _client
+        .from('attendance_records')
+        .select()
+        .eq('user_id', uid)
+        .eq('work_date', _todayDate)
+        .maybeSingle();
+  }
+
+  static Future<List<Map<String, dynamic>>> fetchHistory({int limit = 30}) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return [];
+    final rows = await _client
+        .from('attendance_records')
+        .select()
+        .eq('user_id', uid)
+        .order('work_date', ascending: false)
+        .limit(limit);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  static Future<Map<String, dynamic>> clockIn({
+    double? gpsLat,
+    double? gpsLng,
+    required bool gpsPassed,
+    String? wifiSsid,
+    required bool wifiPassed,
+    required bool devicePassed,
+    required String status,
+    String? flagReason,
+  }) async {
+    final uid = _client.auth.currentUser!.id;
+    final now = DateTime.now();
+    return _client
+        .from('attendance_records')
+        .insert({
+          'user_id': uid,
+          'work_date': _todayDate,
+          'clock_in_at': now.toIso8601String(),
+          'status': status,
+          'flag_reason': flagReason,
+          'gps_lat': gpsLat,
+          'gps_lng': gpsLng,
+          'gps_passed': gpsPassed,
+          'wifi_ssid': wifiSsid,
+          'wifi_passed': wifiPassed,
+          'device_passed': devicePassed,
+        })
+        .select()
+        .single();
+  }
+
+  static Future<Map<String, dynamic>> clockOut(int recordId) async {
+    return _client
+        .from('attendance_records')
+        .update({'clock_out_at': DateTime.now().toIso8601String()})
+        .eq('id', recordId)
+        .select()
+        .single();
+  }
+
+  static Future<Map<String, dynamic>?> fetchPolicySettings() {
+    return _client.from('policy_settings').select().eq('id', 1).maybeSingle();
+  }
+
+  /// Counts 'late'-status records in the last [days] days, including today's
+  /// just-inserted one — used to detect a repeated-late pattern worth
+  /// flagging to HR rather than raising an anomaly on every single late day.
+  static Future<int> countRecentLate({int days = 14}) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return 0;
+    final since = DateTime.now().subtract(Duration(days: days));
+    final rows = await _client
+        .from('attendance_records')
+        .select('id')
+        .eq('user_id', uid)
+        .eq('status', 'late')
+        .gte('work_date', DateFormat('yyyy-MM-dd').format(since));
+    return rows.length;
+  }
+
+  /// Called on first successful clock-in when the profile has no device
+  /// bound yet. Subsequent clock-ins compare against this instead.
+  static Future<void> bindDevice({required String deviceToken, required String deviceName}) async {
+    final uid = _client.auth.currentUser!.id;
+    await _client.from('profiles').update({
+      'device_token': deviceToken,
+      'registered_device_name': deviceName,
+      'device_bound_at': DateTime.now().toIso8601String(),
+    }).eq('id', uid);
+  }
+}

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
+import '../../../controller/attendance_controller.dart';
 
-enum _StepState { pending, checking, success }
+enum _StepState { pending, checking, success, failed }
 
 class ClockOutScreen extends StatefulWidget {
   const ClockOutScreen({super.key});
@@ -13,25 +13,51 @@ class ClockOutScreen extends StatefulWidget {
 }
 
 class _ClockOutScreenState extends State<ClockOutScreen> {
-  _StepState _gps = _StepState.pending;
+  _StepState _gpsState = _StepState.pending;
+  String _gpsDetail = 'Confirming you are within the office geofence';
   bool _isRunning = false;
   bool _isComplete = false;
   String _recordedTime = '';
+  String? _submitError;
 
   Future<void> _runValidation() async {
     setState(() {
       _isRunning = true;
-      _gps = _StepState.checking;
+      _submitError = null;
+      _gpsState = _StepState.checking;
     });
 
-    await Future.delayed(const Duration(milliseconds: 900));
+    final delay = Future.delayed(const Duration(milliseconds: 500));
+    final gpsResult = await attendanceController.runGpsCheck();
+    await delay;
     if (!mounted) return;
     setState(() {
-      _gps = _StepState.success;
-      _isRunning = false;
-      _isComplete = true;
-      _recordedTime = DateFormat('hh:mm a').format(DateTime.now());
+      _gpsState = gpsResult.passed ? _StepState.success : _StepState.failed;
+      _gpsDetail = gpsResult.detail;
     });
+
+    try {
+      final record = await attendanceController.submitClockOut();
+      if (!mounted) return;
+      if (record == null) {
+        setState(() {
+          _isRunning = false;
+          _submitError = 'No clock-in record found for today — clock in first.';
+        });
+        return;
+      }
+      setState(() {
+        _isRunning = false;
+        _isComplete = true;
+        _recordedTime = record.clockOut ?? '';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isRunning = false;
+        _submitError = 'Could not save your clock-out — check your connection and try again.';
+      });
+    }
   }
 
   @override
@@ -61,8 +87,8 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                     _ValidationStep(
                       icon: Icons.my_location_rounded,
                       title: 'GPS Geofence Validation',
-                      subtitle: 'Confirming you are within 100m of the office',
-                      state: _gps,
+                      subtitle: _gpsDetail,
+                      state: _gpsState,
                     ),
                     if (_isComplete) ...[
                       const SizedBox(height: 24),
@@ -88,11 +114,19 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Recorded at $_recordedTime, ${DateFormat('EEE d MMMM yyyy').format(DateTime.now())}',
+                              'Recorded at $_recordedTime',
                               style: TextStyle(fontSize: 12.5, color: c.textSecondary),
                             ),
                           ],
                         ),
+                      ),
+                    ],
+                    if (_submitError != null) ...[
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(color: c.riskHighBg, borderRadius: BorderRadius.circular(12)),
+                        child: Text(_submitError!, style: TextStyle(fontSize: 12.5, color: c.riskHigh, fontWeight: FontWeight.w600)),
                       ),
                     ],
                   ],
@@ -163,6 +197,11 @@ class _ValidationStep extends StatelessWidget {
           decoration: BoxDecoration(color: c.primary, shape: BoxShape.circle),
           child: const Icon(Icons.check_rounded, color: Colors.white, size: 15),
         );
+        break;
+      case _StepState.failed:
+        iconColor = c.riskHigh;
+        iconBg = c.riskHighBg;
+        trailing = Icon(Icons.cancel_rounded, color: c.riskHigh, size: 22);
         break;
     }
 

@@ -1,64 +1,91 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
-import '../../../core/data/dummy_data.dart';
+import '../../../controller/attendance_controller.dart';
 import '../../../model/models.dart';
 
-class AttendanceHistoryScreen extends StatelessWidget {
+class AttendanceHistoryScreen extends StatefulWidget {
   const AttendanceHistoryScreen({super.key});
+
+  @override
+  State<AttendanceHistoryScreen> createState() => _AttendanceHistoryScreenState();
+}
+
+class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
+  @override
+  void initState() {
+    super.initState();
+    attendanceController.loadHistory();
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final records = DummyData.attendanceHistory;
-    final flagged = records.where((r) => r.status == AttendanceStatus.flagged).length;
-    final late = records.where((r) => r.status == AttendanceStatus.late).length;
 
     return Scaffold(
       appBar: const SimpleAppBar(title: 'Attendance History'),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          children: [
-            Row(
+        child: ListenableBuilder(
+          listenable: attendanceController,
+          builder: (context, _) {
+            final records = attendanceController.history;
+            final flagged = records.where((r) => r.status == AttendanceStatus.flagged).length;
+            final late = records.where((r) => r.status == AttendanceStatus.late).length;
+            final onTime = records.where((r) => r.status == AttendanceStatus.onTime).length;
+            final rate = records.isEmpty ? 0 : ((onTime / records.length) * 100).round();
+
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
-                Expanded(
-                  child: StatCard(
-                    label: 'This Month',
-                    value: '96%',
-                    icon: Icons.event_available_rounded,
-                    iconColor: c.primary,
-                    iconBg: c.primaryLight,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: StatCard(
+                        label: 'This Month',
+                        value: '$rate%',
+                        icon: Icons.event_available_rounded,
+                        iconColor: c.primary,
+                        iconBg: c.primaryLight,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: StatCard(
+                        label: 'Late Arrivals',
+                        value: '$late',
+                        icon: Icons.schedule_rounded,
+                        iconColor: c.amber,
+                        iconBg: c.amberBg,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: StatCard(
+                        label: 'Flagged',
+                        value: '$flagged',
+                        icon: Icons.flag_outlined,
+                        iconColor: c.riskHigh,
+                        iconBg: c.riskHighBg,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatCard(
-                    label: 'Late Arrivals',
-                    value: '$late',
-                    icon: Icons.schedule_rounded,
-                    iconColor: c.amber,
-                    iconBg: c.amberBg,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatCard(
-                    label: 'Flagged',
-                    value: '$flagged',
-                    icon: Icons.flag_outlined,
-                    iconColor: c.riskHigh,
-                    iconBg: c.riskHighBg,
-                  ),
-                ),
+                const SizedBox(height: 24),
+                SectionHeader(title: DateFormat('MMMM yyyy').format(DateTime.now())),
+                if (records.isEmpty)
+                  const EmptyState(
+                    icon: Icons.event_busy_rounded,
+                    title: 'No attendance records yet',
+                    subtitle: 'Clock in from the Home tab to start building your history.',
+                  )
+                else
+                  ListRow(children: records.map((r) => _HistoryRow(record: r)).toList()),
               ],
-            ),
-            const SizedBox(height: 24),
-            const SectionHeader(title: 'June 2026'),
-            ListRow(children: records.map((r) => _HistoryRow(record: r)).toList()),
-          ],
+            );
+          },
         ),
       ),
     );
