@@ -189,16 +189,18 @@ function emailShell(title: string, bodyHtml: string): string {
 </html>`;
 }
 
-function welcomeEmailHtml(name: string, email: string, tempPassword: string, jobTitle: string, departmentName: string): string {
+function welcomeEmailHtml(name: string, email: string, tempPassword: string, jobTitle: string, departmentName: string, userRole: string): string {
+  const roleDescription = userRole === 'hr_admin'
+    ? `an <strong style="color:#15211B;">HR Administrator</strong> account (role: <strong style="color:#15211B;">${jobTitle}</strong>, ${departmentName})`
+    : `your employee account as <strong style="color:#15211B;">${jobTitle}</strong> in <strong style="color:#15211B;">${departmentName}</strong>`;
   const body = `
     <p style="margin:0 0 16px 0;font-size:14px;color:#5B6B63;line-height:1.6;">
       Hi ${name},
     </p>
     <p style="margin:0 0 16px 0;font-size:14px;color:#5B6B63;line-height:1.6;">
-      Welcome to MONIKA! Your employee account has been created as
-      <strong style="color:#15211B;">${jobTitle}</strong> in
-      <strong style="color:#15211B;">${departmentName}</strong>. You can now log in to the
-      MONIKA app using the credentials below.
+      Welcome to MONIKA! We've created ${roleDescription}. You can now log in to the
+      MONIKA app using the credentials below. You'll be asked to set your own password
+      the first time you log in.
     </p>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F1F4F2;border-radius:12px;margin:0 0 16px 0;">
       <tr><td style="padding:16px 20px;">
@@ -296,6 +298,7 @@ Deno.serve(async (req) => {
       avatar_initials: avatarInitials,
       hire_date: hireDate,
       base_salary: baseSalary ?? null,
+      must_change_password: true,
     });
 
     if (profileError) {
@@ -306,7 +309,7 @@ Deno.serve(async (req) => {
     const emailResult = await sendViaGmail(
       email,
       'Welcome to MONIKA - your account is ready',
-      welcomeEmailHtml(name, email, password, jobTitle, departmentName),
+      welcomeEmailHtml(name, email, password, jobTitle, departmentName, userRole),
     );
 
     return jsonResponse({
