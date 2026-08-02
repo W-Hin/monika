@@ -186,6 +186,7 @@ class PayrollDeductionItem {
 }
 
 class AnomalyEvent {
+  final int id;
   final String employeeName;
   final String type; // Out-of-zone, Shared-device, Late
   final String date;
@@ -194,6 +195,7 @@ class AnomalyEvent {
   final bool reviewed;
 
   const AnomalyEvent({
+    required this.id,
     required this.employeeName,
     required this.type,
     required this.date,
@@ -203,6 +205,7 @@ class AnomalyEvent {
   });
 
   AnomalyEvent copyWith({bool? reviewed}) => AnomalyEvent(
+        id: id,
         employeeName: employeeName,
         type: type,
         date: date,
@@ -213,7 +216,8 @@ class AnomalyEvent {
 }
 
 class TeamMemberSummary {
-  final String id;
+  final String id; // display employee_code, e.g. EMP-1042
+  final String uuid; // real profiles.id (auth.users uuid) — empty for dummy/unbacked rows
   final String name;
   final String email;
   final String jobTitle;
@@ -223,9 +227,11 @@ class TeamMemberSummary {
   final String avatarInitials;
   final String registeredDevice;
   final bool isActive;
+  final double? baseSalary;
 
   const TeamMemberSummary({
     required this.id,
+    this.uuid = '',
     required this.name,
     required this.email,
     required this.jobTitle,
@@ -235,6 +241,7 @@ class TeamMemberSummary {
     required this.avatarInitials,
     required this.registeredDevice,
     this.isActive = true,
+    this.baseSalary,
   });
 
   TeamMemberSummary copyWith({
@@ -242,9 +249,11 @@ class TeamMemberSummary {
     String? department,
     bool? isActive,
     String? registeredDevice,
+    double? baseSalary,
   }) =>
       TeamMemberSummary(
         id: id,
+        uuid: uuid,
         name: name,
         email: email,
         jobTitle: jobTitle ?? this.jobTitle,
@@ -254,6 +263,7 @@ class TeamMemberSummary {
         avatarInitials: avatarInitials,
         registeredDevice: registeredDevice ?? this.registeredDevice,
         isActive: isActive ?? this.isActive,
+        baseSalary: baseSalary ?? this.baseSalary,
       );
 }
 

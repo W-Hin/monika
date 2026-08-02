@@ -43,6 +43,49 @@ a small server-side script that holds the `service_role` key, creates the
 `auth.users` row and the matching `profiles` row together, and is called
 by the app over HTTPS. That's Phase 3 scope, not this initial setup.
 
+## Email sending (Gmail SMTP)
+
+`create-employee` and `notify-employee-change` (in `supabase/functions/`)
+send real email — the temporary password on account creation, and a
+change-notification when HR edits someone's job title, department, or
+salary. Both send through **your own Gmail account's SMTP server** over
+port 465 (implicit TLS), using a raw SMTP client written against Deno's
+`Deno.connectTls` (no external email API/service — nothing to sign up
+for beyond the Gmail account itself).
+
+Setup, one-time:
+
+1. On the Google account you want emails to come **from**, turn on
+   **2-Step Verification** (Google Account → Security).
+2. Generate an **App Password**: Google Account → Security → 2-Step
+   Verification → App passwords. Name it anything (e.g. "MONIKA"), copy
+   the 16-character password shown.
+3. In the Supabase Dashboard → **Edge Functions** → **Manage secrets**,
+   add:
+   - `GMAIL_SENDER_EMAIL` — the Gmail address itself
+   - `GMAIL_APP_PASSWORD` — the 16-character App Password from step 2
+     (not your regular Google password)
+4. Deploy both `create-employee` and `notify-employee-change` by copying
+   each function's `index.ts` **from the local file on disk**, not from
+   chat — pasting from a chat message has previously introduced invisible
+   formatting that broke the Dashboard's parser. Each file is
+   self-contained (no shared imports), since the Dashboard editor doesn't
+   reliably support cross-function-folder imports.
+5. Test by creating a test employee or editing an existing one's role —
+   check the `emailSent`/`emailError` fields in the response, and check
+   the destination inbox (including spam).
+
+**Status: experimental, not yet verified against a live deployment.**
+Supabase Edge Functions only document outbound ports 25 and 587 as
+blocked — port 465 (what Gmail SMTP needs) is not documented as blocked,
+but that's inference, not a confirmed test. If it turns out 465 is
+blocked in practice, or Gmail's SMTP flags the sends as suspicious
+(new sending pattern from an Edge Function's IP), the fallback is a
+transactional-email provider with single-sender verification (Brevo or
+SendGrid's free tiers both support this) instead of a full domain — same
+Edge Function structure, just swap `sendViaGmail(...)` for an HTTPS POST
+to the provider's API.
+
 ## Free-tier note
 
 A Supabase free-tier project pauses after about a week with no API

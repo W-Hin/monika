@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../model/models.dart';
+import '../../../connection/employee_service.dart';
 
 class EmployeeDetailScreen extends StatefulWidget {
   final TeamMemberSummary employee;
@@ -17,8 +20,10 @@ class EmployeeDetailScreen extends StatefulWidget {
 class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
   late TeamMemberSummary _emp;
   bool _isEditing = false;
+  bool _isSaving = false;
   late String _department;
   late String _jobTitle;
+  late TextEditingController _salaryController;
 
   final _departments = ['Engineering', 'Sales', 'Operations', 'Marketing', 'Design', 'Human Resources', 'Finance'];
   final _jobTitles = ['Employee', 'Senior Engineer', 'Team Lead', 'Manager', 'Designer', 'Analyst', 'Consultant', 'Mobile Developer', 'Backend Engineer', 'UI/UX Designer', 'Sales Executive', 'Operations Executive', 'Marketing Executive'];
@@ -29,19 +34,110 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     _emp = widget.employee;
     _department = _emp.department;
     _jobTitle = _emp.jobTitle;
+    _salaryController = TextEditingController(text: _emp.baseSalary?.toStringAsFixed(2) ?? '');
     if (!_departments.contains(_department)) _departments.add(_department);
     if (!_jobTitles.contains(_jobTitle)) _jobTitles.add(_jobTitle);
   }
 
-  void _saveRoleAndDept() {
-    setState(() {
-      _emp = _emp.copyWith(department: _department, jobTitle: _jobTitle);
-      _isEditing = false;
-    });
-    widget.onUpdate(_emp);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('✓ Role & department updated')),
-    );
+  @override
+  void dispose() {
+    _salaryController.dispose();
+    super.dispose();
+  }
+
+  /// The 1st of next calendar month — used as the "official" effective
+  /// date communicated in the change-notification email. The database
+  /// itself updates immediately (HR sees the new role/department/salary
+  /// right away); this date is purely what's told to the employee as when
+  /// the change is administratively/payroll effective.
+  DateTime get _nextMonthFirst {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month + 1, 1);
+  }
+
+  static const _monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  String _formatDate(DateTime date) => '${date.day} ${_monthNames[date.month - 1]} ${date.year}';
+
+  /// HR admins must not be able to change their own job title, department,
+  /// or salary — that's a self-approval/conflict-of-interest hole. Enforced
+  /// here (hides the edit affordance) and at the RLS layer (migration 0007)
+  /// so a bypassed client can't do it either. Any change to an HR admin's
+  /// own record must come from another HR admin.
+  bool get _isSelf => Supabase.instance.client.auth.currentUser?.id == _emp.uuid;
+
+  Future<void> _saveChanges() async {
+    final oldJobTitle = _emp.jobTitle;
+    final oldDepartment = _emp.department;
+    final oldSalary = _emp.baseSalary;
+    final newSalary = double.tryParse(_salaryController.text.trim());
+
+    final changed = oldJobTitle != _jobTitle || oldDepartment != _department || oldSalary != newSalary;
+    if (!changed) {
+      setState(() => _isEditing = false);
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      await EmployeeService.updateEmployment(
+        uuid: _emp.uuid,
+        jobTitle: _jobTitle,
+        departmentName: _department,
+        baseSalary: newSalary,
+      );
+      if (!mounted) return;
+      setState(() {
+        _emp = _emp.copyWith(department: _department, jobTitle: _jobTitle, baseSalary: newSalary);
+        _isEditing = false;
+        _isSaving = false;
+      });
+      widget.onUpdate(_emp);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✓ Employment details updated')),
+      );
+
+      // Best-effort — a failed notification email doesn't undo the save.
+      unawaited(_sendChangeNotification(
+        oldJobTitle: oldJobTitle,
+        oldDepartment: oldDepartment,
+        oldSalary: oldSalary,
+        newSalary: newSalary,
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save changes: $e')),
+      );
+    }
+  }
+
+  Future<void> _sendChangeNotification({
+    required String oldJobTitle,
+    required String oldDepartment,
+    required double? oldSalary,
+    required double? newSalary,
+  }) async {
+    if (_emp.email.isEmpty) return;
+    try {
+      await Supabase.instance.client.functions.invoke(
+        'notify-employee-change',
+        body: {
+          'email': _emp.email,
+          'name': _emp.name,
+          'oldJobTitle': oldJobTitle,
+          'newJobTitle': _jobTitle,
+          'oldDepartment': oldDepartment,
+          'newDepartment': _department,
+          'oldSalary': oldSalary,
+          'newSalary': newSalary,
+          'effectiveDate': _nextMonthFirst.toIso8601String().split('T').first,
+        },
+      );
+    } catch (_) {
+      // Silent — this is a courtesy notification, not visible feedback HR
+      // is waiting on. The change itself already saved successfully.
+    }
   }
 
   void _toggleActive() {
@@ -63,13 +159,23 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
             TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: activating ? c.primary : c.riskHigh),
-              onPressed: () {
-                setState(() => _emp = _emp.copyWith(isActive: activating));
-                widget.onUpdate(_emp);
-                Navigator.of(dialogContext).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(activating ? '✓ Account reactivated' : '✓ Account deactivated')),
-                );
+              onPressed: () async {
+                try {
+                  await EmployeeService.setActive(uuid: _emp.uuid, isActive: activating);
+                  if (!mounted) return;
+                  setState(() => _emp = _emp.copyWith(isActive: activating));
+                  widget.onUpdate(_emp);
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(activating ? '✓ Account reactivated' : '✓ Account deactivated')),
+                  );
+                } catch (e) {
+                  Navigator.of(dialogContext).pop();
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not update account: $e')),
+                  );
+                }
               },
               child: Text(activating ? 'Reactivate' : 'Deactivate'),
             ),
@@ -95,13 +201,23 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
             TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: c.riskHigh),
-              onPressed: () {
-                setState(() => _emp = _emp.copyWith(registeredDevice: 'Not yet registered'));
-                widget.onUpdate(_emp);
-                Navigator.of(dialogContext).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('✓ Device binding reset')),
-                );
+              onPressed: () async {
+                try {
+                  await EmployeeService.resetDeviceBinding(_emp.uuid);
+                  if (!mounted) return;
+                  setState(() => _emp = _emp.copyWith(registeredDevice: 'Not yet registered'));
+                  widget.onUpdate(_emp);
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('✓ Device binding reset')),
+                  );
+                } catch (e) {
+                  Navigator.of(dialogContext).pop();
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not reset device binding: $e')),
+                  );
+                }
               },
               child: const Text('Reset Binding'),
             ),
@@ -118,10 +234,11 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
       appBar: AppBar(
         title: const Text('Employee Details'),
         actions: [
-          if (!_isEditing)
-            IconButton(onPressed: () => setState(() => _isEditing = true), icon: const Icon(Icons.edit_outlined))
-          else
-            TextButton(onPressed: _saveRoleAndDept, child: const Text('Save')),
+          if (!_isSelf)
+            if (!_isEditing)
+              IconButton(onPressed: () => setState(() => _isEditing = true), icon: const Icon(Icons.edit_outlined))
+            else
+              TextButton(onPressed: _isSaving ? null : _saveChanges, child: Text(_isSaving ? 'Saving…' : 'Save')),
         ],
       ),
       body: SafeArea(
@@ -184,6 +301,24 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                     _DropdownField(label: 'Job Title', value: _jobTitle, items: _jobTitles, onChanged: (v) => setState(() => _jobTitle = v!)),
                     const SizedBox(height: 14),
                     _DropdownField(label: 'Department', value: _department, items: _departments, onChanged: (v) => setState(() => _department = v!)),
+                    const SizedBox(height: 14),
+                    Text('Basic Monthly Salary (RM)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _salaryController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(hintText: '3500.00', prefixText: 'RM '),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: c.infoBlueBg, borderRadius: BorderRadius.circular(10)),
+                      child: Text(
+                        'Any change is saved immediately, and the employee is emailed with an official effective date of ${_formatDate(_nextMonthFirst)}.',
+                        style: TextStyle(fontSize: 11.5, color: c.infoBlue, height: 1.4),
+                      ),
+                    ),
                   ],
                 ),
               )
@@ -195,6 +330,8 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                     _InfoRow(icon: Icons.work_outline_rounded, label: 'Job Title', value: _emp.jobTitle),
                     const Divider(height: 1, indent: 56),
                     _InfoRow(icon: Icons.apartment_rounded, label: 'Department', value: _emp.department),
+                    const Divider(height: 1, indent: 56),
+                    _InfoRow(icon: Icons.payments_outlined, label: 'Basic Monthly Salary', value: _emp.baseSalary != null ? 'RM ${_emp.baseSalary!.toStringAsFixed(2)}' : 'Not set'),
                   ],
                 ),
               ),

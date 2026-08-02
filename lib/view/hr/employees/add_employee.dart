@@ -1,6 +1,27 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
+
+/// Formats input as a Malaysian mobile number: max 10 digits, dash after
+/// the 3rd (e.g. 012-3456789). Strips anything non-numeric as you type.
+class MalaysianPhoneFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    var digits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    if (digits.length > 10) digits = digits.substring(0, 10);
+
+    final formatted = digits.length <= 3 ? digits : '${digits.substring(0, 3)}-${digits.substring(3)}';
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
 
 class AddEmployeeScreen extends StatefulWidget {
   const AddEmployeeScreen({super.key});
@@ -21,7 +42,24 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
   final _departments = ['Engineering', 'Sales', 'Operations', 'Marketing', 'Design', 'Human Resources', 'Finance'];
   final _jobTitles = ['Employee', 'Senior Engineer', 'Team Lead', 'Manager', 'Designer', 'Analyst', 'Consultant'];
 
-  void _submit() {
+  String _generateTempPassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    final rand = Random.secure();
+    return List.generate(10, (_) => chars[rand.nextInt(chars.length)]).join();
+  }
+
+  String _initialsFrom(String name) {
+    final initials = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .map((w) => w[0].toUpperCase())
+        .take(2)
+        .join();
+    return initials.isEmpty ? '??' : initials;
+  }
+
+  Future<void> _submit() async {
     if (_name.text.isEmpty || _email.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -32,45 +70,113 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
       return;
     }
     setState(() => _isSubmitting = true);
-    Future.delayed(const Duration(milliseconds: 900), () {
-      if (!mounted) return;
-      setState(() => _isSubmitting = false);
-      showDialog(
-        context: context,
-        builder: (dialogContext) {
-          final c = dialogContext.colors;
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 60, height: 60,
-                  decoration: BoxDecoration(color: c.primaryLight, shape: BoxShape.circle),
-                  child: Icon(Icons.check_circle_rounded, color: c.primary, size: 34),
-                ),
-                const SizedBox(height: 16),
-                const Text('Account Created', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 8),
-                Text(
-                  'A setup invitation has been sent to the employee\'s email address. They can now register their device and set a password.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12.5, color: c.textSecondary, height: 1.4),
-                ),
-                const SizedBox(height: 20),
-                PrimaryButton(
-                  label: 'Done',
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop();
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ],
-            ),
-          );
+
+    final tempPassword = _generateTempPassword();
+    final employeeCode = 'EMP-${DateTime.now().millisecondsSinceEpoch % 100000}';
+
+    try {
+      final response = await Supabase.instance.client.functions.invoke(
+        'create-employee',
+        body: {
+          'email': _email.text.trim(),
+          'password': tempPassword,
+          'name': _name.text.trim(),
+          'employeeCode': employeeCode,
+          'userRole': 'employee',
+          'jobTitle': _jobTitle,
+          'departmentName': _department,
+          'avatarInitials': _initialsFrom(_name.text),
+          'hireDate': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+          'baseSalary': double.tryParse(_salary.text.trim()),
         },
       );
-    });
+
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+
+      final data = response.data;
+      if (data is Map && data['error'] != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not create account: ${data['error']}'), backgroundColor: context.colors.riskHigh),
+        );
+        return;
+      }
+
+      final emailSent = data is Map && data['emailSent'] == true;
+      final emailError = data is Map ? data['emailError'] as String? : null;
+      _showSuccessDialog(tempPassword, emailSent, emailError);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not create account: $e'), backgroundColor: context.colors.riskHigh),
+      );
+    }
+  }
+
+  void _showSuccessDialog(String tempPassword, bool emailSent, String? emailError) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        final c = dialogContext.colors;
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 60, height: 60,
+                decoration: BoxDecoration(color: c.primaryLight, shape: BoxShape.circle),
+                child: Icon(Icons.check_circle_rounded, color: c.primary, size: 34),
+              ),
+              const SizedBox(height: 16),
+              const Text('Account Created', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              Text(
+                emailSent
+                    ? 'A welcome email with these login details has been sent to the employee. They can change their password after logging in.'
+                    : 'The account was created, but the welcome email could not be sent — share this temporary password with the employee securely instead.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12.5, color: c.textSecondary, height: 1.4),
+              ),
+              if (!emailSent) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(color: c.riskHighBg, borderRadius: BorderRadius.circular(10)),
+                  child: Text(
+                    emailError != null
+                        ? 'Email error: $emailError'
+                        : 'Email delivery is not configured — set GMAIL_SENDER_EMAIL and GMAIL_APP_PASSWORD as Edge Function secrets.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 11, color: c.riskHigh),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+                child: SelectableText(
+                  tempPassword,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 1),
+                ),
+              ),
+              const SizedBox(height: 20),
+              PrimaryButton(
+                label: 'Done',
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -93,7 +199,14 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
               const SizedBox(height: 14),
               _Field(label: 'Email Address *', controller: _email, hint: 'employee@company.com', icon: Icons.mail_outline_rounded, type: TextInputType.emailAddress),
               const SizedBox(height: 14),
-              _Field(label: 'Phone Number', controller: _phone, hint: '+60 12-345 6789', icon: Icons.phone_outlined, type: TextInputType.phone),
+              _Field(
+                label: 'Phone Number',
+                controller: _phone,
+                hint: '012-3456789',
+                icon: Icons.phone_outlined,
+                type: TextInputType.phone,
+                inputFormatters: [MalaysianPhoneFormatter()],
+              ),
               const SizedBox(height: 24),
 
               // Role & Department
@@ -214,6 +327,7 @@ class _Field extends StatelessWidget {
   final String hint;
   final IconData icon;
   final TextInputType type;
+  final List<TextInputFormatter>? inputFormatters;
 
   const _Field({
     required this.label,
@@ -221,6 +335,7 @@ class _Field extends StatelessWidget {
     required this.hint,
     required this.icon,
     this.type = TextInputType.text,
+    this.inputFormatters,
   });
 
   @override
@@ -234,6 +349,7 @@ class _Field extends StatelessWidget {
         TextField(
           controller: controller,
           keyboardType: type,
+          inputFormatters: inputFormatters,
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: Icon(icon, size: 18, color: c.textMuted),
