@@ -37,6 +37,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
   final _salary = TextEditingController(text: '3500.00');
   String _department = 'Engineering';
   String _jobTitle = 'Employee';
+  String _accountType = 'employee';
   bool _isSubmitting = false;
 
   final _departments = ['Engineering', 'Sales', 'Operations', 'Marketing', 'Design', 'Human Resources', 'Finance'];
@@ -82,7 +83,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
           'password': tempPassword,
           'name': _name.text.trim(),
           'employeeCode': employeeCode,
-          'userRole': 'employee',
+          'userRole': _accountType,
           'jobTitle': _jobTitle,
           'departmentName': _department,
           'avatarInitials': _initialsFrom(_name.text),
@@ -212,6 +213,53 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
               // Role & Department
               _SectionHeader(icon: Icons.work_outline_rounded, title: 'Role & Department'),
               const SizedBox(height: 12),
+              Text('Account Type', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(14)),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _accountType = 'employee'),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _accountType == 'employee' ? c.primary : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            'Employee',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _accountType == 'employee' ? Colors.white : c.textMuted),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _accountType = 'hr_admin'),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _accountType == 'hr_admin' ? c.primary : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            'HR Admin',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _accountType == 'hr_admin' ? Colors.white : c.textMuted),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
               _DropdownField(
                 label: 'Department',
                 value: _department,
