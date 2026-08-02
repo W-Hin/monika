@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_colors_extension.dart';
 import '../shared/widgets/buttons.dart';
+import 'verify_reset_code_screen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -25,7 +27,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return RegExp(r'^[\w\.\-]+@[\w\-]+\.[\w\.\-]+$').hasMatch(value.trim());
   }
 
-  void _handleSendLink() {
+  Future<void> _handleSendLink() async {
     final email = _emailController.text.trim();
     if (email.isEmpty || !_isValidEmail(email)) {
       setState(() => _errorText = 'Enter a valid email address');
@@ -35,13 +37,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _errorText = null;
       _isLoading = true;
     });
-    // Phase 1 prototype — simulated request; Phase 2 will call auth_service.dart
-    Future.delayed(const Duration(milliseconds: 900), () {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _linkSent = true;
-      });
+    try {
+      await Supabase.instance.client.auth.resetPasswordForEmail(email);
+    } catch (_) {
+      // Deliberately silent — Supabase already avoids confirming whether
+      // an account exists for this email, and the UI's copy below is
+      // generic regardless of outcome, so there's nothing more useful to
+      // show the user here even on failure.
+    }
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+      _linkSent = true;
     });
   }
 
@@ -87,7 +94,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Enter the email address associated with your account and we\'ll send you a link to reset your password.',
+          'Enter the email address associated with your account and we\'ll send you a code to reset your password.',
           style: TextStyle(fontSize: 14.5, color: c.textSecondary, height: 1.4),
         ),
         const SizedBox(height: 28),
@@ -107,30 +114,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
         const SizedBox(height: 24),
         PrimaryButton(
-          label: 'Send Reset Link',
+          label: 'Send Reset Code',
           onPressed: _handleSendLink,
           isLoading: _isLoading,
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: c.wash(c.primary),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.info_outline_rounded, size: 18, color: c.primaryDark),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Phase 1 Prototype — no email is actually sent. This simulates the reset flow.',
-                  style: TextStyle(fontSize: 12, color: c.primaryDark.withOpacity(0.9), height: 1.4),
-                ),
-              ),
-            ],
-          ),
         ),
       ],
     );
@@ -157,13 +143,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          'If an account exists for ${_emailController.text.trim()}, a password reset link has been sent.',
+          'If an account exists for ${_emailController.text.trim()}, a 6-digit reset code has been sent.',
           style: TextStyle(fontSize: 14.5, color: c.textSecondary, height: 1.4),
         ),
         const SizedBox(height: 28),
         PrimaryButton(
-          label: 'Back to Login',
-          onPressed: () => Navigator.of(context).pop(),
+          label: 'Enter Code',
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => VerifyResetCodeScreen(email: _emailController.text.trim())),
+          ),
         ),
         const SizedBox(height: 12),
         Center(

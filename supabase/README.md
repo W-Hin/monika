@@ -86,6 +86,28 @@ SendGrid's free tiers both support this) instead of a full domain — same
 Edge Function structure, just swap `sendViaGmail(...)` for an HTTPS POST
 to the provider's API.
 
+## Forgot Password (email OTP code)
+
+Forgot Password uses Supabase Auth's own built-in email delivery
+(`resetPasswordForEmail` / `verifyOTP`) — a completely separate system
+from the Gmail SMTP Edge Functions above, and it needs no secrets of its
+own.
+
+**One manual Dashboard step required:** by default, Supabase's "Reset
+Password" email template only renders a clickable link
+(`{{ .ConfirmationURL }}`), not a code. This app's flow needs an actual
+6-digit code in the email instead. To fix:
+
+1. Supabase Dashboard → Authentication → Email Templates → **Reset
+   Password**.
+2. Add `{{ .Token }}` somewhere in the template body (e.g. "Your reset
+   code is: `{{ .Token }}`").
+3. Save.
+
+Without this, `resetPasswordForEmail` will still succeed and an email
+will still arrive, but it won't contain a code the app's "Enter Code"
+screen can use.
+
 ## Free-tier note
 
 A Supabase free-tier project pauses after about a week with no API
