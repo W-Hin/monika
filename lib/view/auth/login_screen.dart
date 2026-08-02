@@ -135,28 +135,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: _handleLogin,
                 isLoading: _isLoading,
               ),
-              const SizedBox(height: 16),
-
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: c.wash(c.primary),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.info_outline_rounded, size: 18, color: c.primaryDark),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'You\'ll land in your employee view first. HR admins can switch to Admin View from the profile menu.',
-                        style: TextStyle(fontSize: 12, color: c.primaryDark.withOpacity(0.9), height: 1.4),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               const SizedBox(height: 24),
             ],
           ),

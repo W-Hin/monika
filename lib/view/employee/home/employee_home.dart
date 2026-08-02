@@ -15,6 +15,12 @@ import '../pe/pe_detail.dart';
 import '../attendance/attendance_history.dart';
 import '../../shared/notification.dart';
 
+// Fixed so both stat cards line up evenly — Attendance Rate carries an
+// extra trend row (increase/decrease indicator) Leave Balance doesn't,
+// so letting each card size to its own content leaves a ragged bottom
+// edge. Same fix as the HR dashboard's stat card row.
+const double _kStatCardHeight = 150;
+
 class EmployeeHomeScreen extends StatefulWidget {
   const EmployeeHomeScreen({super.key});
 
@@ -70,25 +76,32 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
 
             // Quick stat row
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: StatCard(
-                    label: 'Attendance Rate',
-                    value: '96%',
-                    icon: Icons.event_available_rounded,
-                    iconColor: c.primary,
-                    iconBg: c.primaryLight,
-                    trend: '+2% MoM',
+                  child: SizedBox(
+                    height: _kStatCardHeight,
+                    child: StatCard(
+                      label: 'Attendance Rate',
+                      value: '96%',
+                      icon: Icons.event_available_rounded,
+                      iconColor: c.primary,
+                      iconBg: c.primaryLight,
+                      trend: '+2% MoM',
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: StatCard(
-                    label: 'Leave Balance',
-                    value: '${DummyData.myLeaveBalance.annualRemaining} days',
-                    icon: Icons.beach_access_rounded,
-                    iconColor: c.infoBlue,
-                    iconBg: c.infoBlueBg,
+                  child: SizedBox(
+                    height: _kStatCardHeight,
+                    child: StatCard(
+                      label: 'Leave Balance',
+                      value: '${DummyData.myLeaveBalance.annualRemaining} days',
+                      icon: Icons.beach_access_rounded,
+                      iconColor: c.infoBlue,
+                      iconBg: c.infoBlueBg,
+                    ),
                   ),
                 ),
               ],
