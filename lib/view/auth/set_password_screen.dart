@@ -17,24 +17,34 @@ class SetPasswordScreen extends StatefulWidget {
 }
 
 class _SetPasswordScreenState extends State<SetPasswordScreen> {
+  final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  bool _obscureCurrent = true;
   bool _obscureNew = true;
   bool _obscureConfirm = true;
   bool _isLoading = false;
   String? _errorText;
 
+  bool get _requiresCurrentPassword => widget.mode == SetPasswordMode.voluntary;
+
   @override
   void dispose() {
+    _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
+    final currentPassword = _currentPasswordController.text;
     final newPassword = _newPasswordController.text;
     final confirmPassword = _confirmPasswordController.text;
 
+    if (_requiresCurrentPassword && currentPassword.isEmpty) {
+      setState(() => _errorText = 'Enter your current password');
+      return;
+    }
     if (newPassword.length < 8) {
       setState(() => _errorText = 'Password must be at least 8 characters');
       return;
@@ -50,6 +60,23 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
     });
 
     try {
+      if (_requiresCurrentPassword) {
+        final email = Supabase.instance.client.auth.currentUser?.email;
+        if (email == null) {
+          throw Exception('No active session');
+        }
+        try {
+          await Supabase.instance.client.auth.signInWithPassword(email: email, password: currentPassword);
+        } on AuthException {
+          if (!mounted) return;
+          setState(() {
+            _isLoading = false;
+            _errorText = 'Current password is incorrect';
+          });
+          return;
+        }
+      }
+
       await Supabase.instance.client.auth.updateUser(
         UserAttributes(password: newPassword),
       );
@@ -129,6 +156,27 @@ class _SetPasswordScreenState extends State<SetPasswordScreen> {
                 style: TextStyle(fontSize: 14.5, color: c.textSecondary, height: 1.4),
               ),
               const SizedBox(height: 28),
+
+              if (_requiresCurrentPassword) ...[
+                Text('Current Password', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _currentPasswordController,
+                  obscureText: _obscureCurrent,
+                  onChanged: (_) {
+                    if (_errorText != null) setState(() => _errorText = null);
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Enter your current password',
+                    prefixIcon: Icon(Icons.lock_person_outlined, size: 20, color: c.textMuted),
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscureCurrent ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20, color: c.textMuted),
+                      onPressed: () => setState(() => _obscureCurrent = !_obscureCurrent),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+              ],
 
               Text('New Password', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
               const SizedBox(height: 8),
