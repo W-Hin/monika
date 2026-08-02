@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors_extension.dart';
 import '../shared/widgets/buttons.dart';
-import '../../model/models.dart';
 import '../../controller/auth_controller.dart';
 import '../employee/employee_shell.dart';
-import '../hr/hr_shell.dart';
 import 'forgot_password.dart';
+import 'set_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -36,19 +35,24 @@ class _LoginScreenState extends State<LoginScreen> {
     );
     if (!mounted) return;
     setState(() => _isLoading = false);
-    if (success) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => authController.role == UserRole.hrAdmin
-              ? const HrShell()
-              : const EmployeeShell(),
-        ),
-      );
-    } else {
+
+    if (!success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(authController.errorMessage ?? 'Login failed. Check your credentials.')),
       );
+      return;
     }
+
+    if (authController.mustChangePassword) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const SetPasswordScreen(mode: SetPasswordMode.mandatoryFirstLogin)),
+      );
+      return;
+    }
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const EmployeeShell()),
+    );
   }
 
   @override
@@ -146,7 +150,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Your role (Employee or HR Administrator) is determined automatically from your account after logging in.',
+                        'You\'ll land in your employee view first. HR admins can switch to Admin View from the profile menu.',
                         style: TextStyle(fontSize: 12, color: c.primaryDark.withOpacity(0.9), height: 1.4),
                       ),
                     ),
