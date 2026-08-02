@@ -120,10 +120,17 @@ async function sendViaGmail(to: string, subject: string, html: string): Promise<
     if (res.code !== 354) throw new Error(`DATA failed: ${res.text}`);
 
     const stuffedHtml = html.replace(/^\./gm, '..');
+    // Date and Message-ID are standard RFC 5322 headers every real MTA
+    // includes - a manually composed message missing them is a common
+    // spam-filter signal, separate from whether the SMTP transaction
+    // itself succeeds.
+    const messageId = `<${crypto.randomUUID()}@${GMAIL_SENDER.split('@')[1]}>`;
     const message =
       `From: MONIKA HR <${GMAIL_SENDER}>\r\n` +
       `To: ${to}\r\n` +
       `Subject: ${subject}\r\n` +
+      `Date: ${new Date().toUTCString()}\r\n` +
+      `Message-ID: ${messageId}\r\n` +
       `MIME-Version: 1.0\r\n` +
       `Content-Type: text/html; charset=UTF-8\r\n` +
       `\r\n` +

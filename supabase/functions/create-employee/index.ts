@@ -124,10 +124,19 @@ async function sendViaGmail(to: string, subject: string, html: string): Promise<
     // Dot-stuffing per RFC 5321: a line starting with '.' must be escaped
     // as '..' so it isn't mistaken for the end-of-message marker below.
     const stuffedHtml = html.replace(/^\./gm, '..');
+    // Date and Message-ID are standard RFC 5322 headers every real MTA
+    // includes - a manually composed message missing them is a common
+    // spam-filter signal, separate from whether the SMTP transaction
+    // itself succeeds (Gmail accepting the message with a 250 response
+    // only means it was handed off, not that the recipient's server
+    // won't still flag it as spam).
+    const messageId = `<${crypto.randomUUID()}@${GMAIL_SENDER.split('@')[1]}>`;
     const message =
       `From: MONIKA HR <${GMAIL_SENDER}>\r\n` +
       `To: ${to}\r\n` +
       `Subject: ${subject}\r\n` +
+      `Date: ${new Date().toUTCString()}\r\n` +
+      `Message-ID: ${messageId}\r\n` +
       `MIME-Version: 1.0\r\n` +
       `Content-Type: text/html; charset=UTF-8\r\n` +
       `\r\n` +
