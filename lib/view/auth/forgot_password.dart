@@ -143,7 +143,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          'If an account exists for ${_emailController.text.trim()}, a 6-digit reset code has been sent.',
+          'If an account exists for ${_emailController.text.trim()}, an 8-digit reset code has been sent.',
           style: TextStyle(fontSize: 14.5, color: c.textSecondary, height: 1.4),
         ),
         const SizedBox(height: 28),

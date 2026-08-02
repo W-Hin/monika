@@ -96,7 +96,9 @@ own.
 **One manual Dashboard step required:** by default, Supabase's "Reset
 Password" email template only renders a clickable link
 (`{{ .ConfirmationURL }}`), not a code. This app's flow needs an actual
-6-digit code in the email instead. To fix:
+code in the email instead — `{{ .Token }}` renders as an 8-digit code
+(Supabase's own format, confirmed against a real received email — not
+the shorter 6-digit code some other providers use). To fix:
 
 1. Supabase Dashboard → Authentication → Email Templates → **Reset
    Password**.

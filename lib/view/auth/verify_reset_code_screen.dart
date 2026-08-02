@@ -26,8 +26,8 @@ class _VerifyResetCodeScreenState extends State<VerifyResetCodeScreen> {
 
   Future<void> _verify() async {
     final code = _codeController.text.trim();
-    if (code.length != 6) {
-      setState(() => _errorText = 'Enter the 6-digit code from your email');
+    if (code.length != 8) {
+      setState(() => _errorText = 'Enter the 8-digit code from your email');
       return;
     }
 
@@ -78,7 +78,7 @@ class _VerifyResetCodeScreenState extends State<VerifyResetCodeScreen> {
               Text('Enter your code', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: c.textPrimary)),
               const SizedBox(height: 6),
               Text(
-                'We sent a 6-digit code to ${widget.email}. Enter it below.',
+                'We sent an 8-digit code to ${widget.email}. Enter it below.',
                 style: TextStyle(fontSize: 14.5, color: c.textSecondary, height: 1.4),
               ),
               const SizedBox(height: 28),
@@ -87,12 +87,12 @@ class _VerifyResetCodeScreenState extends State<VerifyResetCodeScreen> {
               TextField(
                 controller: _codeController,
                 keyboardType: TextInputType.number,
-                maxLength: 6,
+                maxLength: 8,
                 onChanged: (_) {
                   if (_errorText != null) setState(() => _errorText = null);
                 },
                 decoration: InputDecoration(
-                  hintText: '123456',
+                  hintText: '12345678',
                   prefixIcon: Icon(Icons.pin_outlined, size: 20, color: c.textMuted),
                   errorText: _errorText,
                   counterText: '',
