@@ -84,6 +84,7 @@ class _HrAnalyticsScreenState extends State<HrAnalyticsScreen> {
     final c = context.colors;
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('Analytics & Reports'),
         actions: [
           Padding(

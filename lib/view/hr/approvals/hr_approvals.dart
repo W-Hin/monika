@@ -68,6 +68,7 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('Leave Approvals'),
         actions: [
           IconButton(

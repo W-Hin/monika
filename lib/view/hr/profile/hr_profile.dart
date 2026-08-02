@@ -12,7 +12,6 @@ import '../../shared/company_calendar.dart';
 import '../../shared/settings_placeholder.dart';
 import '../leave/leave_balances.dart';
 import '../payroll/hr_payroll.dart';
-import '../../employee/employee_shell.dart';
 import '../../auth/set_password_screen.dart';
 
 class HrProfileScreen extends StatelessWidget {
@@ -24,7 +23,7 @@ class HrProfileScreen extends StatelessWidget {
     final user = DummyData.hrUser;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(automaticallyImplyLeading: false, title: const Text('Profile')),
       body: SafeArea(
         top: false,
         child: ListView(
@@ -122,13 +121,6 @@ class HrProfileScreen extends StatelessWidget {
                     label: 'Company Calendar',
                     color: c.primary,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CompanyCalendarScreen())),
-                  ),
-                  const Divider(height: 1, indent: 56),
-                  _MenuRow(
-                    icon: Icons.badge_outlined,
-                    label: 'Switch to My Employee View',
-                    color: c.primary,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EmployeeShell(viewingAsHr: true))),
                   ),
                 ],
               ),

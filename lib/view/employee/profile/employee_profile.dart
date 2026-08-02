@@ -148,6 +148,19 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
               ),
             ),
 
+            if (authController.role == UserRole.hrAdmin) ...[
+              const SizedBox(height: 24),
+              const SectionHeader(title: 'Administration'),
+              AppCard(
+                padding: EdgeInsets.zero,
+                child: _MenuRow(
+                  icon: Icons.admin_panel_settings_outlined,
+                  label: 'Switch to Admin View',
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HrShell())),
+                ),
+              ),
+            ],
+
             const SizedBox(height: 24),
             const SectionHeader(title: 'Registered Device'),
             AppCard(
@@ -169,7 +182,10 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
                       ],
                     ),
                   ),
-                  TextButton(onPressed: _requestDeviceChange, child: const Text('Request Change')),
+                  TextButton(
+                    onPressed: user.registeredDevice == 'Not yet registered' ? null : _requestDeviceChange,
+                    child: const Text('Request Change'),
+                  ),
                 ],
               ),
             ),
@@ -199,14 +215,6 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
                     label: 'Change Password',
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SetPasswordScreen(mode: SetPasswordMode.voluntary))),
                   ),
-                  if (authController.role == UserRole.hrAdmin) ...[
-                    const Divider(height: 1, indent: 56),
-                    _MenuRow(
-                      icon: Icons.admin_panel_settings_outlined,
-                      label: 'Switch to Admin View',
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HrShell(viewingAsEmployee: true))),
-                    ),
-                  ],
                   const Divider(height: 1, indent: 56),
                   _MenuRow(
                     icon: Icons.help_outline_rounded,
