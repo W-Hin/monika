@@ -106,6 +106,12 @@ the shorter 6-digit code some other providers use). To fix:
    code is: `{{ .Token }}`").
 3. Save.
 
+**Branded template available:** `supabase/email_templates/reset_password.html`
+has the full HTML for a MONIKA-branded version of this email (matching
+the welcome email's look) — paste its contents into the Message body
+field (Subject heading: "Reset your MONIKA password"), replacing
+Supabase's plain default.
+
 Without this, `resetPasswordForEmail` will still succeed and an email
 will still arrive, but it won't contain a code the app's "Enter Code"
 screen can use.
