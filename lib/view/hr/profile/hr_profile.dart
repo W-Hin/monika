@@ -13,6 +13,7 @@ import '../../shared/settings_placeholder.dart';
 import '../leave/leave_balances.dart';
 import '../payroll/hr_payroll.dart';
 import '../../employee/employee_shell.dart';
+import '../../auth/set_password_screen.dart';
 
 class HrProfileScreen extends StatelessWidget {
   const HrProfileScreen({super.key});
@@ -162,7 +163,7 @@ class HrProfileScreen extends StatelessWidget {
                   _MenuRow(
                     icon: Icons.lock_outline_rounded,
                     label: 'Change Password',
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPlaceholderScreen(title: 'Change Password', icon: Icons.lock_outline_rounded))),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SetPasswordScreen(mode: SetPasswordMode.voluntary))),
                   ),
                   const Divider(height: 1, indent: 56),
                   _MenuRow(

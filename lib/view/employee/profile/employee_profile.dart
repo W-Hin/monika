@@ -5,7 +5,10 @@ import '../../../controller/auth_controller.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../core/data/dummy_data.dart';
+import '../../../model/models.dart';
 import '../../auth/login_screen.dart';
+import '../../auth/set_password_screen.dart';
+import '../../hr/hr_shell.dart';
 import '../../shared/company_calendar.dart';
 import '../../shared/settings_placeholder.dart';
 
@@ -194,8 +197,16 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
                   _MenuRow(
                     icon: Icons.lock_outline_rounded,
                     label: 'Change Password',
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPlaceholderScreen(title: 'Change Password', icon: Icons.lock_outline_rounded))),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SetPasswordScreen(mode: SetPasswordMode.voluntary))),
                   ),
+                  if (authController.role == UserRole.hrAdmin) ...[
+                    const Divider(height: 1, indent: 56),
+                    _MenuRow(
+                      icon: Icons.admin_panel_settings_outlined,
+                      label: 'Switch to Admin View',
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HrShell(viewingAsEmployee: true))),
+                    ),
+                  ],
                   const Divider(height: 1, indent: 56),
                   _MenuRow(
                     icon: Icons.help_outline_rounded,
