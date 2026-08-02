@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../../main.dart';
+import '../../../controller/auth_controller.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../../core/data/dummy_data.dart';
 import '../../auth/login_screen.dart';
@@ -169,10 +170,14 @@ class HrProfileScreen extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                      (route) => false,
-                ),
+                onPressed: () async {
+                  await authController.signOut();
+                  if (!context.mounted) return;
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                        (route) => false,
+                  );
+                },
                 icon: Icon(Icons.logout_rounded, size: 18, color: c.riskHigh),
                 label: const Text('Log Out'),
                 style: OutlinedButton.styleFrom(

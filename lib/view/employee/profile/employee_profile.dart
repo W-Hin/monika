@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../../main.dart';
+import '../../../controller/auth_controller.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../core/data/dummy_data.dart';
@@ -209,7 +210,9 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () {
+                onPressed: () async {
+                  await authController.signOut();
+                  if (!context.mounted) return;
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (_) => const LoginScreen()),
                         (route) => false,

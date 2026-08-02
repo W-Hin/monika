@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors_extension.dart';
 import '../shared/widgets/buttons.dart';
 import '../../model/models.dart';
+import '../../controller/auth_controller.dart';
 import '../employee/employee_shell.dart';
 import '../hr/hr_shell.dart';
+import 'forgot_password.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,12 +15,11 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  UserRole _selectedRole = UserRole.employee;
   bool _obscurePassword = true;
   bool _isLoading = false;
 
-  final _emailController = TextEditingController(text: 'hin.chenwei@monika-demo.com');
-  final _passwordController = TextEditingController(text: '••••••••');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   @override
   void dispose() {
@@ -27,19 +28,27 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _handleLogin() {
+  Future<void> _handleLogin() async {
     setState(() => _isLoading = true);
-    Future.delayed(const Duration(milliseconds: 700), () {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+    final success = await authController.signIn(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    );
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+    if (success) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => _selectedRole == UserRole.employee
-              ? const EmployeeShell()
-              : const HrShell(),
+          builder: (_) => authController.role == UserRole.hrAdmin
+              ? const HrShell()
+              : const EmployeeShell(),
         ),
       );
-    });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(authController.errorMessage ?? 'Login failed. Check your credentials.')),
+      );
+    }
   }
 
   @override
@@ -72,36 +81,6 @@ class _LoginScreenState extends State<LoginScreen> {
               Text(
                 'Log in to continue to MONIKA',
                 style: TextStyle(fontSize: 14.5, color: c.textSecondary),
-              ),
-              const SizedBox(height: 28),
-
-              // Role toggle — demo-only convenience for Phase 1 prototype
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: c.surfaceMuted,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _RoleTab(
-                        label: 'Employee',
-                        icon: Icons.badge_outlined,
-                        selected: _selectedRole == UserRole.employee,
-                        onTap: () => setState(() => _selectedRole = UserRole.employee),
-                      ),
-                    ),
-                    Expanded(
-                      child: _RoleTab(
-                        label: 'HR Admin',
-                        icon: Icons.admin_panel_settings_outlined,
-                        selected: _selectedRole == UserRole.hrAdmin,
-                        onTap: () => setState(() => _selectedRole = UserRole.hrAdmin),
-                      ),
-                    ),
-                  ],
-                ),
               ),
               const SizedBox(height: 28),
 
@@ -139,14 +118,16 @@ class _LoginScreenState extends State<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ForgotPasswordScreen()),
+                  ),
                   child: const Text('Forgot password?'),
                 ),
               ),
               const SizedBox(height: 12),
 
               PrimaryButton(
-                label: 'Log In as ${_selectedRole == UserRole.employee ? "Employee" : "HR Administrator"}',
+                label: 'Log In',
                 onPressed: _handleLogin,
                 isLoading: _isLoading,
               ),
@@ -165,7 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Phase 1 Prototype — credentials are pre-filled with dummy data. Use the toggle above to preview either role.',
+                        'Your role (Employee or HR Administrator) is determined automatically from your account after logging in.',
                         style: TextStyle(fontSize: 12, color: c.primaryDark.withOpacity(0.9), height: 1.4),
                       ),
                     ),
@@ -175,54 +156,6 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 24),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RoleTab extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _RoleTab({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: selected ? c.surface : Colors.transparent,
-          borderRadius: BorderRadius.circular(11),
-          boxShadow: selected
-              ? [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 2))]
-              : null,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 17, color: selected ? c.primary : c.textMuted),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: selected ? c.textPrimary : c.textMuted,
-              ),
-            ),
-          ],
         ),
       ),
     );

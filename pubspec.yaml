@@ -20,10 +20,13 @@ dependencies:
   network_info_plus: ^6.1.1
   device_info_plus: ^11.4.0
 
-  # Secure local storage for JWT session tokens (Phase 2+)
+  # Secure local storage for cached session data (Phase 2+)
   flutter_secure_storage: ^9.2.4
 
-  # HTTP client for PHP REST API calls (Phase 2+)
+  # Supabase client — Auth, Postgres (via auto REST), Row Level Security (Phase 2+)
+  supabase_flutter: ^2.0.0
+
+  # HTTP client (kept for any future non-Supabase calls, e.g. Phase 5 ML endpoint)
   http: ^1.4.0
 
   # Local data persistence (Phase 1: not used; Phase 2+: cache tokens/settings)

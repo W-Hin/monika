@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors_extension.dart';
+import '../../controller/auth_controller.dart';
+import '../../model/models.dart';
+import '../employee/employee_shell.dart';
+import '../hr/hr_shell.dart';
 import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -13,16 +17,26 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 1400), () {
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 500),
-          pageBuilder: (_, anim, __) => const LoginScreen(),
-          transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
-        ),
-      );
-    });
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    final minSplash = Future.delayed(const Duration(milliseconds: 1400));
+    await authController.restoreSession();
+    await minSplash;
+    if (!mounted) return;
+
+    final Widget destination = authController.status == AuthStatus.signedIn
+        ? (authController.role == UserRole.hrAdmin ? const HrShell() : const EmployeeShell())
+        : const LoginScreen();
+
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 500),
+        pageBuilder: (_, anim, __) => destination,
+        transitionsBuilder: (_, anim, __, child) => FadeTransition(opacity: anim, child: child),
+      ),
+    );
   }
 
   @override
