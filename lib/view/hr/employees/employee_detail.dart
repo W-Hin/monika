@@ -350,7 +350,10 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                   Expanded(
                     child: Text(_emp.registeredDevice, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
                   ),
-                  TextButton(onPressed: _resetDeviceBinding, child: const Text('Reset')),
+                  TextButton(
+                    onPressed: _emp.registeredDevice == 'Not yet registered' ? null : _resetDeviceBinding,
+                    child: const Text('Reset'),
+                  ),
                 ],
               ),
             ),

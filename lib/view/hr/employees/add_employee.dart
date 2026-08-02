@@ -36,12 +36,21 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
   final _phone = TextEditingController();
   final _salary = TextEditingController(text: '3500.00');
   String _department = 'Engineering';
-  String _jobTitle = 'Employee';
+  String _jobTitle = _jobTitlesByDepartment['Engineering']!.first;
   String _accountType = 'employee';
   bool _isSubmitting = false;
 
   final _departments = ['Engineering', 'Sales', 'Operations', 'Marketing', 'Design', 'Human Resources', 'Finance'];
-  final _jobTitles = ['Employee', 'Senior Engineer', 'Team Lead', 'Manager', 'Designer', 'Analyst', 'Consultant'];
+
+  static const _jobTitlesByDepartment = <String, List<String>>{
+    'Engineering': ['Software Engineer', 'Senior Engineer', 'Team Lead', 'Backend Engineer', 'Mobile Developer'],
+    'Sales': ['Sales Executive', 'Sales Manager', 'Account Executive'],
+    'Operations': ['Operations Executive', 'Operations Manager'],
+    'Marketing': ['Marketing Executive', 'Marketing Manager'],
+    'Design': ['UI/UX Designer', 'Graphic Designer', 'Design Lead'],
+    'Human Resources': ['HR Executive', 'HR Manager', 'HR Administrator'],
+    'Finance': ['Financial Analyst', 'Accountant', 'Finance Manager'],
+  };
 
   String _generateTempPassword() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
@@ -98,7 +107,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
       final data = response.data;
       if (data is Map && data['error'] != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not create account: ${data['error']}'), backgroundColor: context.colors.riskHigh),
+          SnackBar(content: Text(_friendlyCreateError(data['error'].toString())), backgroundColor: context.colors.riskHigh),
         );
         return;
       }
@@ -110,9 +119,25 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not create account: $e'), backgroundColor: context.colors.riskHigh),
+        SnackBar(content: const Text('Could not create account. Please check your connection and try again.'), backgroundColor: context.colors.riskHigh),
       );
     }
+  }
+
+  /// The Edge Function already returns reasonably plain-language errors
+  /// (e.g. "Only HR admins can create employee accounts") - only the
+  /// known Supabase Auth error strings get rewritten to something less
+  /// technical; anything else is passed through as-is rather than
+  /// replaced with a vague generic message.
+  String _friendlyCreateError(String raw) {
+    final message = raw.toLowerCase();
+    if (message.contains('already') && (message.contains('registered') || message.contains('exists'))) {
+      return 'The email address has already been registered.';
+    }
+    if (message.contains('invalid') && message.contains('email')) {
+      return 'Please enter a valid email address.';
+    }
+    return raw;
   }
 
   void _showSuccessDialog(String tempPassword, bool emailSent, String? emailError) {
@@ -222,7 +247,9 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
                   children: [
                     Expanded(
                       child: GestureDetector(
-                        onTap: () => setState(() => _accountType = 'employee'),
+                        onTap: () => setState(() {
+                          _accountType = 'employee';
+                        }),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 150),
                           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -240,7 +267,11 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
                     ),
                     Expanded(
                       child: GestureDetector(
-                        onTap: () => setState(() => _accountType = 'hr_admin'),
+                        onTap: () => setState(() {
+                          _accountType = 'hr_admin';
+                          _department = 'Human Resources';
+                          _jobTitle = _jobTitlesByDepartment['Human Resources']!.first;
+                        }),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 150),
                           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -265,13 +296,24 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
                 value: _department,
                 items: _departments,
                 icon: Icons.apartment_rounded,
-                onChanged: (v) => setState(() => _department = v!),
+                enabled: _accountType != 'hr_admin',
+                onChanged: (v) => setState(() {
+                  _department = v!;
+                  _jobTitle = _jobTitlesByDepartment[_department]!.first;
+                }),
               ),
+              if (_accountType == 'hr_admin') ...[
+                const SizedBox(height: 6),
+                Text(
+                  'HR Admin accounts belong to Human Resources by default.',
+                  style: TextStyle(fontSize: 11.5, color: c.textMuted),
+                ),
+              ],
               const SizedBox(height: 14),
               _DropdownField(
                 label: 'Job Title',
                 value: _jobTitle,
-                items: _jobTitles,
+                items: _jobTitlesByDepartment[_department]!,
                 icon: Icons.work_history_outlined,
                 onChanged: (v) => setState(() => _jobTitle = v!),
               ),
@@ -414,6 +456,7 @@ class _DropdownField extends StatelessWidget {
   final List<String> items;
   final IconData icon;
   final ValueChanged<String?> onChanged;
+  final bool enabled;
 
   const _DropdownField({
     required this.label,
@@ -421,6 +464,7 @@ class _DropdownField extends StatelessWidget {
     required this.items,
     required this.icon,
     required this.onChanged,
+    this.enabled = true,
   });
 
   @override
@@ -433,7 +477,7 @@ class _DropdownField extends StatelessWidget {
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-          decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: enabled ? c.surfaceMuted : c.surfaceMuted.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(12)),
           child: Row(
             children: [
               Icon(icon, size: 18, color: c.textMuted),
@@ -445,10 +489,11 @@ class _DropdownField extends StatelessWidget {
                     isExpanded: true,
                     borderRadius: BorderRadius.circular(12),
                     items: items.map((i) => DropdownMenuItem(value: i, child: Text(i, style: const TextStyle(fontSize: 13.5)))).toList(),
-                    onChanged: onChanged,
+                    onChanged: enabled ? onChanged : null,
                   ),
                 ),
               ),
+              if (!enabled) Icon(Icons.lock_outline_rounded, size: 14, color: c.textMuted),
             ],
           ),
         ),
