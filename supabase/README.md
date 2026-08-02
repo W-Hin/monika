@@ -116,6 +116,21 @@ Without this, `resetPasswordForEmail` will still succeed and an email
 will still arrive, but it won't contain a code the app's "Enter Code"
 screen can use.
 
+## Password Changed notification (optional security email)
+
+Separate from the Reset Password template above, Supabase also offers
+"Security notification emails" — a distinct section from the main
+Templates list — which includes a **Password changed** template, sent
+automatically whenever `updateUser(password:)` succeeds (both the
+mandatory first-login flow and the voluntary Change Password screen in
+this app trigger it).
+
+**Branded template available:** `supabase/email_templates/password_changed.html`
+— paste into Dashboard → Authentication → Emails → **Security
+notification emails** → **Password changed** (Subject heading: "Your
+MONIKA password was changed"). Purely informational, no `{{ .Token }}`
+needed.
+
 ## Free-tier note
 
 A Supabase free-tier project pauses after about a week with no API
