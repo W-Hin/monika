@@ -5,6 +5,7 @@ import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
+import '../../../controller/anomaly_controller.dart';
 import '../employees/employee_detail.dart';
 
 class AnomalyDetailScreen extends StatefulWidget {
@@ -17,25 +18,22 @@ class AnomalyDetailScreen extends StatefulWidget {
 class _AnomalyDetailScreenState extends State<AnomalyDetailScreen> {
   String _filter = 'All';
   final _filters = ['All', 'High', 'Medium', 'Low'];
-  late List<AnomalyEvent> _events;
 
   @override
   void initState() {
     super.initState();
-    _events = List.from(DummyData.anomalyFeed);
+    anomalyController.loadFeed();
   }
 
-  List<AnomalyEvent> get _filtered {
-    if (_filter == 'All') return _events;
+  List<AnomalyEvent> _filtered(List<AnomalyEvent> events) {
+    if (_filter == 'All') return events;
     final map = {'High': RiskLevel.high, 'Medium': RiskLevel.medium, 'Low': RiskLevel.low};
-    return _events.where((e) => e.severity == map[_filter]).toList();
+    return events.where((e) => e.severity == map[_filter]).toList();
   }
 
-  void _markReviewed(AnomalyEvent event) {
-    setState(() {
-      final i = _events.indexOf(event);
-      if (i != -1) _events[i] = event.copyWith(reviewed: true);
-    });
+  void _markReviewed(AnomalyEvent event) async {
+    await anomalyController.markReviewed(event);
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('✓ Marked reviewed: ${event.employeeName} · ${event.type}')),
     );
@@ -45,7 +43,7 @@ class _AnomalyDetailScreenState extends State<AnomalyDetailScreen> {
     final match = DummyData.teamOverview.where((e) => e.name == employeeName);
     if (match.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$employeeName is not in the current team directory')),
+        SnackBar(content: Text('$employeeName is not in the current team directory yet')),
       );
       return;
     }
@@ -60,9 +58,13 @@ class _AnomalyDetailScreenState extends State<AnomalyDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final events = _filtered;
-    final high = _events.where((e) => e.severity == RiskLevel.high).length;
-    final med = _events.where((e) => e.severity == RiskLevel.medium).length;
+    return ListenableBuilder(
+      listenable: anomalyController,
+      builder: (context, _) {
+    final allEvents = anomalyController.feed;
+    final events = _filtered(allEvents);
+    final high = allEvents.where((e) => e.severity == RiskLevel.high).length;
+    final med = allEvents.where((e) => e.severity == RiskLevel.medium).length;
 
     return Scaffold(
       appBar: const SimpleAppBar(title: 'Anomaly & Violation Feed'),
@@ -79,7 +81,7 @@ class _AnomalyDetailScreenState extends State<AnomalyDetailScreen> {
                       const SizedBox(width: 12),
                       Expanded(child: StatCard(label: 'Medium Severity', value: '$med', icon: Icons.warning_amber_rounded, iconColor: c.riskMedium, iconBg: c.riskMediumBg)),
                       const SizedBox(width: 12),
-                      Expanded(child: StatCard(label: 'Total Today', value: '${_events.length}', icon: Icons.flag_rounded, iconColor: c.infoBlue, iconBg: c.infoBlueBg)),
+                      Expanded(child: StatCard(label: 'Total Events', value: '${allEvents.length}', icon: Icons.flag_rounded, iconColor: c.infoBlue, iconBg: c.infoBlueBg)),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -111,22 +113,26 @@ class _AnomalyDetailScreenState extends State<AnomalyDetailScreen> {
               ),
             ),
             Expanded(
-              child: events.isEmpty
-                  ? const EmptyState(icon: Icons.security_rounded, title: 'No violations found', subtitle: 'No anomalies matching the selected filter.')
-                  : ListView.separated(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                itemCount: events.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) => _AnomalyCard(
-                  event: events[i],
-                  onViewEmployee: () => _viewEmployee(context, events[i].employeeName),
-                  onMarkReviewed: () => _markReviewed(events[i]),
-                ),
-              ),
+              child: anomalyController.loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : events.isEmpty
+                      ? const EmptyState(icon: Icons.security_rounded, title: 'No violations found', subtitle: 'No anomalies matching the selected filter.')
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                          itemCount: events.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (_, i) => _AnomalyCard(
+                            event: events[i],
+                            onViewEmployee: () => _viewEmployee(context, events[i].employeeName),
+                            onMarkReviewed: () => _markReviewed(events[i]),
+                          ),
+                        ),
             ),
           ],
         ),
       ),
+    );
+      },
     );
   }
 }

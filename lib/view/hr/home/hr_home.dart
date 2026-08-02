@@ -5,6 +5,7 @@ import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
+import '../../../controller/anomaly_controller.dart';
 import '../analytics/anomaly_detail.dart';
 import '../approvals/hr_approvals.dart';
 import '../analytics/hr_analytics.dart';
@@ -12,8 +13,19 @@ import '../employees/add_employee.dart';
 import '../policy/policy_config.dart';
 import '../../shared/notification.dart';
 
-class HrHomeScreen extends StatelessWidget {
+class HrHomeScreen extends StatefulWidget {
   const HrHomeScreen({super.key});
+
+  @override
+  State<HrHomeScreen> createState() => _HrHomeScreenState();
+}
+
+class _HrHomeScreenState extends State<HrHomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    anomalyController.loadFeed();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,45 +44,58 @@ class HrHomeScreen extends StatelessWidget {
       ),
       body: SafeArea(
         top: false,
-        child: ListView(
+        child: ListenableBuilder(
+          listenable: anomalyController,
+          builder: (context, _) => ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.5,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                StatCard(
-                  label: 'Total Employees',
-                  value: '${DummyData.totalEmployees}',
-                  icon: Icons.groups_rounded,
-                  iconColor: c.primary,
-                  iconBg: c.primaryLight,
+                Expanded(
+                  child: StatCard(
+                    label: 'Total Employees',
+                    value: '${DummyData.totalEmployees}',
+                    icon: Icons.groups_rounded,
+                    iconColor: c.primary,
+                    iconBg: c.primaryLight,
+                  ),
                 ),
-                StatCard(
-                  label: 'Attendance Rate',
-                  value: '${(DummyData.overallAttendanceRate * 100).toInt()}%',
-                  icon: Icons.event_available_rounded,
-                  iconColor: c.infoBlue,
-                  iconBg: c.infoBlueBg,
-                  trend: '+1.2%',
+                const SizedBox(width: 12),
+                Expanded(
+                  child: StatCard(
+                    label: 'Attendance Rate',
+                    value: '${(DummyData.overallAttendanceRate * 100).toInt()}%',
+                    icon: Icons.event_available_rounded,
+                    iconColor: c.infoBlue,
+                    iconBg: c.infoBlueBg,
+                    trend: '+1.2%',
+                  ),
                 ),
-                StatCard(
-                  label: 'Pending Approvals',
-                  value: '${DummyData.pendingLeaveCount}',
-                  icon: Icons.pending_actions_rounded,
-                  iconColor: c.amber,
-                  iconBg: c.amberBg,
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: StatCard(
+                    label: 'Pending Approvals',
+                    value: '${DummyData.pendingLeaveCount}',
+                    icon: Icons.pending_actions_rounded,
+                    iconColor: c.amber,
+                    iconBg: c.amberBg,
+                  ),
                 ),
-                StatCard(
-                  label: 'Flagged Today',
-                  value: '${DummyData.flaggedEventsToday}',
-                  icon: Icons.flag_rounded,
-                  iconColor: c.riskHigh,
-                  iconBg: c.riskHighBg,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: StatCard(
+                    label: 'Flagged Today',
+                    value: '${DummyData.flaggedEventsToday}',
+                    icon: Icons.flag_rounded,
+                    iconColor: c.riskHigh,
+                    iconBg: c.riskHighBg,
+                  ),
                 ),
               ],
             ),
@@ -153,10 +178,15 @@ class HrHomeScreen extends StatelessWidget {
               actionLabel: 'See all',
               onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AnomalyDetailScreen())),
             ),
-            ...DummyData.anomalyFeed.take(3).map((a) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _AnomalyTile(event: a),
-            )),
+            if (anomalyController.feed.isEmpty)
+              AppCard(
+                child: Text('No anomalies logged yet', style: TextStyle(fontSize: 12.5, color: c.textMuted)),
+              )
+            else
+              ...anomalyController.feed.take(3).map((a) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _AnomalyTile(event: a),
+              )),
 
             const SizedBox(height: 12),
             SectionHeader(
@@ -199,6 +229,7 @@ class HrHomeScreen extends StatelessWidget {
               ),
             ),
           ],
+          ),
         ),
       ),
     );

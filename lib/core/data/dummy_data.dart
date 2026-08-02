@@ -154,10 +154,10 @@ class DummyData {
   ];
 
   static final List<AnomalyEvent> anomalyFeed = [
-    const AnomalyEvent(employeeName: 'Faiz Hidayat', type: 'Shared-device violation', date: 'Today, 09:14 AM', details: 'Device token already bound to another employee account', severity: RiskLevel.high),
-    const AnomalyEvent(employeeName: 'Lim Jia Hui', type: 'Out-of-zone clock-in', date: 'Today, 08:51 AM', details: 'GPS coordinates 340m outside geofence radius', severity: RiskLevel.medium),
-    const AnomalyEvent(employeeName: 'Ramesh Kumar', type: 'Repeated late arrival', date: 'Yesterday', details: '4th late arrival in the past 14 days', severity: RiskLevel.medium),
-    const AnomalyEvent(employeeName: 'Tan Wei Ming', type: 'WiFi SSID mismatch', date: '2 days ago', details: 'Connected to unrecognised network during clock-in attempt', severity: RiskLevel.low),
+    const AnomalyEvent(id: 1, employeeName: 'Faiz Hidayat', type: 'Shared-device violation', date: 'Today, 09:14 AM', details: 'Device token already bound to another employee account', severity: RiskLevel.high),
+    const AnomalyEvent(id: 2, employeeName: 'Lim Jia Hui', type: 'Out-of-zone clock-in', date: 'Today, 08:51 AM', details: 'GPS coordinates 340m outside geofence radius', severity: RiskLevel.medium),
+    const AnomalyEvent(id: 3, employeeName: 'Ramesh Kumar', type: 'Repeated late arrival', date: 'Yesterday', details: '4th late arrival in the past 14 days', severity: RiskLevel.medium),
+    const AnomalyEvent(id: 4, employeeName: 'Tan Wei Ming', type: 'WiFi SSID mismatch', date: '2 days ago', details: 'Connected to unrecognised network during clock-in attempt', severity: RiskLevel.low),
   ];
 
   static final List<TeamMemberSummary> teamOverview = [
