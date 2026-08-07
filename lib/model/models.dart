@@ -6,6 +6,22 @@ enum LeaveStatus { pending, approved, rejected }
 
 enum AttendanceStatus { onTime, late, flagged, leave }
 
+class CalendarEvent {
+  final int? dbId; // company_events.id - null for a not-yet-saved local draft
+  final String title;
+  final DateTime eventDate;
+  final DateTime? endDate;
+  final String type; // 'Public Holiday' | 'Company Event' | 'HR Event' (display)
+
+  const CalendarEvent({
+    this.dbId,
+    required this.title,
+    required this.eventDate,
+    this.endDate,
+    required this.type,
+  });
+}
+
 class AppUser {
   final String id;
   final String name;
