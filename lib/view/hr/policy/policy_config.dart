@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
+import '../../../controller/policy_controller.dart';
 
 class PolicyConfigScreen extends StatefulWidget {
   const PolicyConfigScreen({super.key});
@@ -34,18 +35,64 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
   double _behaviouralThreshold = 60;
 
   bool _saving = false;
+  bool _hydrated = false;
 
-  void _save() {
+  @override
+  void initState() {
+    super.initState();
+    policyController.load();
+  }
+
+  /// Populates the local editable fields from the just-loaded real
+  /// values. Guarded by _hydrated so it only runs once — after that,
+  /// the fields are the user's own in-progress edits, not something to
+  /// keep overwriting every time the controller notifies.
+  void _hydrateFromController() {
+    final p = policyController;
+    _workStart.text = p.workStartTime;
+    _workEnd.text = p.workEndTime;
+    _gracePeriod.text = '${p.gracePeriodMinutes}';
+    _geofenceRadius.text = '${p.geofenceRadiusMeters}';
+    _officeWifi.text = p.officeWifiSsid;
+    _lateWeight = p.lateWeight;
+    _outOfZoneWeight = p.outOfZoneWeight;
+    _sharedDeviceWeight = p.sharedDeviceWeight;
+    _wifiMismatchWeight = p.wifiMismatchWeight;
+    _lateDeduction.text = p.lateDeduction.toStringAsFixed(2);
+    _absentDeduction.text = p.absentDeduction.toStringAsFixed(2);
+    _unpaidLeaveRate.text = p.unpaidLeaveDailyRate.toStringAsFixed(2);
+    _leadershipThreshold = p.leadershipThreshold;
+    _technicalThreshold = p.technicalThreshold;
+    _behaviouralThreshold = p.behaviouralThreshold;
+    _hydrated = true;
+  }
+
+  Future<void> _save() async {
     setState(() => _saving = true);
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (!mounted) return;
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✓ Policy configuration saved successfully'),
-        ),
-      );
-    });
+    final success = await policyController.save(
+      workStartTime: _workStart.text.trim(),
+      workEndTime: _workEnd.text.trim(),
+      gracePeriodMinutes: int.tryParse(_gracePeriod.text.trim()) ?? policyController.gracePeriodMinutes,
+      geofenceRadiusMeters: int.tryParse(_geofenceRadius.text.trim()) ?? policyController.geofenceRadiusMeters,
+      officeWifiSsid: _officeWifi.text.trim(),
+      lateWeight: _lateWeight,
+      outOfZoneWeight: _outOfZoneWeight,
+      sharedDeviceWeight: _sharedDeviceWeight,
+      wifiMismatchWeight: _wifiMismatchWeight,
+      lateDeduction: double.tryParse(_lateDeduction.text.trim()) ?? policyController.lateDeduction,
+      absentDeduction: double.tryParse(_absentDeduction.text.trim()) ?? policyController.absentDeduction,
+      unpaidLeaveDailyRate: double.tryParse(_unpaidLeaveRate.text.trim()) ?? policyController.unpaidLeaveDailyRate,
+      leadershipThreshold: _leadershipThreshold,
+      technicalThreshold: _technicalThreshold,
+      behaviouralThreshold: _behaviouralThreshold,
+    );
+    if (!mounted) return;
+    setState(() => _saving = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success ? '✓ Policy configuration saved successfully' : policyController.errorMessage ?? 'Could not save policy configuration'),
+      ),
+    );
   }
 
   @override
@@ -68,7 +115,18 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: ListView(
+        child: ListenableBuilder(
+          listenable: policyController,
+          builder: (context, _) {
+            if (!policyController.loaded) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (!_hydrated) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) setState(_hydrateFromController);
+              });
+            }
+            return ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
           children: [
             // ── Attendance Policy ──────────────────────────────────
@@ -338,6 +396,8 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
               isLoading: _saving,
             ),
           ],
+            );
+          },
         ),
       ),
     );
@@ -518,7 +578,7 @@ class _SliderRow extends StatelessWidget {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Text(
@@ -536,8 +596,8 @@ class _SliderRow extends StatelessWidget {
             data: SliderThemeData(
               activeTrackColor: color,
               thumbColor: color,
-              inactiveTrackColor: color.withOpacity(0.15),
-              overlayColor: color.withOpacity(0.1),
+              inactiveTrackColor: color.withValues(alpha: 0.15),
+              overlayColor: color.withValues(alpha: 0.1),
               trackHeight: 4,
             ),
             child: Slider(
