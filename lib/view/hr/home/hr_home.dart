@@ -6,6 +6,7 @@ import '../../shared/widgets/status_pill.dart';
 import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
 import '../../../controller/anomaly_controller.dart';
+import '../../../controller/analytics_controller.dart';
 import '../analytics/anomaly_detail.dart';
 import '../approvals/hr_approvals.dart';
 import '../analytics/hr_analytics.dart';
@@ -30,6 +31,7 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
   void initState() {
     super.initState();
     anomalyController.loadFeed();
+    analyticsController.load();
   }
 
   @override
@@ -50,7 +52,7 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
       body: SafeArea(
         top: false,
         child: ListenableBuilder(
-          listenable: anomalyController,
+          listenable: Listenable.merge([anomalyController, analyticsController]),
           builder: (context, _) => ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
@@ -62,7 +64,7 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
                     height: _kStatCardHeight,
                     child: StatCard(
                       label: 'Total Employees',
-                      value: '${DummyData.totalEmployees}',
+                      value: '${analyticsController.totalEmployees}',
                       icon: Icons.groups_rounded,
                       iconColor: c.primary,
                       iconBg: c.primaryLight,
@@ -75,11 +77,10 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
                     height: _kStatCardHeight,
                     child: StatCard(
                       label: 'Attendance Rate',
-                      value: '${(DummyData.overallAttendanceRate * 100).toInt()}%',
+                      value: '${(analyticsController.attendanceRate * 100).toInt()}%',
                       icon: Icons.event_available_rounded,
                       iconColor: c.infoBlue,
                       iconBg: c.infoBlueBg,
-                      trend: '+1.2%',
                     ),
                   ),
                 ),
@@ -94,7 +95,7 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
                     height: _kStatCardHeight,
                     child: StatCard(
                       label: 'Pending Approvals',
-                      value: '${DummyData.pendingLeaveCount}',
+                      value: '${analyticsController.pendingLeaveCount}',
                       icon: Icons.pending_actions_rounded,
                       iconColor: c.amber,
                       iconBg: c.amberBg,
@@ -107,7 +108,7 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
                     height: _kStatCardHeight,
                     child: StatCard(
                       label: 'Flagged Today',
-                      value: '${DummyData.flaggedEventsToday}',
+                      value: '${analyticsController.flaggedToday}',
                       icon: Icons.flag_rounded,
                       iconColor: c.riskHigh,
                       iconBg: c.riskHighBg,
@@ -126,15 +127,15 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
                   Row(
                     children: [
                       Expanded(
-                        flex: DummyData.riskDistribution[RiskLevel.low]!,
+                        flex: (analyticsController.riskDistribution[RiskLevel.low] ?? 0) + 1,
                         child: Container(height: 10, decoration: BoxDecoration(color: c.riskLow, borderRadius: const BorderRadius.horizontal(left: Radius.circular(6)))),
                       ),
                       Expanded(
-                        flex: DummyData.riskDistribution[RiskLevel.medium]!,
+                        flex: (analyticsController.riskDistribution[RiskLevel.medium] ?? 0) + 1,
                         child: Container(height: 10, color: c.riskMedium),
                       ),
                       Expanded(
-                        flex: DummyData.riskDistribution[RiskLevel.high]!,
+                        flex: (analyticsController.riskDistribution[RiskLevel.high] ?? 0) + 1,
                         child: Container(height: 10, decoration: BoxDecoration(color: c.riskHigh, borderRadius: const BorderRadius.horizontal(right: Radius.circular(6)))),
                       ),
                     ],
@@ -143,9 +144,9 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _LegendDot(color: c.riskLow, label: 'Low', value: '${DummyData.riskDistribution[RiskLevel.low]}'),
-                      _LegendDot(color: c.riskMedium, label: 'Medium', value: '${DummyData.riskDistribution[RiskLevel.medium]}'),
-                      _LegendDot(color: c.riskHigh, label: 'High', value: '${DummyData.riskDistribution[RiskLevel.high]}'),
+                      _LegendDot(color: c.riskLow, label: 'Low', value: '${analyticsController.riskDistribution[RiskLevel.low] ?? 0}'),
+                      _LegendDot(color: c.riskMedium, label: 'Medium', value: '${analyticsController.riskDistribution[RiskLevel.medium] ?? 0}'),
+                      _LegendDot(color: c.riskHigh, label: 'High', value: '${analyticsController.riskDistribution[RiskLevel.high] ?? 0}'),
                     ],
                   ),
                 ],
@@ -162,7 +163,7 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
                     label: 'Approvals',
                     color: c.infoBlue,
                     bg: c.infoBlueBg,
-                    badge: DummyData.pendingLeaveCount,
+                    badge: analyticsController.pendingLeaveCount,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HrApprovalsScreen())),
                   ),
                 ),
@@ -217,8 +218,9 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
                 height: 120,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
-                  children: List.generate(DummyData.weeklyAttendanceTrend.length, (i) {
-                    final v = DummyData.weeklyAttendanceTrend[i];
+                  children: List.generate(analyticsController.weeklyTrend.length, (i) {
+                    final v = analyticsController.weeklyTrend[i];
+                    final isToday = i == analyticsController.weeklyTrend.length - 1;
                     return Expanded(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -231,12 +233,12 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
                               duration: const Duration(milliseconds: 400),
                               height: 70 * v,
                               decoration: BoxDecoration(
-                                color: i == 4 ? c.primary : c.primary.withValues(alpha: 0.35),
+                                color: isToday ? c.primary : c.primary.withValues(alpha: 0.35),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                             ),
                             const SizedBox(height: 6),
-                            Text(DummyData.weekdayLabels[i], style: TextStyle(fontSize: 10, color: c.textMuted, fontWeight: FontWeight.w600)),
+                            Text(analyticsController.weekdayLabels[i], style: TextStyle(fontSize: 10, color: c.textMuted, fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
