@@ -166,6 +166,8 @@ class TrainingProgram {
 }
 
 class PayrollSummary {
+  final int? dbId; // payroll_summaries.id - null for dummy/local-only rows
+  final String? userUuid; // profiles.id - null for dummy rows
   final String month;
   final double baseSalary;
   final double deductions;
@@ -174,6 +176,8 @@ class PayrollSummary {
   final String employeeName;
 
   const PayrollSummary({
+    this.dbId,
+    this.userUuid,
     required this.month,
     required this.baseSalary,
     required this.deductions,
