@@ -10,30 +10,51 @@ class EmployeeController extends ChangeNotifier {
     loading = true;
     notifyListeners();
     final rows = await EmployeeService.fetchAll();
-    employees = rows.map(_mapEmployee).toList();
+    final attendanceRows = await EmployeeService.fetchAllAttendanceStatuses();
+
+    final totalByUser = <String, int>{};
+    final presentByUser = <String, int>{};
+    for (final r in attendanceRows) {
+      final uid = r['user_id'] as String;
+      totalByUser[uid] = (totalByUser[uid] ?? 0) + 1;
+      if (r['status'] == 'on_time' || r['status'] == 'late') {
+        presentByUser[uid] = (presentByUser[uid] ?? 0) + 1;
+      }
+    }
+
+    employees = rows.map((row) => _mapEmployee(row, totalByUser, presentByUser)).toList();
     loading = false;
     notifyListeners();
   }
 
-  TeamMemberSummary _mapEmployee(Map<String, dynamic> row) {
+  TeamMemberSummary _mapEmployee(
+    Map<String, dynamic> row,
+    Map<String, int> totalByUser,
+    Map<String, int> presentByUser,
+  ) {
     final risk = RiskLevel.values.firstWhere(
       (r) => r.name == row['risk_level'],
       orElse: () => RiskLevel.low,
     );
     final deptName = (row['departments'] as Map<String, dynamic>?)?['name'] as String? ?? 'Unassigned';
-    // attendanceRate isn't a stored column (deliberately — it's a derived
-    // aggregate per the schema's own notes); approximated from risk_score
-    // until Analytics wiring computes it for real from attendance_records.
-    final riskScore = (row['risk_score'] as num?)?.toDouble() ?? 100;
+    final uuid = row['id'] as String;
+    final total = totalByUser[uuid] ?? 0;
+    final present = presentByUser[uuid] ?? 0;
+    // Fraction of this employee's logged clock-ins that were on_time or
+    // late (not flagged) - real now, computed from attendance_records.
+    // No attendance history yet (e.g. a brand new hire) defaults to 1.0
+    // rather than 0, so a new employee doesn't look like a risk before
+    // they've ever had the chance to clock in.
+    final attendanceRate = total == 0 ? 1.0 : present / total;
     return TeamMemberSummary(
       id: row['employee_code'] as String,
-      uuid: row['id'] as String,
+      uuid: uuid,
       name: row['name'] as String,
       email: row['email'] as String? ?? '',
       jobTitle: row['job_title'] as String,
       department: deptName,
       risk: risk,
-      attendanceRate: (riskScore / 100).clamp(0.0, 1.0),
+      attendanceRate: attendanceRate,
       avatarInitials: row['avatar_initials'] as String,
       registeredDevice: row['registered_device_name'] as String? ?? 'Not yet registered',
       isActive: row['is_active'] as bool? ?? true,

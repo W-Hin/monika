@@ -3,9 +3,9 @@ import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
-import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
 import '../../../controller/anomaly_controller.dart';
+import '../../../controller/employee_controller.dart';
 import '../employees/employee_detail.dart';
 
 class AnomalyDetailScreen extends StatefulWidget {
@@ -23,6 +23,9 @@ class _AnomalyDetailScreenState extends State<AnomalyDetailScreen> {
   void initState() {
     super.initState();
     anomalyController.loadFeed();
+    if (employeeController.employees.isEmpty) {
+      employeeController.loadEmployees();
+    }
   }
 
   List<AnomalyEvent> _filtered(List<AnomalyEvent> events) {
@@ -40,7 +43,7 @@ class _AnomalyDetailScreenState extends State<AnomalyDetailScreen> {
   }
 
   void _viewEmployee(BuildContext context, String employeeName) {
-    final match = DummyData.teamOverview.where((e) => e.name == employeeName);
+    final match = employeeController.employees.where((e) => e.name == employeeName);
     if (match.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('$employeeName is not in the current team directory yet')),
@@ -50,7 +53,7 @@ class _AnomalyDetailScreenState extends State<AnomalyDetailScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => EmployeeDetailScreen(employee: match.first, onUpdate: (_) {}),
+        builder: (_) => EmployeeDetailScreen(employee: match.first, onUpdate: employeeController.updateLocal),
       ),
     );
   }

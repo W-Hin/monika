@@ -13,6 +13,18 @@ class EmployeeService {
     return List<Map<String, dynamic>>.from(rows);
   }
 
+  /// Every attendance record's user_id + status, company-wide, all-time.
+  /// Used to compute each employee's real attendance rate (fraction of
+  /// logged clock-ins that were on_time or late, i.e. not flagged) -
+  /// previously approximated from risk_score as a stand-in until this
+  /// existed. Same "not a true presence/absence rate" caveat as
+  /// Analytics/Payroll - there's no working-days calendar to know what
+  /// the denominator of expected attendance days should be.
+  static Future<List<Map<String, dynamic>>> fetchAllAttendanceStatuses() async {
+    final rows = await _client.from('attendance_records').select('user_id, status');
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
   static Future<List<String>> fetchDepartmentNames() async {
     final rows = await _client.from('departments').select('name').order('name');
     return List<Map<String, dynamic>>.from(rows).map((r) => r['name'] as String).toList();
