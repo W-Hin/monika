@@ -315,6 +315,22 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: profileError.message }, 400);
     }
 
+    // Default leave entitlement for the current year - without this the
+    // Leave screens have nothing to show until HR manually adjusts it.
+    // Best-effort: a failure here shouldn't undo the account creation
+    // that already succeeded, migration 0009 can backfill it later if
+    // this somehow doesn't go through.
+    await adminClient.from('leave_balances').insert({
+      user_id: created.user.id,
+      year: new Date().getFullYear(),
+      annual_total: 14,
+      annual_used: 0,
+      medical_total: 14,
+      medical_used: 0,
+      emergency_total: 3,
+      emergency_used: 0,
+    });
+
     const emailResult = await sendViaGmail(
       email,
       'Welcome to MONIKA - your account is ready',
