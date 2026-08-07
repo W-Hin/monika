@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
-import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
+import '../../../controller/employee_controller.dart';
+import '../../../controller/pe_controller.dart';
 
 class HrPeScreen extends StatefulWidget {
   const HrPeScreen({super.key});
@@ -13,12 +14,13 @@ class HrPeScreen extends StatefulWidget {
 }
 
 class _HrPeScreenState extends State<HrPeScreen> {
-  late TeamMemberSummary _selectedEmployee;
-  late KpiTemplate _selectedTemplate;
-  final _year = '2026';
+  TeamMemberSummary? _selectedEmployee;
+  KpiTemplate? _selectedTemplate;
+  final _year = DateTime.now().year.toString();
   bool _isSubmitting = false;
+  bool _initialized = false;
 
-  late List<Map<String, dynamic>> _kpis;
+  List<Map<String, dynamic>> _kpis = [];
 
   final _commentsController = TextEditingController();
 
@@ -30,12 +32,15 @@ class _HrPeScreenState extends State<HrPeScreen> {
   }
 
   KpiTemplate _templateFor(String department) {
-    final match = DummyData.kpiTemplates.where((t) => t.department == department);
+    final templates = peController.templates;
+    final match = templates.where((t) => t.department == department);
     if (match.isNotEmpty) return match.first;
-    return DummyData.kpiTemplates.firstWhere((t) => t.department == 'All Departments', orElse: () => DummyData.kpiTemplates.last);
+    final allDept = templates.where((t) => t.department == 'All Departments');
+    if (allDept.isNotEmpty) return allDept.first;
+    return templates.isNotEmpty ? templates.last : const KpiTemplate(name: 'No Template Available', department: 'All Departments', items: []);
   }
 
-  void _loadTemplate(KpiTemplate template) {
+  void _loadTemplateDefaults(KpiTemplate template) {
     _selectedTemplate = template;
     _kpis = template.items
         .map((i) => {
@@ -50,9 +55,59 @@ class _HrPeScreenState extends State<HrPeScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedEmployee = DummyData.teamOverview[0];
-    _loadTemplate(_templateFor(_selectedEmployee.department));
-    _commentsController.text = 'Strong technical delivery this cycle. Continue developing stakeholder communication skills.';
+    _bootstrap();
+  }
+
+  @override
+  void dispose() {
+    _commentsController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _bootstrap() async {
+    if (employeeController.employees.isEmpty) {
+      await employeeController.loadEmployees();
+    }
+    await peController.loadTemplates();
+    if (!mounted) return;
+    if (employeeController.employees.isNotEmpty) {
+      await _selectEmployee(employeeController.employees.first);
+    }
+    if (!mounted) return;
+    setState(() => _initialized = true);
+  }
+
+  /// Loads the employee's real evaluation for this year, if one already
+  /// exists, and prefills the form from it (so re-opening an already-
+  /// scored employee shows what was actually saved, not fresh defaults).
+  /// Otherwise starts from the department's suggested template at
+  /// default scores, same as before this was wired to real data.
+  Future<void> _selectEmployee(TeamMemberSummary emp) async {
+    setState(() => _selectedEmployee = emp);
+    await peController.loadForEmployee(emp.uuid);
+    if (!mounted) return;
+
+    final existing = peController.selectedCurrent;
+    if (existing != null && existing.kpis.isNotEmpty) {
+      final matchedTemplate = peController.templates.where((t) => t.dbId == existing.templateId);
+      setState(() {
+        _selectedTemplate = matchedTemplate.isNotEmpty ? matchedTemplate.first : _templateFor(emp.department);
+        _kpis = existing.kpis
+            .map((k) => {
+                  'name': k.name,
+                  'weightage': k.weightage,
+                  'score': k.score,
+                  'category': _categoryFor(k.name),
+                })
+            .toList();
+        _commentsController.text = existing.comments;
+      });
+    } else {
+      setState(() {
+        _loadTemplateDefaults(_templateFor(emp.department));
+        _commentsController.text = '';
+      });
+    }
   }
 
   void _pickEmployee() {
@@ -62,13 +117,10 @@ class _HrPeScreenState extends State<HrPeScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => _PickerSheet<TeamMemberSummary>(
         title: 'Select Employee',
-        items: DummyData.teamOverview,
+        items: employeeController.employees,
         labelBuilder: (e) => e.name,
         subtitleBuilder: (e) => '${e.jobTitle} · ${e.department}',
-        onSelected: (e) => setState(() {
-          _selectedEmployee = e;
-          _loadTemplate(_templateFor(e.department));
-        }),
+        onSelected: (e) => _selectEmployee(e),
       ),
     );
   }
@@ -80,10 +132,10 @@ class _HrPeScreenState extends State<HrPeScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => _PickerSheet<KpiTemplate>(
         title: 'Select KPI Template',
-        items: DummyData.kpiTemplates,
+        items: peController.templates,
         labelBuilder: (t) => t.name,
         subtitleBuilder: (t) => '${t.department} · ${t.items.length} KPIs',
-        onSelected: (t) => setState(() => _loadTemplate(t)),
+        onSelected: (t) => setState(() => _loadTemplateDefaults(t)),
       ),
     );
   }
@@ -102,62 +154,78 @@ class _HrPeScreenState extends State<HrPeScreen> {
     return c.riskHigh;
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    final employee = _selectedEmployee;
+    if (employee == null) return;
     setState(() => _isSubmitting = true);
-    Future.delayed(const Duration(milliseconds: 900), () {
-      if (!mounted) return;
-      setState(() => _isSubmitting = false);
-      final c = context.colors;
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: c.primaryLight,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.check_circle_rounded,
-                  color: c.primary,
-                  size: 34,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'PE Submitted',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Performance evaluation for $_year has been saved. Training recommendations have been updated.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: c.textSecondary,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 20),
-              PrimaryButton(
-                label: 'Done',
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).pop();
-                },
-              ),
-            ],
-          ),
-        ),
+
+    final kpiItems = _kpis
+        .map((k) => KpiItem(name: k['name'] as String, weightage: k['weightage'] as double, score: k['score'] as double))
+        .toList();
+    final success = await peController.submit(
+      userUuid: employee.uuid,
+      templateId: _selectedTemplate?.dbId,
+      kpis: kpiItems,
+      comments: _commentsController.text.trim(),
+    );
+
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(peController.errorMessage ?? 'Could not submit evaluation'), backgroundColor: context.colors.riskHigh),
       );
-    });
+      return;
+    }
+
+    final c = context.colors;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: c.primaryLight,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.check_circle_rounded,
+                color: c.primary,
+                size: 34,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'PE Submitted',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Performance evaluation for $_year has been saved for ${employee.name}.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.5,
+                color: c.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+            PrimaryButton(
+              label: 'Done',
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -167,336 +235,367 @@ class _HrPeScreenState extends State<HrPeScreen> {
       appBar: AppBar(title: const Text('Performance Evaluation')),
       body: SafeArea(
         top: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          children: [
-            // Employee + Year selector
-            AppCard(
-              onTap: _pickEmployee,
-              child: Row(
-                children: [
-                  InitialsAvatar(
-                    initials: _selectedEmployee.avatarInitials,
-                    size: 44,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _selectedEmployee.name,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                          ),
+        child: ListenableBuilder(
+          listenable: Listenable.merge([employeeController, peController]),
+          builder: (context, _) {
+            if (!_initialized) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (_selectedEmployee == null) {
+              return const EmptyState(
+                icon: Icons.groups_outlined,
+                title: 'No employees found',
+                subtitle: 'Add an employee first from Employee Management.',
+              );
+            }
+
+            final history = peController.selectedHistory.where((h) => h.dbId != peController.selectedCurrent?.dbId).toList();
+
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              children: [
+                // Employee + Year selector
+                AppCard(
+                  onTap: _pickEmployee,
+                  child: Row(
+                    children: [
+                      InitialsAvatar(
+                        initials: _selectedEmployee!.avatarInitials,
+                        size: 44,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _selectedEmployee!.name,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            Text(
+                              _selectedEmployee!.department,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: c.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          _selectedEmployee.department,
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: c.primaryLight,
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: Text(
+                          _year,
                           style: TextStyle(
-                            fontSize: 12,
-                            color: c.textSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: c.primaryDark,
                           ),
                         ),
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(Icons.unfold_more_rounded, size: 18, color: c.textMuted),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                InkWell(
+                  onTap: _pickTemplate,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+                    child: Row(
+                      children: [
+                        Icon(Icons.fact_check_outlined, size: 16, color: c.textSecondary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text('KPI Template: ${_selectedTemplate?.name ?? '—'}', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.textPrimary)),
+                        ),
+                        Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: c.primary)),
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: c.primaryLight,
-                      borderRadius: BorderRadius.circular(100),
-                    ),
-                    child: Text(
-                      _year,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: c.primaryDark,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Icon(Icons.unfold_more_rounded, size: 18, color: c.textMuted),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            InkWell(
-              onTap: _pickTemplate,
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
-                child: Row(
-                  children: [
-                    Icon(Icons.fact_check_outlined, size: 16, color: c.textSecondary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text('KPI Template: ${_selectedTemplate.name}', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.textPrimary)),
-                    ),
-                    Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: c.primary)),
-                  ],
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-            // Weighted total preview
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: c.kpiGradient,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [c.shadowTinted()],
-              ),
-              child: Row(
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                // Weighted total preview
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: c.kpiGradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [c.shadowTinted()],
+                  ),
+                  child: Row(
                     children: [
-                      const Text(
-                        'Weighted Total Score',
-                        style: TextStyle(color: Colors.white70, fontSize: 12.5),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _weightedTotal.toStringAsFixed(1),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 40,
-                          fontWeight: FontWeight.w900,
-                          height: 1,
-                          fontFeatures: [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                      const Text(
-                        '/ 100',
-                        style: TextStyle(color: Colors.white60, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  SizedBox(
-                    width: 80,
-                    height: 80,
-                    child: CircularProgressIndicator(
-                      value: _weightedTotal / 100,
-                      strokeWidth: 8,
-                      backgroundColor: Colors.white24,
-                      valueColor: const AlwaysStoppedAnimation(Colors.white),
-                      strokeCap: StrokeCap.round,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            const SectionHeader(title: 'KPI Scoring'),
-            ..._kpis.asMap().entries.map((e) {
-              final i = e.key;
-              final kpi = e.value;
-              final score = kpi['score'] as double;
-              final color = _scoreColor(score, c);
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: c.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [c.shadowNeutral],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                      child: Row(
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  kpi['name'] as String,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${(kpi['weightage'] as double).toInt()}% weight  ·  ${kpi['category']}',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: c.textMuted,
-                                  ),
-                                ),
-                              ],
+                          const Text(
+                            'Weighted Total Score',
+                            style: TextStyle(color: Colors.white70, fontSize: 12.5),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _weightedTotal.toStringAsFixed(1),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 40,
+                              fontWeight: FontWeight.w900,
+                              height: 1,
+                              fontFeatures: [FontFeature.tabularFigures()],
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: color.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(100),
-                            ),
-                            child: Text(
-                              '${score.toInt()} / 100',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w900,
-                                color: color,
-                                fontFeatures: const [FontFeature.tabularFigures()],
-                              ),
-                            ),
+                          const Text(
+                            '/ 100',
+                            style: TextStyle(color: Colors.white60, fontSize: 13),
                           ),
                         ],
                       ),
-                    ),
-                    SliderTheme(
-                      data: SliderThemeData(
-                        activeTrackColor: color,
-                        thumbColor: color,
-                        inactiveTrackColor: color.withOpacity(0.15),
-                        overlayColor: color.withOpacity(0.1),
-                        trackHeight: 4,
+                      const Spacer(),
+                      SizedBox(
+                        width: 80,
+                        height: 80,
+                        child: CircularProgressIndicator(
+                          value: _weightedTotal / 100,
+                          strokeWidth: 8,
+                          backgroundColor: Colors.white24,
+                          valueColor: const AlwaysStoppedAnimation(Colors.white),
+                          strokeCap: StrokeCap.round,
+                        ),
                       ),
-                      child: Slider(
-                        value: score,
-                        min: 0,
-                        max: 100,
-                        divisions: 100,
-                        onChanged: (v) => setState(() => _kpis[i]['score'] = v),
-                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                const SectionHeader(title: 'KPI Scoring'),
+                if (_kpis.isEmpty)
+                  AppCard(
+                    child: Text('This template has no KPI items to score.', style: TextStyle(fontSize: 12.5, color: c.textMuted)),
+                  ),
+                ..._kpis.asMap().entries.map((e) {
+                  final i = e.key;
+                  final kpi = e.value;
+                  final score = kpi['score'] as double;
+                  final color = _scoreColor(score, c);
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: c.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [c.shadowNeutral],
                     ),
-                    // Auto trigger badge
-                    if (score < 65)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: c.amberBg,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                           child: Row(
-                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
-                                Icons.auto_awesome_rounded,
-                                size: 13,
-                                color: c.amber,
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      kpi['name'] as String,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${(kpi['weightage'] as double).toInt()}% weight  ·  ${kpi['category']}',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        color: c.textMuted,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Training recommendation will be triggered for ${kpi['category']}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: c.amber,
-                                  fontWeight: FontWeight.w600,
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: color.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(100),
+                                ),
+                                child: Text(
+                                  '${score.toInt()} / 100',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                    color: color,
+                                    fontFeatures: const [FontFeature.tabularFigures()],
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ),
-                  ],
-                ),
-              );
-            }),
-
-            const SizedBox(height: 8),
-            const SectionHeader(title: 'HR Comments'),
-            TextField(
-              controller: _commentsController,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                hintText:
-                    'Add overall comments, feedback, or development notes for this employee...',
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // PE history preview
-            const SectionHeader(title: 'Previous PE Records'),
-            ...DummyData.peHistory.map(
-              (pe) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: AppCard(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: c.surfaceMuted,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          Icons.calendar_month_rounded,
-                          size: 16,
-                          color: c.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Evaluation ${pe.year}',
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
+                        SliderTheme(
+                          data: SliderThemeData(
+                            activeTrackColor: color,
+                            thumbColor: color,
+                            inactiveTrackColor: color.withValues(alpha: 0.15),
+                            overlayColor: color.withValues(alpha: 0.1),
+                            trackHeight: 4,
+                          ),
+                          child: Slider(
+                            value: score,
+                            min: 0,
+                            max: 100,
+                            divisions: 100,
+                            onChanged: (v) => setState(() => _kpis[i]['score'] = v),
                           ),
                         ),
-                      ),
-                      Text(
-                        pe.weightedTotal.toStringAsFixed(1),
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          color: c.primary,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '/ 100',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: c.textMuted,
-                        ),
-                      ),
-                    ],
+                        // Auto trigger badge - informational only for now;
+                        // Training isn't wired to real data yet, so this
+                        // doesn't actually create a training_enrollments
+                        // row (same as before this screen was wired).
+                        if (score < 65)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: c.amberBg,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.auto_awesome_rounded,
+                                    size: 13,
+                                    color: c.amber,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Training recommendation will be triggered for ${kpi['category']}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: c.amber,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                }),
+
+                const SizedBox(height: 8),
+                const SectionHeader(title: 'HR Comments'),
+                TextField(
+                  controller: _commentsController,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    hintText:
+                        'Add overall comments, feedback, or development notes for this employee...',
                   ),
                 ),
-              ),
-            ),
+                const SizedBox(height: 24),
 
-            const SizedBox(height: 16),
-            PrimaryButton(
-              label: 'Submit Evaluation',
-              icon: Icons.assessment_rounded,
-              onPressed: _submit,
-              isLoading: _isSubmitting,
-            ),
-          ],
+                // PE history preview
+                const SectionHeader(title: 'Previous PE Records'),
+                if (history.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text('No previous evaluations for this employee.', style: TextStyle(fontSize: 12.5, color: c.textMuted)),
+                  )
+                else
+                  ...history.map(
+                    (pe) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: AppCard(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: c.surfaceMuted,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.calendar_month_rounded,
+                                size: 16,
+                                color: c.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Evaluation ${pe.year}',
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              pe.weightedTotal.toStringAsFixed(1),
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                color: c.primary,
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '/ 100',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: c.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                const SizedBox(height: 16),
+                PrimaryButton(
+                  label: 'Submit Evaluation',
+                  icon: Icons.assessment_rounded,
+                  onPressed: _submit,
+                  isLoading: _isSubmitting,
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

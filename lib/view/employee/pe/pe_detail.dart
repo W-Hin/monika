@@ -2,121 +2,153 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
-import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
+import '../../../controller/pe_controller.dart';
 
-class PeDetailScreen extends StatelessWidget {
+class PeDetailScreen extends StatefulWidget {
   const PeDetailScreen({super.key});
+
+  @override
+  State<PeDetailScreen> createState() => _PeDetailScreenState();
+}
+
+class _PeDetailScreenState extends State<PeDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    peController.loadMy();
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final pe = DummyData.currentPE;
-    final total = pe.weightedTotal;
 
     return Scaffold(
       appBar: const SimpleAppBar(title: 'Performance Evaluation'),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: c.surface,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [c.shadowTinted()],
-              ),
-              child: Column(
-                children: [
-                  Text('Evaluation Year ${pe.year}', style: TextStyle(fontSize: 12.5, color: c.textMuted, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: 140,
-                    height: 140,
-                    child: Stack(
-                      alignment: Alignment.center,
+        child: ListenableBuilder(
+          listenable: peController,
+          builder: (context, _) {
+            if (peController.loading && peController.myHistory.isEmpty && peController.myCurrent == null) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final pe = peController.myCurrent;
+            final history = peController.myHistory.where((h) => h.dbId != pe?.dbId).toList();
+
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              children: [
+                if (pe == null)
+                  const EmptyState(
+                    icon: Icons.assessment_outlined,
+                    title: 'No evaluation yet',
+                    subtitle: 'HR hasn\'t submitted your performance evaluation for this year yet.',
+                  )
+                else ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: c.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [c.shadowTinted()],
+                    ),
+                    child: Column(
                       children: [
+                        Text('Evaluation Year ${pe.year}', style: TextStyle(fontSize: 12.5, color: c.textMuted, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 12),
                         SizedBox(
                           width: 140,
                           height: 140,
-                          child: CircularProgressIndicator(
-                            value: total / 100,
-                            strokeWidth: 12,
-                            backgroundColor: c.surfaceMuted,
-                            valueColor: AlwaysStoppedAnimation(c.primary),
-                            strokeCap: StrokeCap.round,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              SizedBox(
+                                width: 140,
+                                height: 140,
+                                child: CircularProgressIndicator(
+                                  value: pe.weightedTotal / 100,
+                                  strokeWidth: 12,
+                                  backgroundColor: c.surfaceMuted,
+                                  valueColor: AlwaysStoppedAnimation(c.primary),
+                                  strokeCap: StrokeCap.round,
+                                ),
+                              ),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(pe.weightedTotal.toStringAsFixed(1), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: c.textPrimary, fontFeatures: const [FontFeature.tabularFigures()])),
+                                  Text('/ 100', style: TextStyle(fontSize: 12, color: c.textMuted)),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                        Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(total.toStringAsFixed(1), style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: c.textPrimary, fontFeatures: const [FontFeature.tabularFigures()])),
-                            Text('/ 100', style: TextStyle(fontSize: 12, color: c.textMuted)),
-                          ],
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(color: c.primaryLight, borderRadius: BorderRadius.circular(100)),
+                          child: Text('Weighted Total Score', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: c.primaryDark)),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: c.primaryLight, borderRadius: BorderRadius.circular(100)),
-                    child: Text('Weighted Total Score', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: c.primaryDark)),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            const SectionHeader(title: 'KPI Breakdown'),
-            ...pe.kpis.map((k) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _KpiBar(kpi: k),
-            )),
-            const SizedBox(height: 12),
-            const SectionHeader(title: 'HR Comments'),
-            AppCard(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.format_quote_rounded, color: c.primary, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      pe.comments,
-                      style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.5, fontStyle: FontStyle.italic),
+                  const SizedBox(height: 24),
+                  const SectionHeader(title: 'KPI Breakdown'),
+                  ...pe.kpis.map((k) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _KpiBar(kpi: k),
+                      )),
+                  const SizedBox(height: 12),
+                  const SectionHeader(title: 'HR Comments'),
+                  AppCard(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.format_quote_rounded, color: c.primary, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            pe.comments.isEmpty ? 'No comments left for this evaluation.' : pe.comments,
+                            style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.5, fontStyle: FontStyle.italic),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                  const SizedBox(height: 20),
                 ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            const SectionHeader(title: 'PE History'),
-            ...DummyData.peHistory.map((e) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: AppCard(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(10)),
-                      child: Icon(Icons.calendar_month_rounded, size: 16, color: c.textSecondary),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(child: Text('Evaluation ${e.year}', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700))),
-                    Text(
-                      e.weightedTotal.toStringAsFixed(1),
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: c.primary, fontFeatures: const [FontFeature.tabularFigures()]),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(Icons.chevron_right_rounded, color: c.textMuted, size: 18),
-                  ],
-                ),
-              ),
-            )),
-          ],
+                const SectionHeader(title: 'PE History'),
+                if (history.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text('No previous evaluations.', style: TextStyle(fontSize: 12.5, color: c.textMuted)),
+                  )
+                else
+                  ...history.map((e) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: AppCard(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(10)),
+                                child: Icon(Icons.calendar_month_rounded, size: 16, color: c.textSecondary),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(child: Text('Evaluation ${e.year}', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700))),
+                              Text(
+                                e.weightedTotal.toStringAsFixed(1),
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: c.primary, fontFeatures: const [FontFeature.tabularFigures()]),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )),
+              ],
+            );
+          },
         ),
       ),
     );

@@ -98,11 +98,17 @@ class KpiItem {
 }
 
 class PerformanceEvaluation {
+  final int? dbId; // performance_evaluations.id - null for dummy/local-only rows
+  final String? userUuid;
+  final int? templateId;
   final String year;
   final List<KpiItem> kpis;
   final String comments;
 
   const PerformanceEvaluation({
+    this.dbId,
+    this.userUuid,
+    this.templateId,
     required this.year,
     required this.kpis,
     required this.comments,
@@ -282,10 +288,11 @@ class KpiTemplateItem {
 }
 
 class KpiTemplate {
+  final int? dbId; // kpi_templates.id - null for dummy/local-only rows
   final String name;
   final String department; // 'All Departments' if not department-specific
   final List<KpiTemplateItem> items;
-  const KpiTemplate({required this.name, required this.department, required this.items});
+  const KpiTemplate({this.dbId, required this.name, required this.department, required this.items});
 }
 
 class TrainingCompletionRecord {
