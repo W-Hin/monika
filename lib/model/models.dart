@@ -65,7 +65,9 @@ class AttendanceRecord {
 }
 
 class LeaveApplication {
-  final String id;
+  final int? dbId; // leave_applications.id - null for dummy/local-only rows
+  final String? userUuid; // profiles.id of the applicant - null for dummy rows
+  final String id; // reference_code, e.g. LV-2201 (display)
   final String employeeName;
   final String leaveType;
   final String startDate;
@@ -75,6 +77,8 @@ class LeaveApplication {
   final LeaveStatus status;
 
   const LeaveApplication({
+    this.dbId,
+    this.userUuid,
     required this.id,
     required this.employeeName,
     required this.leaveType,
@@ -297,6 +301,7 @@ class TrainingCompletionRecord {
 }
 
 class LeaveBalance {
+  final String? userUuid; // profiles.id - null for dummy/local-only rows
   final String employeeName;
   final int annualTotal;
   final int annualUsed;
@@ -306,6 +311,7 @@ class LeaveBalance {
   final int emergencyUsed;
 
   const LeaveBalance({
+    this.userUuid,
     required this.employeeName,
     required this.annualTotal,
     required this.annualUsed,

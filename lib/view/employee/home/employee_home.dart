@@ -7,6 +7,7 @@ import '../../shared/widgets/status_pill.dart';
 import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
 import '../../../controller/attendance_controller.dart';
+import '../../../controller/leave_controller.dart';
 import '../attendance/clock_in.dart';
 import '../attendance/clock_out.dart';
 import '../leave/leave_apply.dart';
@@ -34,6 +35,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
     super.initState();
     attendanceController.loadToday();
     attendanceController.loadHistory();
+    leaveController.loadMy();
   }
 
   Future<void> _handleClockIn() async {
@@ -62,7 +64,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
       body: SafeArea(
         top: false,
         child: ListenableBuilder(
-          listenable: attendanceController,
+          listenable: Listenable.merge([attendanceController, leaveController]),
           builder: (context, _) => ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
@@ -97,7 +99,7 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                     height: _kStatCardHeight,
                     child: StatCard(
                       label: 'Leave Balance',
-                      value: '${DummyData.myLeaveBalance.annualRemaining} days',
+                      value: '${leaveController.myBalance?.annualRemaining ?? 0} days',
                       icon: Icons.beach_access_rounded,
                       iconColor: c.infoBlue,
                       iconBg: c.infoBlueBg,

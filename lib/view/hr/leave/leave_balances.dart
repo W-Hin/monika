@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../shared/widgets/common_widgets.dart';
-import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
+import '../../../controller/leave_controller.dart';
 import '../../../core/theme/app_colors_extension.dart';
 
 class HrLeaveBalancesScreen extends StatefulWidget {
@@ -12,12 +12,10 @@ class HrLeaveBalancesScreen extends StatefulWidget {
 }
 
 class _HrLeaveBalancesScreenState extends State<HrLeaveBalancesScreen> {
-  late List<LeaveBalance> _balances;
-
   @override
   void initState() {
     super.initState();
-    _balances = List.from(DummyData.leaveBalances);
+    leaveController.loadAllBalancesForHr();
   }
 
   void _adjustBalance(LeaveBalance balance) {
@@ -43,23 +41,26 @@ class _HrLeaveBalancesScreenState extends State<HrLeaveBalancesScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
           ElevatedButton(
-            onPressed: () {
-              setState(() {
-                final i = _balances.indexOf(balance);
-                _balances[i] = LeaveBalance(
-                  employeeName: balance.employeeName,
+            onPressed: () async {
+              final navigator = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
+              try {
+                await leaveController.updateEntitlement(
+                  balance: balance,
                   annualTotal: int.tryParse(annualController.text) ?? balance.annualTotal,
-                  annualUsed: balance.annualUsed,
                   medicalTotal: int.tryParse(medicalController.text) ?? balance.medicalTotal,
-                  medicalUsed: balance.medicalUsed,
                   emergencyTotal: int.tryParse(emergencyController.text) ?? balance.emergencyTotal,
-                  emergencyUsed: balance.emergencyUsed,
                 );
-              });
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('✓ Leave entitlement updated for ${balance.employeeName}')),
-              );
+                navigator.pop();
+                messenger.showSnackBar(
+                  SnackBar(content: Text('✓ Leave entitlement updated for ${balance.employeeName}')),
+                );
+              } catch (e) {
+                navigator.pop();
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Could not update entitlement: $e')),
+                );
+              }
             },
             child: const Text('Save'),
           ),
@@ -74,12 +75,28 @@ class _HrLeaveBalancesScreenState extends State<HrLeaveBalancesScreen> {
       appBar: AppBar(title: const Text('Leave Balances')),
       body: SafeArea(
         top: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          children: [
-            const SectionHeader(title: 'Employee Leave Balances'),
-            ListRow(children: _balances.map((b) => _BalanceRow(balance: b, onTap: () => _adjustBalance(b))).toList()),
-          ],
+        child: ListenableBuilder(
+          listenable: leaveController,
+          builder: (context, _) {
+            if (leaveController.loading && leaveController.allBalances.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final balances = leaveController.allBalances;
+            if (balances.isEmpty) {
+              return const EmptyState(
+                icon: Icons.account_balance_wallet_outlined,
+                title: 'No leave balances found',
+                subtitle: 'Balances are provisioned automatically when an employee account is created.',
+              );
+            }
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              children: [
+                const SectionHeader(title: 'Employee Leave Balances'),
+                ListRow(children: balances.map((b) => _BalanceRow(balance: b, onTap: () => _adjustBalance(b))).toList()),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -136,7 +153,7 @@ class _BalancePill extends StatelessWidget {
     final c = context.colors;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
       child: Column(
         children: [
           Text('$remaining/$total',

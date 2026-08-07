@@ -3,18 +3,27 @@ import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
-import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
+import '../../../controller/leave_controller.dart';
 import '../leave/leave_apply.dart';
 
-class EmployeeLeaveScreen extends StatelessWidget {
+class EmployeeLeaveScreen extends StatefulWidget {
   const EmployeeLeaveScreen({super.key});
+
+  @override
+  State<EmployeeLeaveScreen> createState() => _EmployeeLeaveScreenState();
+}
+
+class _EmployeeLeaveScreenState extends State<EmployeeLeaveScreen> {
+  @override
+  void initState() {
+    super.initState();
+    leaveController.loadMy();
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final apps = DummyData.employeeLeaveApplications;
-    final balance = DummyData.myLeaveBalance;
 
     return Scaffold(
       appBar: AppBar(
@@ -24,7 +33,10 @@ class EmployeeLeaveScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: IconButton(
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LeaveApplyScreen())),
+              onPressed: () async {
+                await Navigator.push(context, MaterialPageRoute(builder: (_) => const LeaveApplyScreen()));
+                leaveController.loadMy();
+              },
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(color: c.primary, borderRadius: BorderRadius.circular(10)),
@@ -36,31 +48,52 @@ class EmployeeLeaveScreen extends StatelessWidget {
       ),
       body: SafeArea(
         top: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          children: [
-            Row(
+        child: ListenableBuilder(
+          listenable: leaveController,
+          builder: (context, _) {
+            if (leaveController.loading && leaveController.myBalance == null) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final balance = leaveController.myBalance;
+            final apps = leaveController.myApplications;
+
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
-                Expanded(child: _BalanceCard(label: 'Annual', value: '${balance.annualRemaining}', total: '${balance.annualTotal}', color: c.primary)),
-                const SizedBox(width: 10),
-                Expanded(child: _BalanceCard(label: 'Medical', value: '${balance.medicalRemaining}', total: '${balance.medicalTotal}', color: c.infoBlue)),
-                const SizedBox(width: 10),
-                Expanded(child: _BalanceCard(label: 'Emergency', value: '${balance.emergencyRemaining}', total: '${balance.emergencyTotal}', color: c.amber)),
+                Row(
+                  children: [
+                    Expanded(child: _BalanceCard(label: 'Annual', value: '${balance?.annualRemaining ?? 0}', total: '${balance?.annualTotal ?? 0}', color: c.primary)),
+                    const SizedBox(width: 10),
+                    Expanded(child: _BalanceCard(label: 'Medical', value: '${balance?.medicalRemaining ?? 0}', total: '${balance?.medicalTotal ?? 0}', color: c.infoBlue)),
+                    const SizedBox(width: 10),
+                    Expanded(child: _BalanceCard(label: 'Emergency', value: '${balance?.emergencyRemaining ?? 0}', total: '${balance?.emergencyTotal ?? 0}', color: c.amber)),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                PrimaryButton(
+                  label: 'Apply for Leave',
+                  icon: Icons.add_circle_outline_rounded,
+                  onPressed: () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const LeaveApplyScreen()));
+                    leaveController.loadMy();
+                  },
+                ),
+                const SizedBox(height: 24),
+                const SectionHeader(title: 'My Applications'),
+                if (apps.isEmpty)
+                  const EmptyState(
+                    icon: Icons.event_note_outlined,
+                    title: 'No applications yet',
+                    subtitle: 'Applications you submit will show up here.',
+                  )
+                else
+                  ...apps.map((a) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _LeaveTile(app: a),
+                      )),
               ],
-            ),
-            const SizedBox(height: 24),
-            PrimaryButton(
-              label: 'Apply for Leave',
-              icon: Icons.add_circle_outline_rounded,
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LeaveApplyScreen())),
-            ),
-            const SizedBox(height: 24),
-            const SectionHeader(title: 'My Applications'),
-            ...apps.map((a) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _LeaveTile(app: a),
-            )),
-          ],
+            );
+          },
         ),
       ),
     );

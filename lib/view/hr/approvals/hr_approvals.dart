@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
-import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
+import '../../../controller/leave_controller.dart';
 import '../leave/leave_balances.dart';
 
 class HrApprovalsScreen extends StatefulWidget {
@@ -15,46 +16,36 @@ class HrApprovalsScreen extends StatefulWidget {
 }
 
 class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
-  late List<LeaveApplication> _applications;
-
   @override
   void initState() {
     super.initState();
-    _applications = List.from(DummyData.pendingApprovalsForHr);
+    leaveController.loadAllForHr();
   }
 
-  void _handleDecision(int index, bool approve) {
+  Future<void> _handleDecision(LeaveApplication app, bool approve) async {
     showDialog(
       context: context,
       builder: (_) => _DecisionDialog(
-        app: _applications[index],
+        app: app,
         approve: approve,
-        onConfirm: (reason) {
-          setState(() {
-            final updated = LeaveApplication(
-              id: _applications[index].id,
-              employeeName: _applications[index].employeeName,
-              leaveType: _applications[index].leaveType,
-              startDate: _applications[index].startDate,
-              endDate: _applications[index].endDate,
-              days: _applications[index].days,
-              reason: _applications[index].reason,
-              status: approve ? LeaveStatus.approved : LeaveStatus.rejected,
-            );
-            _applications[index] = updated;
-          });
+        onConfirm: (reason) async {
           Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                approve
-                    ? '✓ Leave approved for ${_applications[index].employeeName}'
-                    : '✗ Leave rejected for ${_applications[index].employeeName}',
+          try {
+            await leaveController.decide(app: app, approve: approve);
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(approve ? '✓ Leave approved for ${app.employeeName}' : '✗ Leave rejected for ${app.employeeName}'),
+                backgroundColor: approve ? context.colors.primary : context.colors.riskHigh,
+                behavior: SnackBarBehavior.floating,
               ),
-              backgroundColor: approve ? context.colors.primary : context.colors.riskHigh,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+            );
+          } catch (e) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not update this application: $e'), backgroundColor: context.colors.riskHigh),
+            );
+          }
         },
       ),
     );
@@ -63,8 +54,15 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final pending = _applications.where((a) => a.status == LeaveStatus.pending).toList();
-    final processed = _applications.where((a) => a.status != LeaveStatus.pending).toList();
+    final myUid = Supabase.instance.client.auth.currentUser?.id;
+    // This screen is for reviewing OTHERS' requests - an HR admin's own
+    // leave applications are handled the same way anyone else's are
+    // (their own Employee view, decided by a different HR admin), so
+    // they're excluded here entirely rather than shown with disabled
+    // actions.
+    final reviewable = leaveController.allApplications.where((a) => a.userUuid != myUid).toList();
+    final pending = reviewable.where((a) => a.status == LeaveStatus.pending).toList();
+    final processed = reviewable.where((a) => a.status != LeaveStatus.pending).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -80,70 +78,75 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          children: [
-            Row(
+        child: ListenableBuilder(
+          listenable: leaveController,
+          builder: (context, _) {
+            if (leaveController.loading && leaveController.allApplications.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
-                Expanded(
-                  child: StatCard(
-                    label: 'Pending',
-                    value: '${pending.length}',
-                    icon: Icons.pending_actions_rounded,
-                    iconColor: c.amber,
-                    iconBg: c.amberBg,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: StatCard(
+                        label: 'Pending',
+                        value: '${pending.length}',
+                        icon: Icons.pending_actions_rounded,
+                        iconColor: c.amber,
+                        iconBg: c.amberBg,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: StatCard(
+                        label: 'Approved',
+                        value: '${processed.where((a) => a.status == LeaveStatus.approved).length}',
+                        icon: Icons.check_circle_outline_rounded,
+                        iconColor: c.primary,
+                        iconBg: c.primaryLight,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: StatCard(
+                        label: 'Rejected',
+                        value: '${processed.where((a) => a.status == LeaveStatus.rejected).length}',
+                        icon: Icons.cancel_outlined,
+                        iconColor: c.riskHigh,
+                        iconBg: c.riskHighBg,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatCard(
-                    label: 'Approved Today',
-                    value: '${processed.where((a) => a.status == LeaveStatus.approved).length}',
+                const SizedBox(height: 24),
+
+                if (pending.isNotEmpty) ...[
+                  SectionHeader(title: 'Pending Approval (${pending.length})'),
+                  ...pending.map((a) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _ApprovalCard(
+                          app: a,
+                          onApprove: () => _handleDecision(a, true),
+                          onReject: () => _handleDecision(a, false),
+                        ),
+                      )),
+                  const SizedBox(height: 8),
+                ] else
+                  const EmptyState(
                     icon: Icons.check_circle_outline_rounded,
-                    iconColor: c.primary,
-                    iconBg: c.primaryLight,
+                    title: 'All caught up!',
+                    subtitle: 'No pending leave applications at this time.',
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: StatCard(
-                    label: 'Rejected',
-                    value: '${processed.where((a) => a.status == LeaveStatus.rejected).length}',
-                    icon: Icons.cancel_outlined,
-                    iconColor: c.riskHigh,
-                    iconBg: c.riskHighBg,
-                  ),
-                ),
+
+                if (processed.isNotEmpty) ...[
+                  const SectionHeader(title: 'Recently Processed'),
+                  ListRow(children: processed.map((a) => _ProcessedRow(app: a)).toList()),
+                ],
               ],
-            ),
-            const SizedBox(height: 24),
-
-            if (pending.isNotEmpty) ...[
-              SectionHeader(title: 'Pending Approval (${pending.length})'),
-              ...pending.asMap().entries.map((e) {
-                final i = _applications.indexOf(e.value);
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _ApprovalCard(
-                    app: e.value,
-                    onApprove: () => _handleDecision(i, true),
-                    onReject: () => _handleDecision(i, false),
-                  ),
-                );
-              }),
-              const SizedBox(height: 8),
-            ] else
-              const EmptyState(
-                icon: Icons.check_circle_outline_rounded,
-                title: 'All caught up!',
-                subtitle: 'No pending leave applications at this time.',
-              ),
-
-            if (processed.isNotEmpty) ...[
-              const SectionHeader(title: 'Recently Processed'),
-              ListRow(children: processed.map((a) => _ProcessedRow(app: a)).toList()),
-            ],
-          ],
+            );
+          },
         ),
       ),
     );
@@ -160,7 +163,7 @@ class _ApprovalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final initials = app.employeeName.split(' ').map((w) => w[0]).take(2).join();
+    final initials = app.employeeName.split(' ').where((w) => w.isNotEmpty).map((w) => w[0]).take(2).join();
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -242,6 +245,11 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
+// The optional note/reason text isn't persisted anywhere yet - the
+// leave_applications table only tracks status/decided_by/decided_at, no
+// note column. Kept as a courtesy field for the HR admin's own reference
+// while deciding; a real audit-trail note is a natural next addition if
+// ever needed.
 class _DecisionDialog extends StatefulWidget {
   final LeaveApplication app;
   final bool approve;
@@ -279,7 +287,7 @@ class _DecisionDialogState extends State<_DecisionDialog> {
           ),
           const SizedBox(height: 16),
           Text(
-            widget.approve ? 'Add a note (optional)' : 'Rejection reason (required)',
+            widget.approve ? 'Add a note (optional)' : 'Rejection reason (optional)',
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
@@ -314,7 +322,7 @@ class _ProcessedRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = app.employeeName.split(' ').map((w) => w[0]).take(2).join();
+    final initials = app.employeeName.split(' ').where((w) => w.isNotEmpty).map((w) => w[0]).take(2).join();
     final c = context.colors;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
