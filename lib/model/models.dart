@@ -124,6 +124,9 @@ class PerformanceEvaluation {
 }
 
 class TrainingProgram {
+  final int? dbId; // training_programs.id - null for dummy/local-only rows
+  final int? enrollmentId; // training_enrollments.id - null if not enrolled
+  final int enrolledCount; // real count across all employees, HR view only
   final String title;
   final String category; // Technical, Behavioural, Leadership
   final String description;
@@ -137,6 +140,9 @@ class TrainingProgram {
   final String? department; // null = all departments
 
   const TrainingProgram({
+    this.dbId,
+    this.enrollmentId,
+    this.enrolledCount = 0,
     required this.title,
     required this.category,
     required this.description,
@@ -157,6 +163,9 @@ class TrainingProgram {
     String? department,
   }) =>
       TrainingProgram(
+        dbId: dbId,
+        enrollmentId: enrollmentId,
+        enrolledCount: enrolledCount,
         title: title,
         category: category,
         description: description,
@@ -296,6 +305,7 @@ class KpiTemplate {
 }
 
 class TrainingCompletionRecord {
+  final int? enrollmentId; // training_enrollments.id - null for dummy/local-only rows
   final String employeeName;
   final String department;
   final String programTitle;
@@ -303,6 +313,7 @@ class TrainingCompletionRecord {
   final double? performanceScore;
 
   const TrainingCompletionRecord({
+    this.enrollmentId,
     required this.employeeName,
     required this.department,
     required this.programTitle,

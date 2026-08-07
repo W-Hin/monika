@@ -24,7 +24,7 @@ void main() {
     );
     await tester.pumpWidget(MaterialApp(
       theme: AppTheme.light,
-      home: TrainingDetailScreen(program: program, onUpdate: (_) {}),
+      home: TrainingDetailScreen(program: program),
     ));
     expect(find.text('Leadership Fundamentals'), findsOneWidget);
   });

@@ -3,12 +3,12 @@ import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../../model/models.dart';
+import '../../../controller/training_controller.dart';
 
 class TrainingDetailScreen extends StatefulWidget {
   final TrainingProgram program;
-  final ValueChanged<TrainingProgram> onUpdate;
 
-  const TrainingDetailScreen({super.key, required this.program, required this.onUpdate});
+  const TrainingDetailScreen({super.key, required this.program});
 
   @override
   State<TrainingDetailScreen> createState() => _TrainingDetailScreenState();
@@ -36,34 +36,49 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
     }
   }
 
-  void _apply(TrainingProgram updated) {
-    setState(() => _program = updated);
-    widget.onUpdate(updated);
+  /// Pulls the freshly-reloaded version of this program from the
+  /// controller's list (by dbId) after a mutation succeeds, so the
+  /// screen reflects whatever was actually saved.
+  void _syncFromController() {
+    final updated = trainingController.myPrograms.where((p) => p.dbId == _program.dbId);
+    if (updated.isNotEmpty) {
+      setState(() => _program = updated.first);
+    }
   }
 
-  void _enroll() {
+  Future<void> _enroll() async {
     setState(() => _busy = true);
-    Future.delayed(const Duration(milliseconds: 700), () {
-      if (!mounted) return;
-      setState(() => _busy = false);
-      _apply(_program.copyWith(progress: 0.1));
+    final success = await trainingController.enroll(_program);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✓ Enrolled successfully')),
+        SnackBar(content: Text(trainingController.errorMessage ?? 'Could not enrol')),
       );
-    });
+      return;
+    }
+    _syncFromController();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('✓ Enrolled successfully')),
+    );
   }
 
-  void _continue() {
-    final next = (_program.progress + 0.3).clamp(0.0, 1.0);
-    final completed = next >= 1.0;
-    _apply(_program.copyWith(
-      progress: next,
-      isCompleted: completed,
-      performanceScore: completed ? 85 : null,
-    ));
-    if (completed) {
+  Future<void> _continue() async {
+    setState(() => _busy = true);
+    final wasCompleted = _program.isCompleted;
+    final success = await trainingController.continueTraining(_program);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('🎉 Training completed!')),
+        SnackBar(content: Text(trainingController.errorMessage ?? 'Could not update progress')),
+      );
+      return;
+    }
+    _syncFromController();
+    if (!wasCompleted && _program.isCompleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('🎉 Training completed! HR will review and score it soon.')),
       );
     }
   }
@@ -83,7 +98,7 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(color: catColor.withOpacity(0.12), borderRadius: BorderRadius.circular(100)),
+                  decoration: BoxDecoration(color: catColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(100)),
                   child: Text(p.category, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: catColor)),
                 ),
                 const SizedBox(width: 8),
@@ -138,7 +153,10 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
                     const Expanded(
                       child: Text('Training Performance Score', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                     ),
-                    Text('${p.performanceScore?.toInt() ?? '—'} / 100', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: c.primary)),
+                    Text(
+                      p.performanceScore != null ? '${p.performanceScore!.toInt()} / 100' : 'Pending HR review',
+                      style: TextStyle(fontSize: p.performanceScore != null ? 16 : 12.5, fontWeight: FontWeight.w900, color: p.performanceScore != null ? c.primary : c.textMuted),
+                    ),
                   ],
                 ),
               ),
@@ -156,7 +174,7 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
               const SizedBox(height: 6),
               Text('${(p.progress * 100).toInt()}% complete', style: TextStyle(fontSize: 11.5, color: c.textMuted, fontWeight: FontWeight.w600)),
               const SizedBox(height: 20),
-              PrimaryButton(label: 'Continue Training', icon: Icons.play_arrow_rounded, onPressed: _continue),
+              PrimaryButton(label: 'Continue Training', icon: Icons.play_arrow_rounded, onPressed: _continue, isLoading: _busy),
             ] else ...[
               PrimaryButton(label: 'Enrol Now', icon: Icons.how_to_reg_rounded, onPressed: _enroll, isLoading: _busy),
             ],
