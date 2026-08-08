@@ -142,13 +142,17 @@ class _HrPeScreenState extends State<HrPeScreen> {
     );
   }
 
-  void _pickTemplate() {
-    // Only templates compatible with the selected employee's department
-    // (their own department's template, or an "All Departments" one) —
-    // otherwise HR could apply e.g. a Sales-authored template to a Design
-    // employee, which never made sense as a choice.
+  // Only templates compatible with the selected employee's department
+  // (their own department's template, or an "All Departments" one) —
+  // otherwise HR could apply e.g. a Sales-authored template to a Design
+  // employee, which never made sense as a choice.
+  List<KpiTemplate> get _compatibleTemplates {
     final dept = _selectedEmployee?.department;
-    final compatible = peController.templates.where((t) => t.department == dept || t.department == 'All Departments').toList();
+    return peController.templates.where((t) => t.department == dept || t.department == 'All Departments').toList();
+  }
+
+  void _pickTemplate() {
+    final compatible = _compatibleTemplates;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -276,6 +280,37 @@ class _HrPeScreenState extends State<HrPeScreen> {
     );
   }
 
+  void _manageAllTemplates() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PickerSheet<KpiTemplate>(
+        title: 'All KPI Templates',
+        items: peController.templates,
+        labelBuilder: (t) => t.name,
+        subtitleBuilder: (t) => '${t.department} · ${t.items.length} KPIs',
+        onSelected: (t) => setState(() => _loadTemplateDefaults(t)),
+        onEdit: (t) {
+          Navigator.of(context).pop();
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => _CreateTemplateSheet(existing: t),
+          );
+        },
+        onDelete: (t) async {
+          final success = await peController.deleteTemplate(t);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(success ? '✓ Template deleted' : peController.errorMessage ?? 'Could not delete template')),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -283,6 +318,11 @@ class _HrPeScreenState extends State<HrPeScreen> {
       appBar: AppBar(
         title: const Text('Performance Evaluation'),
         actions: [
+          IconButton(
+            tooltip: 'Manage All Templates',
+            onPressed: _manageAllTemplates,
+            icon: Icon(Icons.list_alt_rounded, color: c.textSecondary),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: IconButton(
@@ -373,24 +413,27 @@ class _HrPeScreenState extends State<HrPeScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                InkWell(
-                  onTap: _pickTemplate,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
-                    child: Row(
-                      children: [
-                        Icon(Icons.fact_check_outlined, size: 16, color: c.textSecondary),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text('KPI Template: ${_selectedTemplate?.name ?? '—'}', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.textPrimary)),
-                        ),
-                        Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: c.primary)),
-                      ],
+                Builder(builder: (context) {
+                  final noneAvailable = _compatibleTemplates.isEmpty;
+                  return InkWell(
+                    onTap: noneAvailable ? _createTemplate : _pickTemplate,
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+                      child: Row(
+                        children: [
+                          Icon(Icons.fact_check_outlined, size: 16, color: c.textSecondary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text('KPI Template: ${_selectedTemplate?.name ?? '—'}', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.textPrimary)),
+                          ),
+                          Text(noneAvailable ? 'Create' : 'Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: c.primary)),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                }),
                 const SizedBox(height: 16),
 
                 if (_selectedTemplate == null) ...[
@@ -401,9 +444,9 @@ class _HrPeScreenState extends State<HrPeScreen> {
                   ),
                   const SizedBox(height: 12),
                   PrimaryButton(
-                    label: 'Select KPI Template',
-                    icon: Icons.fact_check_rounded,
-                    onPressed: _pickTemplate,
+                    label: _compatibleTemplates.isEmpty ? 'Create KPI Template' : 'Select KPI Template',
+                    icon: _compatibleTemplates.isEmpty ? Icons.add_rounded : Icons.fact_check_rounded,
+                    onPressed: _compatibleTemplates.isEmpty ? _createTemplate : _pickTemplate,
                   ),
                 ] else ...[
                   // Weighted total preview

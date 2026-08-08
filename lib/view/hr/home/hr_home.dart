@@ -24,11 +24,6 @@ import '../payroll/hr_payroll.dart';
 import '../../shared/company_calendar.dart';
 import '../../shared/notification.dart';
 
-// Fixed so all 4 stat cards line up evenly — Attendance Rate carries an
-// extra trend row (increase/decrease indicator) the other 3 don't, so
-// letting each card size to its own content leaves a ragged bottom edge.
-const double _kStatCardHeight = 150;
-
 class HrHomeScreen extends StatefulWidget {
   const HrHomeScreen({super.key});
 
@@ -180,62 +175,48 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: SizedBox(
-                    height: _kStatCardHeight,
-                    child: StatCard(
-                      label: 'Total Employees',
-                      value: '${analyticsController.totalEmployees}',
-                      icon: Icons.groups_rounded,
-                      iconColor: c.primary,
-                      iconBg: c.primaryLight,
-                    ),
+                  child: StatCard(
+                    label: 'Total Employees',
+                    value: '${analyticsController.totalEmployees}',
+                    icon: Icons.groups_rounded,
+                    iconColor: c.primary,
+                    iconBg: c.primaryLight,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: SizedBox(
-                    height: _kStatCardHeight,
-                    child: StatCard(
-                      label: 'Pending Approvals',
-                      value: '${analyticsController.pendingLeaveCount}',
-                      icon: Icons.pending_actions_rounded,
-                      iconColor: c.amber,
-                      iconBg: c.amberBg,
-                    ),
+                  child: StatCard(
+                    label: 'Pending Approvals',
+                    value: '${analyticsController.pendingLeaveCount}',
+                    icon: Icons.pending_actions_rounded,
+                    iconColor: c.amber,
+                    iconBg: c.amberBg,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: SizedBox(
-                    height: _kStatCardHeight,
-                    child: StatCard(
-                      label: 'Device Requests',
-                      value: '${deviceRequestController.allRequests.where((r) => r.status == 'pending').length}',
-                      icon: Icons.phone_android_rounded,
-                      iconColor: c.infoBlue,
-                      iconBg: c.infoBlueBg,
-                    ),
+                  child: StatCard(
+                    label: 'Device Requests',
+                    value: '${deviceRequestController.allRequests.where((r) => r.status == 'pending').length}',
+                    icon: Icons.phone_android_rounded,
+                    iconColor: c.infoBlue,
+                    iconBg: c.infoBlueBg,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: SizedBox(
-                    height: _kStatCardHeight,
-                    child: StatCard(
-                      label: 'Flagged Today',
-                      value: '${analyticsController.flaggedToday}',
-                      icon: Icons.flag_rounded,
-                      iconColor: c.riskHigh,
-                      iconBg: c.riskHighBg,
-                    ),
+                  child: StatCard(
+                    label: 'Flagged Today',
+                    value: '${analyticsController.flaggedToday}',
+                    icon: Icons.flag_rounded,
+                    iconColor: c.riskHigh,
+                    iconBg: c.riskHighBg,
                   ),
                 ),
               ],
@@ -245,16 +226,17 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
             const SectionHeader(title: 'Risk Classification Overview'),
             AppCard(
               padding: const EdgeInsets.all(18),
-              child: Row(
-                children: [
-                  RiskDonutChart(
-                    low: analyticsController.riskDistribution[RiskLevel.low] ?? 0,
-                    medium: analyticsController.riskDistribution[RiskLevel.medium] ?? 0,
-                    high: analyticsController.riskDistribution[RiskLevel.high] ?? 0,
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RiskDonutChart(
+                      low: analyticsController.riskDistribution[RiskLevel.low] ?? 0,
+                      medium: analyticsController.riskDistribution[RiskLevel.medium] ?? 0,
+                      high: analyticsController.riskDistribution[RiskLevel.high] ?? 0,
+                    ),
+                    const SizedBox(width: 24),
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -265,8 +247,8 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
                         _LegendDot(color: c.riskHigh, label: 'High', value: '${analyticsController.riskDistribution[RiskLevel.high] ?? 0}'),
                       ],
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
 
@@ -448,6 +430,11 @@ class _DonutPainter extends CustomPainter {
     final radius = size.width / 2;
     const strokeWidth = 16.0;
     const gapRadians = 0.04;
+    // Gaps only make sense between two *visible* slices — segments.length
+    // is always 3 (low/medium/high) even when only one category actually
+    // has anyone in it, so gating on that left a stray gap notched into an
+    // otherwise-full circle whenever everyone fell into a single category.
+    final visibleCount = segments.where((s) => s.$1 > 0).length;
 
     var startAngle = -3.14159265 / 2;
     for (final (fraction, color) in segments) {
@@ -457,8 +444,8 @@ class _DonutPainter extends CustomPainter {
         ..color = color
         ..style = PaintingStyle.stroke
         ..strokeWidth = strokeWidth
-        ..strokeCap = segments.length > 1 ? StrokeCap.butt : StrokeCap.round;
-      final adjustedSweep = segments.length > 1 ? (sweep - gapRadians).clamp(0.0, sweep) : sweep;
+        ..strokeCap = visibleCount > 1 ? StrokeCap.butt : StrokeCap.round;
+      final adjustedSweep = visibleCount > 1 ? (sweep - gapRadians).clamp(0.0, sweep) : sweep;
       canvas.drawArc(
         Rect.fromCircle(center: center, radius: radius - strokeWidth / 2),
         startAngle,
@@ -491,6 +478,7 @@ class _MoreMenuItem extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             padding: const EdgeInsets.all(12),

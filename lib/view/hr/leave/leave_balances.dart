@@ -98,25 +98,31 @@ class _HrLeaveBalancesScreenState extends State<HrLeaveBalancesScreen> {
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: departments.map((d) {
-                      final sel = _departmentFilter == d;
-                      final c = context.colors;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(d),
-                          selected: sel,
-                          onSelected: (_) => setState(() => _departmentFilter = d),
-                          selectedColor: c.primaryLight,
-                          labelStyle: TextStyle(color: sel ? c.primaryDark : c.textSecondary, fontWeight: FontWeight.w700, fontSize: 12.5),
-                          side: BorderSide(color: sel ? c.primary : Colors.transparent),
+                Builder(
+                  builder: (context) {
+                    final c = context.colors;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _departmentFilter,
+                          isExpanded: true,
+                          icon: Icon(Icons.keyboard_arrow_down_rounded, color: c.textMuted),
+                          borderRadius: BorderRadius.circular(12),
+                          items: departments
+                              .map((d) => DropdownMenuItem(
+                                    value: d,
+                                    child: Text(d, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
+                                  ))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) setState(() => _departmentFilter = v);
+                          },
                         ),
-                      );
-                    }).toList(),
-                  ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 SectionHeader(title: 'Employee Leave Balances (${balances.length})'),

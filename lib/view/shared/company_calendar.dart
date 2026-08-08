@@ -675,6 +675,12 @@ class _EventFormSheetState extends State<_EventFormSheet> {
       );
       return;
     }
+    if (_type != 'Public Holiday' && (_startTime == null || _endTime == null)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a start and end time')),
+      );
+      return;
+    }
     setState(() => _saving = true);
     // A start time with no explicit end date means a same-day timed event
     // (e.g. "Team Meeting 2-4pm") — the end date defaults to the start
@@ -753,7 +759,16 @@ class _EventFormSheetState extends State<_EventFormSheet> {
                 return ChoiceChip(
                   label: Text(t),
                   selected: sel,
-                  onSelected: (_) => setState(() => _type = t),
+                  onSelected: (_) => setState(() {
+                    _type = t;
+                    // Public holidays are always all-day — clear any time
+                    // picked before switching type so it can't sneak
+                    // through if the user picks a time then changes type.
+                    if (t == 'Public Holiday') {
+                      _startTime = null;
+                      _endTime = null;
+                    }
+                  }),
                   selectedColor: c.primaryLight,
                   labelStyle: TextStyle(color: sel ? c.primaryDark : c.textSecondary, fontWeight: FontWeight.w700, fontSize: 12.5),
                   side: BorderSide(color: sel ? c.primary : Colors.transparent),
@@ -789,38 +804,27 @@ class _EventFormSheetState extends State<_EventFormSheet> {
             ],
             const SizedBox(height: 14),
 
-            Text('Time (optional)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _DatePickerField(
-                    label: 'Start Time',
-                    value: _startTime != null ? _timeFormat.format(DateTime(2000, 1, 1, _startTime!.hour, _startTime!.minute)) : 'All day',
-                    onTap: () => _pickTime(isEnd: false),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _DatePickerField(
-                    label: 'End Time',
-                    value: _endTime != null ? _timeFormat.format(DateTime(2000, 1, 1, _endTime!.hour, _endTime!.minute)) : '—',
-                    onTap: () => _pickTime(isEnd: true),
-                  ),
-                ),
-              ],
-            ),
-            if (_startTime != null || _endTime != null) ...[
+            if (_type != 'Public Holiday') ...[
+              Text('Time', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
               const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => setState(() {
-                    _startTime = null;
-                    _endTime = null;
-                  }),
-                  child: const Text('Clear time (all day)'),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _DatePickerField(
+                      label: 'Start Time',
+                      value: _startTime != null ? _timeFormat.format(DateTime(2000, 1, 1, _startTime!.hour, _startTime!.minute)) : 'Select time',
+                      onTap: () => _pickTime(isEnd: false),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _DatePickerField(
+                      label: 'End Time',
+                      value: _endTime != null ? _timeFormat.format(DateTime(2000, 1, 1, _endTime!.hour, _endTime!.minute)) : 'Select time',
+                      onTap: () => _pickTime(isEnd: true),
+                    ),
+                  ),
+                ],
               ),
             ],
             const SizedBox(height: 14),

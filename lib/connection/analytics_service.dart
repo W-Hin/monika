@@ -71,8 +71,16 @@ class AnalyticsService {
     return List.from(rows).length;
   }
 
+  /// Excludes the current HR admin's own pending applications — the
+  /// self-decision-lock trigger means HR can never decide on their own
+  /// leave anyway, and hr_approvals.dart's reviewable list already
+  /// excludes them, so counting them here just left the Dashboard badge
+  /// showing "1 pending" for a request that never actually appeared in
+  /// the Approvals list.
   static Future<int> fetchPendingLeaveCount() async {
-    final rows = await _client.from('leave_applications').select('id').eq('status', 'pending');
+    final myUid = _client.auth.currentUser?.id;
+    var query = _client.from('leave_applications').select('id').eq('status', 'pending');
+    final rows = myUid != null ? await query.neq('user_id', myUid) : await query;
     return List.from(rows).length;
   }
 
