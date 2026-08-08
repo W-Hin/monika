@@ -49,6 +49,29 @@ class PeController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Returns true on success. On failure, sets errorMessage and returns
+  /// false rather than throwing.
+  Future<bool> createTemplate({
+    required String name,
+    required String? departmentName,
+    required List<KpiTemplateItem> items,
+  }) async {
+    errorMessage = null;
+    try {
+      await PeService.createTemplate(
+        name: name,
+        departmentName: departmentName,
+        items: items.map((i) => {'name': i.name, 'weightage': i.weightage}).toList(),
+      );
+      await loadTemplates();
+      return true;
+    } catch (e) {
+      errorMessage = 'Could not create template: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> loadMy() async {
     loading = true;
     notifyListeners();

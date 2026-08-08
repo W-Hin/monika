@@ -121,14 +121,14 @@ class _ClockInScreenState extends State<ClockInScreen> {
                       subtitle: _gpsDetail,
                       state: _gpsState,
                     ),
-                    _ConnectorLine(active: _gpsState != _StepState.pending),
+                    const SizedBox(height: 12),
                     _ValidationStep(
                       icon: Icons.wifi_rounded,
                       title: 'WiFi SSID Verification',
                       subtitle: _wifiDetail,
                       state: _wifiState,
                     ),
-                    _ConnectorLine(active: _wifiState != _StepState.pending),
+                    const SizedBox(height: 12),
                     _ValidationStep(
                       icon: Icons.phone_android_rounded,
                       title: 'Device Token Binding',
@@ -296,18 +296,3 @@ class _ValidationStep extends StatelessWidget {
   }
 }
 
-class _ConnectorLine extends StatelessWidget {
-  final bool active;
-  const _ConnectorLine({required this.active});
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return Container(
-      margin: const EdgeInsets.only(left: 38),
-      height: 16,
-      width: 2,
-      color: active ? c.primary.withOpacity(0.4) : c.border,
-    );
-  }
-}

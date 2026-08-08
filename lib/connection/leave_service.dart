@@ -99,11 +99,12 @@ class LeaveService {
         .eq('year', _currentYear);
   }
 
-  /// HR — every employee's current-year balance, joined with their name.
+  /// HR — every employee's current-year balance, joined with their name
+  /// and department.
   static Future<List<Map<String, dynamic>>> fetchAllBalances() async {
     final rows = await _client
         .from('leave_balances')
-        .select('*, profiles(name)')
+        .select('*, profiles(name, departments(name))')
         .eq('year', _currentYear);
     return List<Map<String, dynamic>>.from(rows);
   }

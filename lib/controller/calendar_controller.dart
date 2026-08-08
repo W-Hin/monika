@@ -22,12 +22,20 @@ class CalendarController extends ChangeNotifier {
   };
 
   CalendarEvent _mapEvent(Map<String, dynamic> row) {
+    final assignRaw = row['company_event_assignments'] as List<dynamic>? ?? [];
+    final assignedTo = assignRaw
+        .map((a) {
+          final profile = a['profiles'] as Map<String, dynamic>?;
+          return AssignedEmployee(uuid: a['user_id'] as String, name: profile?['name'] as String? ?? '');
+        })
+        .toList();
     return CalendarEvent(
       dbId: row['id'] as int,
       title: row['title'] as String,
       eventDate: DateTime.parse(row['event_date'] as String),
       endDate: row['end_date'] != null ? DateTime.parse(row['end_date'] as String) : null,
       type: _typeToDisplay[row['event_type']] ?? row['event_type'] as String,
+      assignedTo: assignedTo,
     );
   }
 
@@ -45,6 +53,7 @@ class CalendarController extends ChangeNotifier {
     required DateTime eventDate,
     DateTime? endDate,
     required String displayType,
+    List<String> assignedUuids = const [],
   }) async {
     errorMessage = null;
     try {
@@ -53,6 +62,7 @@ class CalendarController extends ChangeNotifier {
         eventDate: eventDate,
         endDate: endDate,
         eventType: _typeToDb[displayType] ?? 'company_event',
+        assignedUuids: assignedUuids,
       );
       await load();
       return true;
@@ -69,6 +79,7 @@ class CalendarController extends ChangeNotifier {
     required DateTime eventDate,
     DateTime? endDate,
     required String displayType,
+    List<String> assignedUuids = const [],
   }) async {
     errorMessage = null;
     if (existing.dbId == null) return false;
@@ -79,6 +90,7 @@ class CalendarController extends ChangeNotifier {
         eventDate: eventDate,
         endDate: endDate,
         eventType: _typeToDb[displayType] ?? 'company_event',
+        assignedUuids: assignedUuids,
       );
       await load();
       return true;

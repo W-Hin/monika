@@ -12,6 +12,8 @@ class HrLeaveBalancesScreen extends StatefulWidget {
 }
 
 class _HrLeaveBalancesScreenState extends State<HrLeaveBalancesScreen> {
+  String _departmentFilter = 'All Departments';
+
   @override
   void initState() {
     super.initState();
@@ -81,19 +83,52 @@ class _HrLeaveBalancesScreenState extends State<HrLeaveBalancesScreen> {
             if (leaveController.loading && leaveController.allBalances.isEmpty) {
               return const Center(child: CircularProgressIndicator());
             }
-            final balances = leaveController.allBalances;
-            if (balances.isEmpty) {
+            final allBalances = leaveController.allBalances;
+            if (allBalances.isEmpty) {
               return const EmptyState(
                 icon: Icons.account_balance_wallet_outlined,
                 title: 'No leave balances found',
                 subtitle: 'Balances are provisioned automatically when an employee account is created.',
               );
             }
+            final departments = ['All Departments', ...allBalances.map((b) => b.department).toSet().toList()..sort()];
+            final balances = _departmentFilter == 'All Departments'
+                ? allBalances
+                : allBalances.where((b) => b.department == _departmentFilter).toList();
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
-                const SectionHeader(title: 'Employee Leave Balances'),
-                ListRow(children: balances.map((b) => _BalanceRow(balance: b, onTap: () => _adjustBalance(b))).toList()),
+                SizedBox(
+                  height: 36,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: departments.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, i) {
+                      final d = departments[i];
+                      final sel = _departmentFilter == d;
+                      final c = context.colors;
+                      return ChoiceChip(
+                        label: Text(d),
+                        selected: sel,
+                        onSelected: (_) => setState(() => _departmentFilter = d),
+                        selectedColor: c.primaryLight,
+                        labelStyle: TextStyle(color: sel ? c.primaryDark : c.textSecondary, fontWeight: FontWeight.w700, fontSize: 12.5),
+                        side: BorderSide(color: sel ? c.primary : Colors.transparent),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SectionHeader(title: 'Employee Leave Balances (${balances.length})'),
+                if (balances.isEmpty)
+                  const EmptyState(
+                    icon: Icons.filter_alt_off_outlined,
+                    title: 'No employees in this department',
+                    subtitle: 'Try a different department filter.',
+                  )
+                else
+                  ListRow(children: balances.map((b) => _BalanceRow(balance: b, onTap: () => _adjustBalance(b))).toList()),
               ],
             );
           },

@@ -8,6 +8,7 @@ import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
 import '../../../controller/attendance_controller.dart';
 import '../../../controller/leave_controller.dart';
+import '../../../controller/notification_controller.dart';
 import '../attendance/clock_in.dart';
 import '../attendance/clock_out.dart';
 import '../leave/leave_apply.dart';
@@ -52,13 +53,19 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
     final user = DummyData.employeeUser;
 
     return Scaffold(
-      appBar: HomeAppBar(
-        greeting: 'Good morning,',
-        name: user.name,
-        initials: user.avatarInitials,
-        notificationCount: 2,
-        onNotificationTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const NotificationScreen()),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(64),
+        child: ListenableBuilder(
+          listenable: notificationController,
+          builder: (context, _) => HomeAppBar(
+            greeting: 'Good morning,',
+            name: user.name,
+            initials: user.avatarInitials,
+            notificationCount: notificationController.unreadCount,
+            onNotificationTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const NotificationScreen()),
+            ),
+          ),
         ),
       ),
       body: SafeArea(

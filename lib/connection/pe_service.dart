@@ -47,6 +47,33 @@ class PeService {
     return List<Map<String, dynamic>>.from(rows);
   }
 
+  static Future<int?> departmentIdForName(String? name) async {
+    if (name == null) return null;
+    final row = await _client.from('departments').select('id').eq('name', name).maybeSingle();
+    return row?['id'] as int?;
+  }
+
+  /// HR — creates a new KPI template with its scoring items. `departmentName`
+  /// is null (or 'All Departments') for a template that applies everywhere.
+  static Future<void> createTemplate({
+    required String name,
+    required String? departmentName,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final departmentId = await departmentIdForName(departmentName == 'All Departments' ? null : departmentName);
+    final inserted = await _client
+        .from('kpi_templates')
+        .insert({'name': name, 'department_id': departmentId})
+        .select()
+        .single();
+    final templateId = inserted['id'] as int;
+    if (items.isNotEmpty) {
+      await _client.from('kpi_template_items').insert(
+            items.map((i) => {...i, 'template_id': templateId}).toList(),
+          );
+    }
+  }
+
   /// Upserts the evaluation (unique on user_id+year, so re-submitting the
   /// same year cleanly replaces it) and replaces its scores.
   static Future<void> submitEvaluation({

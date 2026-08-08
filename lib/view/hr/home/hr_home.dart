@@ -7,6 +7,7 @@ import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
 import '../../../controller/anomaly_controller.dart';
 import '../../../controller/analytics_controller.dart';
+import '../../../controller/notification_controller.dart';
 import '../analytics/anomaly_detail.dart';
 import '../approvals/hr_approvals.dart';
 import '../analytics/hr_analytics.dart';
@@ -40,13 +41,19 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
     final user = DummyData.hrUser;
 
     return Scaffold(
-      appBar: HomeAppBar(
-        greeting: 'Welcome back,',
-        name: user.name,
-        initials: user.avatarInitials,
-        notificationCount: 3,
-        onNotificationTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const NotificationScreen()),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(64),
+        child: ListenableBuilder(
+          listenable: notificationController,
+          builder: (context, _) => HomeAppBar(
+            greeting: 'Welcome back,',
+            name: user.name,
+            initials: user.avatarInitials,
+            notificationCount: notificationController.unreadCount,
+            onNotificationTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const NotificationScreen()),
+            ),
+          ),
         ),
       ),
       body: SafeArea(

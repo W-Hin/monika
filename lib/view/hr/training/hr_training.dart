@@ -194,22 +194,30 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
                   child: trainingController.loading && available.isEmpty
                       ? const Center(child: CircularProgressIndicator())
                       : _tab == 2
-                          ? const _CompletionTab()
-                          : ListView(
-                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                              children: (_tab == 0 ? available : mandatory)
-                                  .map(
-                                    (t) => Padding(
-                                      padding: const EdgeInsets.only(bottom: 12),
-                                      child: _HrTrainingCard(
-                                        program: t,
-                                        onEdit: () => _editProgram(t),
-                                        onAssignDept: () => _assignDepartment(t),
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
+                          ? _CompletionTab()
+                          : (_tab == 0 ? available : mandatory).isEmpty
+                              ? EmptyState(
+                                  icon: Icons.school_outlined,
+                                  title: 'No Training Created Yet',
+                                  subtitle: _tab == 0
+                                      ? 'Tap the + button above to create your first training programme.'
+                                      : 'No mandatory training programmes have been created yet.',
+                                )
+                              : ListView(
+                                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                                  children: (_tab == 0 ? available : mandatory)
+                                      .map(
+                                        (t) => Padding(
+                                          padding: const EdgeInsets.only(bottom: 12),
+                                          child: _HrTrainingCard(
+                                            program: t,
+                                            onEdit: () => _editProgram(t),
+                                            onAssignDept: () => _assignDepartment(t),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
                 ),
               ],
             );

@@ -11,6 +11,7 @@ import '../../auth/set_password_screen.dart';
 import '../../hr/hr_shell.dart';
 import '../../shared/company_calendar.dart';
 import '../../shared/settings_placeholder.dart';
+import '../pe/pe_detail.dart';
 
 class EmployeeProfileScreen extends StatefulWidget {
   const EmployeeProfileScreen({super.key});
@@ -88,7 +89,6 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final user = DummyData.employeeUser;
 
     return Scaffold(
       appBar: AppBar(
@@ -106,7 +106,11 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: ListView(
+        child: ListenableBuilder(
+          listenable: authController,
+          builder: (context, _) {
+          final user = DummyData.employeeUser;
+          return ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
             Center(
@@ -149,6 +153,18 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
               ),
             ),
 
+            const SizedBox(height: 24),
+            const SectionHeader(title: 'My Account'),
+            AppCard(
+              padding: EdgeInsets.zero,
+              child: _MenuRow(
+                icon: Icons.assessment_rounded,
+                label: 'Performance Evaluation',
+                color: c.amber,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PeDetailScreen())),
+              ),
+            ),
+
             if (authController.role == UserRole.hrAdmin) ...[
               const SizedBox(height: 24),
               const SectionHeader(title: 'Administration'),
@@ -157,6 +173,7 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
                 child: _MenuRow(
                   icon: Icons.admin_panel_settings_outlined,
                   label: 'Switch to Admin View',
+                  color: c.primary,
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HrShell())),
                 ),
               ),
@@ -202,24 +219,28 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
                   _MenuRow(
                     icon: Icons.notifications_none_rounded,
                     label: 'Notification Preferences',
+                    color: c.infoBlue,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPlaceholderScreen(title: 'Notification Preferences', icon: Icons.notifications_none_rounded))),
                   ),
                   const Divider(height: 1, indent: 56),
                   _MenuRow(
                     icon: Icons.calendar_month_outlined,
                     label: 'Company Calendar',
+                    color: c.primary,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CompanyCalendarScreen())),
                   ),
                   const Divider(height: 1, indent: 56),
                   _MenuRow(
                     icon: Icons.lock_outline_rounded,
                     label: 'Change Password',
+                    color: c.purple,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SetPasswordScreen(mode: SetPasswordMode.voluntary))),
                   ),
                   const Divider(height: 1, indent: 56),
                   _MenuRow(
                     icon: Icons.help_outline_rounded,
                     label: 'Help & Support',
+                    color: c.amber,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPlaceholderScreen(title: 'Help & Support', icon: Icons.help_outline_rounded))),
                   ),
                 ],
@@ -247,6 +268,8 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
               ),
             ),
           ],
+          );
+          },
         ),
       ),
     );
@@ -286,8 +309,9 @@ class _InfoRow extends StatelessWidget {
 class _MenuRow extends StatelessWidget {
   final IconData icon;
   final String label;
+  final Color? color;
   final VoidCallback onTap;
-  const _MenuRow({required this.icon, required this.label, required this.onTap});
+  const _MenuRow({required this.icon, required this.label, this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -298,7 +322,7 @@ class _MenuRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: c.textSecondary),
+            Icon(icon, size: 18, color: color ?? c.textSecondary),
             const SizedBox(width: 14),
             Expanded(child: Text(label, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600))),
             Icon(Icons.chevron_right_rounded, size: 18, color: c.textMuted),

@@ -4,6 +4,7 @@ import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../core/data/dummy_data.dart';
 import '../../../controller/attendance_controller.dart';
+import '../../../controller/auth_controller.dart';
 
 class EmployeeAttendanceScreen extends StatefulWidget {
   const EmployeeAttendanceScreen({super.key});
@@ -23,15 +24,16 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final user = DummyData.employeeUser;
 
     return Scaffold(
       appBar: AppBar(automaticallyImplyLeading: false, title: const Text('Attendance')),
       body: SafeArea(
         top: false,
         child: ListenableBuilder(
-          listenable: attendanceController,
-          builder: (context, _) => ListView(
+          listenable: Listenable.merge([attendanceController, authController]),
+          builder: (context, _) {
+          final user = DummyData.employeeUser;
+          return ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
             AppCard(
@@ -142,7 +144,8 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
                 ),
               )),
           ],
-          ),
+          );
+          },
         ),
       ),
     );

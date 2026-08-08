@@ -68,19 +68,22 @@ class _HrAnalyticsScreenState extends State<HrAnalyticsScreen> {
     final c = context.colors;
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false,
+        automaticallyImplyLeading: Navigator.canPop(context),
         title: const Text('Analytics & Reports'),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: analyticsController.period,
-                borderRadius: BorderRadius.circular(12),
-                items: _periods.map((p) => DropdownMenuItem(value: p, child: Text(p, style: const TextStyle(fontSize: 13)))).toList(),
-                onChanged: (v) {
-                  if (v != null) analyticsController.load(period: v);
-                },
+            child: ListenableBuilder(
+              listenable: analyticsController,
+              builder: (context, _) => DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: analyticsController.period,
+                  borderRadius: BorderRadius.circular(12),
+                  items: _periods.map((p) => DropdownMenuItem(value: p, child: Text(p, style: const TextStyle(fontSize: 13)))).toList(),
+                  onChanged: (v) {
+                    if (v != null) analyticsController.load(period: v);
+                  },
+                ),
               ),
             ),
           ),

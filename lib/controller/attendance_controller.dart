@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
@@ -8,6 +9,7 @@ import '../connection/attendance_service.dart';
 import '../connection/auth_service.dart';
 import '../connection/anomaly_service.dart';
 import '../model/models.dart';
+import 'auth_controller.dart';
 
 class GpsCheckResult {
   final bool passed;
@@ -187,6 +189,9 @@ class AttendanceController extends ChangeNotifier {
 
       if (storedToken == null) {
         await AttendanceService.bindDevice(deviceToken: token, deviceName: name);
+        // Refresh the cached profile so Attendance/Profile screens show the
+        // newly-bound device immediately instead of only after re-login.
+        unawaited(authController.refreshProfile());
         return DeviceCheckResult(passed: true, deviceToken: token, deviceName: name, detail: 'Registered as your device ($name)');
       }
       final passed = storedToken == token;
@@ -249,7 +254,9 @@ class AttendanceController extends ChangeNotifier {
     );
     _todayRecordId = row['id'] as int;
     todayRecord = _mapRecord(row);
-    notifyListeners();
+    // Keep the Recent Records list in sync with today's just-created row —
+    // without this it only shows up after the screen is freshly re-created.
+    await loadHistory();
 
     await _raiseAnomalies(
       attendanceRecordId: _todayRecordId!,

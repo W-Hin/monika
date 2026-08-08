@@ -227,8 +227,9 @@ class EmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final VoidCallback? onRetry;
 
-  const EmptyState({super.key, required this.icon, required this.title, required this.subtitle});
+  const EmptyState({super.key, required this.icon, required this.title, required this.subtitle, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -249,6 +250,14 @@ class EmptyState extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Text(subtitle, textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: c.textMuted)),
           ),
+          if (onRetry != null) ...[
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text('Retry'),
+            ),
+          ],
         ],
       ),
     );

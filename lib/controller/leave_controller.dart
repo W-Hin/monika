@@ -30,10 +30,13 @@ class LeaveController extends ChangeNotifier {
   static final _dateFormat = DateFormat('d MMM yyyy');
 
   LeaveBalance _mapBalance(Map<String, dynamic> row, {String? employeeNameOverride}) {
-    final joinedName = (row['profiles'] as Map<String, dynamic>?)?['name'] as String?;
+    final profile = row['profiles'] as Map<String, dynamic>?;
+    final joinedName = profile?['name'] as String?;
+    final joinedDept = (profile?['departments'] as Map<String, dynamic>?)?['name'] as String?;
     return LeaveBalance(
       userUuid: row['user_id'] as String,
       employeeName: employeeNameOverride ?? joinedName ?? '',
+      department: joinedDept ?? 'Unassigned',
       annualTotal: row['annual_total'] as int,
       annualUsed: row['annual_used'] as int,
       medicalTotal: row['medical_total'] as int,
@@ -65,11 +68,16 @@ class LeaveController extends ChangeNotifier {
 
   Future<void> loadMy() async {
     loading = true;
+    errorMessage = null;
     notifyListeners();
-    final balanceRow = await LeaveService.fetchMyBalance();
-    myBalance = balanceRow != null ? _mapBalance(balanceRow) : null;
-    final appRows = await LeaveService.fetchMyApplications();
-    myApplications = appRows.map(_mapApplication).toList();
+    try {
+      final balanceRow = await LeaveService.fetchMyBalance();
+      myBalance = balanceRow != null ? _mapBalance(balanceRow) : null;
+      final appRows = await LeaveService.fetchMyApplications();
+      myApplications = appRows.map(_mapApplication).toList();
+    } catch (e) {
+      errorMessage = 'Could not load your leave data: $e';
+    }
     loading = false;
     notifyListeners();
   }
@@ -103,9 +111,14 @@ class LeaveController extends ChangeNotifier {
 
   Future<void> loadAllForHr() async {
     loading = true;
+    errorMessage = null;
     notifyListeners();
-    final rows = await LeaveService.fetchAllApplications();
-    allApplications = rows.map(_mapApplication).toList();
+    try {
+      final rows = await LeaveService.fetchAllApplications();
+      allApplications = rows.map(_mapApplication).toList();
+    } catch (e) {
+      errorMessage = 'Could not load leave applications: $e';
+    }
     loading = false;
     notifyListeners();
   }
@@ -124,9 +137,14 @@ class LeaveController extends ChangeNotifier {
 
   Future<void> loadAllBalancesForHr() async {
     loading = true;
+    errorMessage = null;
     notifyListeners();
-    final rows = await LeaveService.fetchAllBalances();
-    allBalances = rows.map(_mapBalance).toList();
+    try {
+      final rows = await LeaveService.fetchAllBalances();
+      allBalances = rows.map(_mapBalance).toList();
+    } catch (e) {
+      errorMessage = 'Could not load leave balances: $e';
+    }
     loading = false;
     notifyListeners();
   }

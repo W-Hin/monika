@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../connection/auth_service.dart';
 import '../core/data/dummy_data.dart';
 import '../model/models.dart';
+import 'notification_controller.dart';
 
 enum AuthStatus { unknown, signedOut, signedIn }
 
@@ -43,7 +44,17 @@ class AuthController extends ChangeNotifier {
     }
   }
 
+  /// Re-fetches the current user's profile from Supabase and refreshes
+  /// DummyData.employeeUser/hrUser — call after something outside this
+  /// controller changes profile-level state (e.g. device binding during
+  /// clock-in), so screens reading those fields don't need a logout/login
+  /// to see the update.
+  Future<void> refreshProfile() async {
+    await _loadProfile();
+  }
+
   Future<void> signOut() async {
+    notificationController.unsubscribe();
     await AuthService.signOut();
     status = AuthStatus.signedOut;
     role = null;
@@ -72,6 +83,9 @@ class AuthController extends ChangeNotifier {
     }
     status = AuthStatus.signedIn;
     notifyListeners();
+
+    notificationController.subscribe(row['id'] as String);
+    unawaited(notificationController.load());
 
     if (row['email'] != user.email && user.email.isNotEmpty) {
       // Fire-and-forget — HR's employee list reads this, but it's not on

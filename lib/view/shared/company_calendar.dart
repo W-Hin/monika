@@ -6,6 +6,7 @@ import 'widgets/buttons.dart';
 import '../../model/models.dart';
 import '../../controller/calendar_controller.dart';
 import '../../controller/auth_controller.dart';
+import '../../controller/employee_controller.dart';
 
 IconData _iconFor(String type) {
   switch (type) {
@@ -41,6 +42,9 @@ class _CompanyCalendarScreenState extends State<CompanyCalendarScreen> {
   final _filters = ['All', 'Public Holiday', 'Company Event', 'HR Event'];
   static final _dateFormat = DateFormat('d MMM yyyy');
   static final _monthFormat = DateFormat('MMM yyyy');
+  bool _gridView = false;
+  DateTime _visibleMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  DateTime? _selectedDay;
 
   @override
   void initState() {
@@ -100,6 +104,11 @@ class _CompanyCalendarScreenState extends State<CompanyCalendarScreen> {
       appBar: AppBar(
         title: const Text('Company Calendar'),
         actions: [
+          IconButton(
+            tooltip: _gridView ? 'List view' : 'Month view',
+            onPressed: () => setState(() => _gridView = !_gridView),
+            icon: Icon(_gridView ? Icons.view_agenda_outlined : Icons.calendar_view_month_rounded),
+          ),
           if (_isHr)
             Padding(
               padding: const EdgeInsets.only(right: 16),
@@ -178,40 +187,201 @@ class _CompanyCalendarScreenState extends State<CompanyCalendarScreen> {
                   ),
                 ),
                 Expanded(
-                  child: filtered.isEmpty
-                      ? const EmptyState(icon: Icons.calendar_month_outlined, title: 'No events found', subtitle: 'Try a different filter.')
-                      : ListView(
-                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                          children: grouped.entries.map((entry) {
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: Text(
-                                    entry.key,
-                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: c.textPrimary),
-                                  ),
-                                ),
-                                ...entry.value.map((e) => Padding(
+                  child: _gridView
+                      ? _MonthGridView(
+                          visibleMonth: _visibleMonth,
+                          selectedDay: _selectedDay,
+                          events: filtered,
+                          onMonthChanged: (m) => setState(() {
+                            _visibleMonth = m;
+                            _selectedDay = null;
+                          }),
+                          onDaySelected: (d) => setState(() => _selectedDay = d),
+                          dateFormat: _dateFormat,
+                          isHr: _isHr,
+                          onEventTap: _isHr ? _showEventOptions : null,
+                        )
+                      : filtered.isEmpty
+                          ? const EmptyState(icon: Icons.calendar_month_outlined, title: 'No events found', subtitle: 'Try a different filter.')
+                          : ListView(
+                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                              children: grouped.entries.map((entry) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Padding(
                                       padding: const EdgeInsets.only(bottom: 10),
-                                      child: _EventTile(
-                                        event: e,
-                                        dateFormat: _dateFormat,
-                                        onTap: _isHr ? () => _showEventOptions(e) : null,
+                                      child: Text(
+                                        entry.key,
+                                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: c.textPrimary),
                                       ),
-                                    )),
-                                const SizedBox(height: 8),
-                              ],
-                            );
-                          }).toList(),
-                        ),
+                                    ),
+                                    ...entry.value.map((e) => Padding(
+                                          padding: const EdgeInsets.only(bottom: 10),
+                                          child: _EventTile(
+                                            event: e,
+                                            dateFormat: _dateFormat,
+                                            onTap: _isHr ? () => _showEventOptions(e) : null,
+                                          ),
+                                        )),
+                                    const SizedBox(height: 8),
+                                  ],
+                                );
+                              }).toList(),
+                            ),
                 ),
               ],
             );
           },
         ),
       ),
+    );
+  }
+}
+
+class _MonthGridView extends StatelessWidget {
+  final DateTime visibleMonth;
+  final DateTime? selectedDay;
+  final List<CalendarEvent> events;
+  final ValueChanged<DateTime> onMonthChanged;
+  final ValueChanged<DateTime> onDaySelected;
+  final DateFormat dateFormat;
+  final bool isHr;
+  final ValueChanged<CalendarEvent>? onEventTap;
+
+  const _MonthGridView({
+    required this.visibleMonth,
+    required this.selectedDay,
+    required this.events,
+    required this.onMonthChanged,
+    required this.onDaySelected,
+    required this.dateFormat,
+    required this.isHr,
+    this.onEventTap,
+  });
+
+  bool _sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+
+  List<CalendarEvent> _eventsOn(DateTime day) {
+    final d = DateTime(day.year, day.month, day.day);
+    return events.where((e) {
+      final start = DateTime(e.eventDate.year, e.eventDate.month, e.eventDate.day);
+      final end = e.endDate != null ? DateTime(e.endDate!.year, e.endDate!.month, e.endDate!.day) : start;
+      return !d.isBefore(start) && !d.isAfter(end);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final today = DateTime.now();
+    final firstOfMonth = DateTime(visibleMonth.year, visibleMonth.month, 1);
+    final daysInMonth = DateTime(visibleMonth.year, visibleMonth.month + 1, 0).day;
+    final leadingBlank = firstOfMonth.weekday - 1; // Monday-first week
+    final totalCells = ((leadingBlank + daysInMonth) / 7).ceil() * 7;
+    final selectedEvents = selectedDay != null ? _eventsOn(selectedDay!) : const <CalendarEvent>[];
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                onPressed: () => onMonthChanged(DateTime(visibleMonth.year, visibleMonth.month - 1)),
+                icon: const Icon(Icons.chevron_left_rounded),
+              ),
+              Text(DateFormat('MMMM yyyy').format(visibleMonth), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+              IconButton(
+                onPressed: () => onMonthChanged(DateTime(visibleMonth.year, visibleMonth.month + 1)),
+                icon: const Icon(Icons.chevron_right_rounded),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                .map((d) => Expanded(child: Center(child: Text(d, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: c.textMuted)))))
+                .toList(),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, childAspectRatio: 0.95),
+            itemCount: totalCells,
+            itemBuilder: (context, i) {
+              if (i < leadingBlank) return const SizedBox.shrink();
+              final dayNum = i - leadingBlank + 1;
+              if (dayNum > daysInMonth) return const SizedBox.shrink();
+              final day = DateTime(visibleMonth.year, visibleMonth.month, dayNum);
+              final dayEvents = _eventsOn(day);
+              final isToday = _sameDay(day, today);
+              final isSelected = selectedDay != null && _sameDay(day, selectedDay!);
+              return GestureDetector(
+                onTap: dayEvents.isEmpty ? null : () => onDaySelected(day),
+                child: Container(
+                  margin: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: isSelected ? c.primary : (isToday ? c.primaryLight : null),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '$dayNum',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: (isToday || isSelected) ? FontWeight.w800 : FontWeight.w500,
+                          color: isSelected ? Colors.white : (isToday ? c.primaryDark : c.textPrimary),
+                        ),
+                      ),
+                      if (dayEvents.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: dayEvents.take(3).map((e) {
+                            final (color, _) = resolveHue(c, _hueFor(e.type));
+                            return Container(
+                              width: 4,
+                              height: 4,
+                              margin: const EdgeInsets.symmetric(horizontal: 1),
+                              decoration: BoxDecoration(shape: BoxShape.circle, color: isSelected ? Colors.white : color),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        Expanded(
+          child: selectedDay == null
+              ? Center(child: Text('Tap a day with a dot to see its events', style: TextStyle(fontSize: 12.5, color: c.textMuted)))
+              : selectedEvents.isEmpty
+                  ? Center(child: Text('No events on this day', style: TextStyle(fontSize: 12.5, color: c.textMuted)))
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                      children: selectedEvents
+                          .map((e) => Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: _EventTile(event: e, dateFormat: dateFormat, onTap: isHr ? () => onEventTap?.call(e) : null),
+                              ))
+                          .toList(),
+                    ),
+        ),
+      ],
     );
   }
 }
@@ -261,6 +431,22 @@ class _EventTile extends StatelessWidget {
                     decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(100)),
                     child: Text(event.type, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color)),
                   ),
+                  if (event.assignedTo.isNotEmpty) ...[
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        Icon(Icons.person_outline_rounded, size: 12, color: c.textMuted),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            'Assigned to: ${event.assignedTo.map((a) => a.name).join(', ')}',
+                            style: TextStyle(fontSize: 11, color: c.textMuted, fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -287,6 +473,9 @@ class _EventFormSheetState extends State<_EventFormSheet> {
   late String _type = widget.existing?.type ?? 'Company Event';
   bool _saving = false;
   static final _dateFormat = DateFormat('d MMM yyyy');
+  late final Map<String, String> _assigned = {
+    for (final a in widget.existing?.assignedTo ?? const <AssignedEmployee>[]) a.uuid: a.name,
+  };
 
   bool get _isEditing => widget.existing != null;
 
@@ -294,6 +483,25 @@ class _EventFormSheetState extends State<_EventFormSheet> {
   void initState() {
     super.initState();
     _endDate = widget.existing?.endDate;
+    if (employeeController.employees.isEmpty) {
+      employeeController.loadEmployees();
+    }
+  }
+
+  Future<void> _pickAssignees() async {
+    final result = await showModalBottomSheet<Map<String, String>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AssigneePickerSheet(initiallySelected: _assigned),
+    );
+    if (result != null) {
+      setState(() {
+        _assigned
+          ..clear()
+          ..addAll(result);
+      });
+    }
   }
 
   Future<void> _pickDate({required bool isEnd}) async {
@@ -329,12 +537,14 @@ class _EventFormSheetState extends State<_EventFormSheet> {
             eventDate: _eventDate,
             endDate: _endDate,
             displayType: _type,
+            assignedUuids: _assigned.keys.toList(),
           )
         : await calendarController.create(
             title: _title.text.trim(),
             eventDate: _eventDate,
             endDate: _endDate,
             displayType: _type,
+            assignedUuids: _assigned.keys.toList(),
           );
     if (!mounted) return;
     setState(() => _saving = false);
@@ -422,6 +632,46 @@ class _EventFormSheetState extends State<_EventFormSheet> {
                 ),
               ),
             ],
+            const SizedBox(height: 14),
+
+            Text('Assign To (optional)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
+            const SizedBox(height: 4),
+            Text('Leave empty for everyone to see this event.', style: TextStyle(fontSize: 11.5, color: c.textMuted)),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: _pickAssignees,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+                child: Row(
+                  children: [
+                    Icon(Icons.person_add_alt_1_rounded, size: 16, color: c.textSecondary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _assigned.isEmpty ? 'Everyone (company-wide)' : '${_assigned.length} employee${_assigned.length > 1 ? 's' : ''} selected',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.textPrimary),
+                      ),
+                    ),
+                    Text('Choose', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: c.primary)),
+                  ],
+                ),
+              ),
+            ),
+            if (_assigned.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: _assigned.entries.map((e) => Chip(
+                  label: Text(e.value, style: const TextStyle(fontSize: 11.5)),
+                  visualDensity: VisualDensity.compact,
+                  onDeleted: () => setState(() => _assigned.remove(e.key)),
+                )).toList(),
+              ),
+            ],
             const SizedBox(height: 20),
 
             PrimaryButton(
@@ -468,6 +718,76 @@ class _DatePickerField extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AssigneePickerSheet extends StatefulWidget {
+  final Map<String, String> initiallySelected;
+  const _AssigneePickerSheet({required this.initiallySelected});
+
+  @override
+  State<_AssigneePickerSheet> createState() => _AssigneePickerSheetState();
+}
+
+class _AssigneePickerSheetState extends State<_AssigneePickerSheet> {
+  late final Map<String, String> _selected = Map.of(widget.initiallySelected);
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return ListenableBuilder(
+      listenable: employeeController,
+      builder: (context, _) {
+        final employees = employeeController.employees;
+        return Container(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+          decoration: BoxDecoration(color: c.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Assign To', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(_selected),
+                    child: const Text('Done'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: employees.isEmpty
+                    ? Center(child: Text('No employees found.', style: TextStyle(fontSize: 12.5, color: c.textMuted)))
+                    : ListView.separated(
+                        itemCount: employees.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (_, i) {
+                          final e = employees[i];
+                          final checked = _selected.containsKey(e.uuid);
+                          return CheckboxListTile(
+                            value: checked,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(e.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                            subtitle: Text('${e.jobTitle} · ${e.department}', style: TextStyle(fontSize: 12, color: c.textMuted)),
+                            onChanged: (v) => setState(() {
+                              if (v == true) {
+                                _selected[e.uuid] = e.name;
+                              } else {
+                                _selected.remove(e.uuid);
+                              }
+                            }),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

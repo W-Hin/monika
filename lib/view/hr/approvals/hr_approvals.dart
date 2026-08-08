@@ -66,7 +66,7 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: false,
+        automaticallyImplyLeading: Navigator.canPop(context),
         title: const Text('Leave Approvals'),
         actions: [
           IconButton(
@@ -83,6 +83,16 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
           builder: (context, _) {
             if (leaveController.loading && leaveController.allApplications.isEmpty) {
               return const Center(child: CircularProgressIndicator());
+            }
+            if (leaveController.errorMessage != null && leaveController.allApplications.isEmpty) {
+              return Center(
+                child: EmptyState(
+                  icon: Icons.error_outline_rounded,
+                  title: 'Could not load leave applications',
+                  subtitle: leaveController.errorMessage!,
+                  onRetry: leaveController.loadAllForHr,
+                ),
+              );
             }
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),

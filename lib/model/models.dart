@@ -6,12 +6,19 @@ enum LeaveStatus { pending, approved, rejected }
 
 enum AttendanceStatus { onTime, late, flagged, leave }
 
+class AssignedEmployee {
+  final String uuid;
+  final String name;
+  const AssignedEmployee({required this.uuid, required this.name});
+}
+
 class CalendarEvent {
   final int? dbId; // company_events.id - null for a not-yet-saved local draft
   final String title;
   final DateTime eventDate;
   final DateTime? endDate;
   final String type; // 'Public Holiday' | 'Company Event' | 'HR Event' (display)
+  final List<AssignedEmployee> assignedTo; // empty = visible to everyone
 
   const CalendarEvent({
     this.dbId,
@@ -19,6 +26,7 @@ class CalendarEvent {
     required this.eventDate,
     this.endDate,
     required this.type,
+    this.assignedTo = const [],
   });
 }
 
@@ -338,9 +346,37 @@ class TrainingCompletionRecord {
   });
 }
 
+class AppNotification {
+  final int id;
+  final String title;
+  final String body;
+  final String type; // 'leave_decision' | 'training' | 'payroll' | 'anomaly' | 'pe'
+  final bool isRead;
+  final DateTime createdAt;
+
+  const AppNotification({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.type,
+    required this.isRead,
+    required this.createdAt,
+  });
+
+  AppNotification copyWith({bool? isRead}) => AppNotification(
+        id: id,
+        title: title,
+        body: body,
+        type: type,
+        isRead: isRead ?? this.isRead,
+        createdAt: createdAt,
+      );
+}
+
 class LeaveBalance {
   final String? userUuid; // profiles.id - null for dummy/local-only rows
   final String employeeName;
+  final String department;
   final int annualTotal;
   final int annualUsed;
   final int medicalTotal;
@@ -351,6 +387,7 @@ class LeaveBalance {
   const LeaveBalance({
     this.userUuid,
     required this.employeeName,
+    this.department = 'Unassigned',
     required this.annualTotal,
     required this.annualUsed,
     required this.medicalTotal,
