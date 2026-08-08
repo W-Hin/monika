@@ -119,10 +119,12 @@ class _NotificationScreenState extends State<NotificationScreen> {
             }
             final notifs = notificationController.items;
             if (notifs.isEmpty) {
-              return const EmptyState(
-                icon: Icons.notifications_none_rounded,
-                title: 'No notifications',
-                subtitle: 'You\'re all caught up!',
+              return const Center(
+                child: EmptyState(
+                  icon: Icons.notifications_none_rounded,
+                  title: 'No notifications',
+                  subtitle: 'You\'re all caught up!',
+                ),
               );
             }
             return ListView.separated(

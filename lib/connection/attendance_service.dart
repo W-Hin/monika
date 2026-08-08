@@ -32,6 +32,22 @@ class AttendanceService {
     return List<Map<String, dynamic>>.from(rows);
   }
 
+  /// Every record in the last [days] days, uncapped — used for the Risk
+  /// Classification summary, which needs the true count over a fixed
+  /// window rather than fetchHistory's "most recent N rows" cap.
+  static Future<List<Map<String, dynamic>>> fetchWindow({int days = 90}) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return [];
+    final since = DateFormat('yyyy-MM-dd').format(DateTime.now().subtract(Duration(days: days)));
+    final rows = await _client
+        .from('attendance_records')
+        .select()
+        .eq('user_id', uid)
+        .gte('work_date', since)
+        .order('work_date', ascending: false);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
   static Future<Map<String, dynamic>> clockIn({
     double? gpsLat,
     double? gpsLng,

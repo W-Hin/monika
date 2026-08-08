@@ -147,7 +147,7 @@ class _HrProfileScreenState extends State<HrProfileScreen> {
                     icon: Icons.calendar_month_rounded,
                     label: 'Company Calendar',
                     color: c.primary,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CompanyCalendarScreen())),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CompanyCalendarScreen(isAdminView: true))),
                   ),
                   const Divider(height: 1, indent: 56),
                   _MenuRow(

@@ -163,6 +163,22 @@ class AnalyticsController extends ChangeNotifier {
         : 'Average weighted PE score across recorded evaluations: ${avgPe.toStringAsFixed(1)}/100.';
   }
 
+  /// Cheap targeted refresh for just the pending-leave badge — called after
+  /// a leave decision elsewhere in the app. HrHomeScreen only calls the
+  /// full `load()` once (IndexedStack keeps it mounted, so its initState
+  /// never re-runs), so without this the Dashboard's Approvals badge and
+  /// "Pending Approvals" card stay stuck at whatever count they had on
+  /// first load, even after HR approves/rejects requests elsewhere.
+  Future<void> refreshPendingLeaveCount() async {
+    try {
+      pendingLeaveCount = await AnalyticsService.fetchPendingLeaveCount();
+      notifyListeners();
+    } catch (_) {
+      // Best-effort — worst case the badge just doesn't update until the
+      // next full load().
+    }
+  }
+
   String summaryFor(String reportTitle) {
     switch (reportTitle) {
       case 'Monthly Attendance Summary':

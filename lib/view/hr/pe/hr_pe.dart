@@ -24,25 +24,32 @@ class _HrPeScreenState extends State<HrPeScreen> {
 
   final _commentsController = TextEditingController();
 
-  KpiTemplate _templateFor(String department) {
-    final templates = peController.templates;
-    final match = templates.where((t) => t.department == department);
-    if (match.isNotEmpty) return match.first;
-    final allDept = templates.where((t) => t.department == 'All Departments');
-    if (allDept.isNotEmpty) return allDept.first;
-    return templates.isNotEmpty ? templates.last : const KpiTemplate(name: 'No Template Available', department: 'All Departments', items: []);
+  /// Auto-picks only when there's exactly one sensible match — multiple
+  /// templates for the same department (e.g. an IC vs a Lead template) are
+  /// deliberately allowed now, so if it's ambiguous HR must pick explicitly
+  /// via the template picker rather than the app silently guessing.
+  KpiTemplate? _templateFor(String department) {
+    final deptMatches = peController.templates.where((t) => t.department == department).toList();
+    if (deptMatches.length == 1) return deptMatches.first;
+    if (deptMatches.isEmpty) {
+      final allDept = peController.templates.where((t) => t.department == 'All Departments').toList();
+      if (allDept.length == 1) return allDept.first;
+    }
+    return null;
   }
 
-  void _loadTemplateDefaults(KpiTemplate template) {
+  void _loadTemplateDefaults(KpiTemplate? template) {
     _selectedTemplate = template;
-    _kpis = template.items
-        .map((i) => {
-              'name': i.name,
-              'weightage': i.weightage,
-              'score': 70.0,
-              'category': i.category,
-            })
-        .toList();
+    _kpis = template == null
+        ? []
+        : template.items
+            .map((i) => {
+                  'name': i.name,
+                  'weightage': i.weightage,
+                  'score': 70.0,
+                  'category': i.category,
+                })
+            .toList();
   }
 
   @override
@@ -135,6 +142,15 @@ class _HrPeScreenState extends State<HrPeScreen> {
         labelBuilder: (t) => t.name,
         subtitleBuilder: (t) => '${t.department} · ${t.items.length} KPIs',
         onSelected: (t) => setState(() => _loadTemplateDefaults(t)),
+        onEdit: (t) {
+          Navigator.of(context).pop();
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => _CreateTemplateSheet(existing: t),
+          );
+        },
         onDelete: (t) async {
           final success = await peController.deleteTemplate(t);
           if (!mounted) return;
@@ -360,68 +376,81 @@ class _HrPeScreenState extends State<HrPeScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Weighted total preview
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: c.kpiGradient,
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                if (_selectedTemplate == null) ...[
+                  EmptyState(
+                    icon: Icons.fact_check_outlined,
+                    title: 'No KPI Template Created Yet',
+                    subtitle: '${_selectedEmployee!.department} has no KPI Template yet. Create one or pick from another department.',
+                  ),
+                  const SizedBox(height: 12),
+                  PrimaryButton(
+                    label: 'Select KPI Template',
+                    icon: Icons.fact_check_rounded,
+                    onPressed: _pickTemplate,
+                  ),
+                ] else ...[
+                  // Weighted total preview
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: c.kpiGradient,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [c.shadowTinted()],
                     ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [c.shadowTinted()],
-                  ),
-                  child: Row(
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Weighted Total Score',
-                            style: TextStyle(color: Colors.white70, fontSize: 12.5),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _weightedTotal.toStringAsFixed(1),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 40,
-                              fontWeight: FontWeight.w900,
-                              height: 1,
-                              fontFeatures: [FontFeature.tabularFigures()],
+                    child: Row(
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Weighted Total Score',
+                              style: TextStyle(color: Colors.white70, fontSize: 12.5),
                             ),
-                          ),
-                          const Text(
-                            '/ 100',
-                            style: TextStyle(color: Colors.white60, fontSize: 13),
-                          ),
-                        ],
-                      ),
-                      const Spacer(),
-                      SizedBox(
-                        width: 80,
-                        height: 80,
-                        child: CircularProgressIndicator(
-                          value: _weightedTotal / 100,
-                          strokeWidth: 8,
-                          backgroundColor: Colors.white24,
-                          valueColor: const AlwaysStoppedAnimation(Colors.white),
-                          strokeCap: StrokeCap.round,
+                            const SizedBox(height: 4),
+                            Text(
+                              _weightedTotal.toStringAsFixed(1),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 40,
+                                fontWeight: FontWeight.w900,
+                                height: 1,
+                                fontFeatures: [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                            const Text(
+                              '/ 100',
+                              style: TextStyle(color: Colors.white60, fontSize: 13),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
+                        const Spacer(),
+                        SizedBox(
+                          width: 80,
+                          height: 80,
+                          child: CircularProgressIndicator(
+                            value: _weightedTotal / 100,
+                            strokeWidth: 8,
+                            backgroundColor: Colors.white24,
+                            valueColor: const AlwaysStoppedAnimation(Colors.white),
+                            strokeCap: StrokeCap.round,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-                const SectionHeader(title: 'KPI Scoring'),
-                if (_kpis.isEmpty)
-                  AppCard(
-                    child: Text('This template has no KPI items to score.', style: TextStyle(fontSize: 12.5, color: c.textMuted)),
-                  ),
-                ..._kpis.asMap().entries.map((e) {
+                  const SectionHeader(title: 'KPI Scoring'),
+                  if (_kpis.isEmpty)
+                    AppCard(
+                      child: Text('This template has no KPI items to score.', style: TextStyle(fontSize: 12.5, color: c.textMuted)),
+                    ),
+                  ..._kpis.asMap().entries.map((e) {
                   final i = e.key;
                   final kpi = e.value;
                   final score = kpi['score'] as double;
@@ -542,16 +571,17 @@ class _HrPeScreenState extends State<HrPeScreen> {
                   );
                 }),
 
-                const SizedBox(height: 8),
-                const SectionHeader(title: 'HR Comments'),
-                TextField(
-                  controller: _commentsController,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    hintText:
-                        'Add overall comments, feedback, or development notes for this employee...',
+                  const SizedBox(height: 8),
+                  const SectionHeader(title: 'HR Comments'),
+                  TextField(
+                    controller: _commentsController,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      hintText:
+                          'Add overall comments, feedback, or development notes for this employee...',
+                    ),
                   ),
-                ),
+                ],
                 const SizedBox(height: 24),
 
                 // PE history preview
@@ -617,13 +647,15 @@ class _HrPeScreenState extends State<HrPeScreen> {
                     ),
                   ),
 
-                const SizedBox(height: 16),
-                PrimaryButton(
-                  label: 'Submit Evaluation',
-                  icon: Icons.assessment_rounded,
-                  onPressed: _submit,
-                  isLoading: _isSubmitting,
-                ),
+                if (_selectedTemplate != null) ...[
+                  const SizedBox(height: 16),
+                  PrimaryButton(
+                    label: 'Submit Evaluation',
+                    icon: Icons.assessment_rounded,
+                    onPressed: _submit,
+                    isLoading: _isSubmitting,
+                  ),
+                ],
               ],
             );
           },
@@ -639,6 +671,7 @@ class _PickerSheet<T> extends StatelessWidget {
   final String Function(T) labelBuilder;
   final String Function(T) subtitleBuilder;
   final ValueChanged<T> onSelected;
+  final ValueChanged<T>? onEdit;
   final ValueChanged<T>? onDelete;
 
   const _PickerSheet({
@@ -647,6 +680,7 @@ class _PickerSheet<T> extends StatelessWidget {
     required this.labelBuilder,
     required this.subtitleBuilder,
     required this.onSelected,
+    this.onEdit,
     this.onDelete,
   });
 
@@ -677,32 +711,43 @@ class _PickerSheet<T> extends StatelessWidget {
                   contentPadding: EdgeInsets.zero,
                   title: Text(labelBuilder(item), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                   subtitle: Text(subtitleBuilder(item), style: TextStyle(fontSize: 12, color: c.textMuted)),
-                  trailing: onDelete == null
+                  trailing: onEdit == null && onDelete == null
                       ? null
-                      : IconButton(
-                          icon: Icon(Icons.delete_outline_rounded, size: 20, color: c.riskHigh),
-                          onPressed: () async {
-                            final confirmed = await showDialog<bool>(
-                              context: context,
-                              builder: (dialogContext) => AlertDialog(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                title: const Text('Delete this template?'),
-                                content: Text('"${labelBuilder(item)}" will be permanently removed.'),
-                                actions: [
-                                  TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
-                                  ElevatedButton(
-                                    onPressed: () => Navigator.of(dialogContext).pop(true),
-                                    style: ElevatedButton.styleFrom(backgroundColor: c.riskHigh),
-                                    child: const Text('Delete'),
-                                  ),
-                                ],
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (onEdit != null)
+                              IconButton(
+                                icon: Icon(Icons.edit_outlined, size: 20, color: c.textSecondary),
+                                onPressed: () => onEdit!(item),
                               ),
-                            );
-                            if (confirmed != true) return;
-                            if (!context.mounted) return;
-                            Navigator.of(context).pop();
-                            onDelete!(item);
-                          },
+                            if (onDelete != null)
+                              IconButton(
+                                icon: Icon(Icons.delete_outline_rounded, size: 20, color: c.riskHigh),
+                                onPressed: () async {
+                                  final confirmed = await showDialog<bool>(
+                                    context: context,
+                                    builder: (dialogContext) => AlertDialog(
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                      title: const Text('Delete this template?'),
+                                      content: Text('"${labelBuilder(item)}" will be permanently removed.'),
+                                      actions: [
+                                        TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+                                        ElevatedButton(
+                                          onPressed: () => Navigator.of(dialogContext).pop(true),
+                                          style: ElevatedButton.styleFrom(backgroundColor: c.riskHigh),
+                                          child: const Text('Delete'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirmed != true) return;
+                                  if (!context.mounted) return;
+                                  Navigator.of(context).pop();
+                                  onDelete!(item);
+                                },
+                              ),
+                          ],
                         ),
                   onTap: () {
                     onSelected(item);
@@ -719,7 +764,8 @@ class _PickerSheet<T> extends StatelessWidget {
 }
 
 class _CreateTemplateSheet extends StatefulWidget {
-  const _CreateTemplateSheet();
+  final KpiTemplate? existing;
+  const _CreateTemplateSheet({this.existing});
 
   @override
   State<_CreateTemplateSheet> createState() => _CreateTemplateSheetState();
@@ -740,17 +786,30 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
   static const _departments = ['All Departments', 'Engineering', 'Sales', 'Operations', 'Marketing', 'Design', 'Human Resources', 'Finance'];
   static const _categories = ['Technical', 'Behavioural', 'Leadership'];
 
-  final _name = TextEditingController();
-  String _department = 'All Departments';
+  late final _name = TextEditingController(text: widget.existing?.name);
+  late String _department = widget.existing?.department ?? 'All Departments';
   final List<_KpiItemDraft> _items = [];
   bool _saving = false;
   String? _errorText;
 
+  bool get _isEditing => widget.existing != null;
+
   @override
   void initState() {
     super.initState();
-    _addItem();
-    _addItem();
+    final existingItems = widget.existing?.items ?? const [];
+    if (existingItems.isEmpty) {
+      _addItem();
+      _addItem();
+    } else {
+      for (final i in existingItems) {
+        final draft = _KpiItemDraft()
+          ..nameCtrl.text = i.name
+          ..weightCtrl.text = i.weightage % 1 == 0 ? i.weightage.toInt().toString() : i.weightage.toString()
+          ..category = i.category;
+        _items.add(draft);
+      }
+    }
   }
 
   @override
@@ -795,19 +854,20 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
       _errorText = null;
       _saving = true;
     });
-    final success = await peController.createTemplate(
-      name: name,
-      departmentName: _department,
-      items: _items.map((i) => KpiTemplateItem(name: i.nameCtrl.text.trim(), weightage: double.tryParse(i.weightCtrl.text) ?? 0, category: i.category)).toList(),
-    );
+    final items = _items.map((i) => KpiTemplateItem(name: i.nameCtrl.text.trim(), weightage: double.tryParse(i.weightCtrl.text) ?? 0, category: i.category)).toList();
+    final success = _isEditing
+        ? await peController.updateTemplate(existing: widget.existing!, name: name, departmentName: _department, items: items)
+        : await peController.createTemplate(name: name, departmentName: _department, items: items);
     if (!mounted) return;
     setState(() => _saving = false);
     if (!success) {
-      setState(() => _errorText = peController.errorMessage ?? 'Could not create template.');
+      setState(() => _errorText = peController.errorMessage ?? 'Could not save template.');
       return;
     }
     Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✓ KPI template created successfully')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(_isEditing ? '✓ KPI template updated successfully' : '✓ KPI template created successfully')),
+    );
   }
 
   @override
@@ -828,7 +888,7 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
               child: Container(width: 40, height: 4, decoration: BoxDecoration(color: c.border, borderRadius: BorderRadius.circular(100))),
             ),
             const SizedBox(height: 20),
-            const Text('Create KPI Template', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+            Text(_isEditing ? 'Edit KPI Template' : 'Create KPI Template', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
             const SizedBox(height: 20),
 
             const Text('Template Name', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
@@ -937,8 +997,8 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
             const SizedBox(height: 12),
 
             PrimaryButton(
-              label: 'Create Template',
-              icon: Icons.fact_check_rounded,
+              label: _isEditing ? 'Save Changes' : 'Create Template',
+              icon: _isEditing ? Icons.save_rounded : Icons.fact_check_rounded,
               onPressed: _save,
               isLoading: _saving,
             ),

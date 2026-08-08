@@ -44,6 +44,19 @@ class AttendanceController extends ChangeNotifier {
   int? _todayRecordId;
   List<AttendanceRecord> history = [];
 
+  // 90-day window for the Risk Classification card — separate from
+  // `history` because that's capped to the most recent 30 rows for the
+  // Recent Records list, which would understate the window for anyone
+  // with more than 30 records in the last 90 days.
+  List<AttendanceRecord> riskWindow = [];
+  int get riskViolations => riskWindow.where((r) => r.status == AttendanceStatus.flagged).length;
+  int get riskLateDays => riskWindow.where((r) => r.status == AttendanceStatus.late).length;
+  int get riskScorePercent {
+    if (riskWindow.isEmpty) return 100;
+    final present = riskWindow.where((r) => r.status == AttendanceStatus.onTime || r.status == AttendanceStatus.late).length;
+    return ((present / riskWindow.length) * 100).round();
+  }
+
   double _officeLat = 3.1390;
   double _officeLng = 101.6869;
   int _geofenceRadius = 100;
@@ -88,6 +101,16 @@ class AttendanceController extends ChangeNotifier {
     try {
       final rows = await AttendanceService.fetchHistory();
       history = rows.map(_mapRecord).toList();
+    } catch (_) {
+      // Best-effort, same reasoning as loadToday.
+    }
+    notifyListeners();
+  }
+
+  Future<void> loadRiskWindow() async {
+    try {
+      final rows = await AttendanceService.fetchWindow(days: 90);
+      riskWindow = rows.map(_mapRecord).toList();
     } catch (_) {
       // Best-effort, same reasoning as loadToday.
     }

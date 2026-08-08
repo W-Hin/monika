@@ -74,6 +74,27 @@ class PeService {
     }
   }
 
+  /// HR — replaces a template's name/department/items in place. Existing
+  /// performance_evaluations keep referencing the same template_id (their
+  /// scores are already snapshotted onto performance_evaluation_scores at
+  /// submit time, so an edit here doesn't retroactively change past
+  /// evaluations, only what's suggested/picked going forward).
+  static Future<void> updateTemplate({
+    required int id,
+    required String name,
+    required String? departmentName,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    final departmentId = await departmentIdForName(departmentName == 'All Departments' ? null : departmentName);
+    await _client.from('kpi_templates').update({'name': name, 'department_id': departmentId}).eq('id', id);
+    await _client.from('kpi_template_items').delete().eq('template_id', id);
+    if (items.isNotEmpty) {
+      await _client.from('kpi_template_items').insert(
+            items.map((i) => {...i, 'template_id': id}).toList(),
+          );
+    }
+  }
+
   /// HR — deletes a KPI template. Its items cascade-delete; any
   /// performance_evaluations referencing it fall back to a null
   /// template_id (existing FK is ON DELETE SET NULL) rather than being

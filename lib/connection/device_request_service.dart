@@ -12,6 +12,18 @@ class DeviceRequestService {
     await _client.from('device_change_requests').insert({'user_id': uid, 'reason': reason});
   }
 
+  static Future<bool> hasPendingRequest() async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return false;
+    final row = await _client
+        .from('device_change_requests')
+        .select('id')
+        .eq('user_id', uid)
+        .eq('status', 'pending')
+        .maybeSingle();
+    return row != null;
+  }
+
   /// HR — every request, joined with the requester's name. Explicitly
   /// disambiguated to the user_id FK — this table also has a decided_by FK
   /// to profiles, so a plain 'profiles(name)' embed is ambiguous to

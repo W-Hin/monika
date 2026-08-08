@@ -98,25 +98,24 @@ class _HrLeaveBalancesScreenState extends State<HrLeaveBalancesScreen> {
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
-                SizedBox(
-                  height: 36,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: departments.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (context, i) {
-                      final d = departments[i];
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: departments.map((d) {
                       final sel = _departmentFilter == d;
                       final c = context.colors;
-                      return ChoiceChip(
-                        label: Text(d),
-                        selected: sel,
-                        onSelected: (_) => setState(() => _departmentFilter = d),
-                        selectedColor: c.primaryLight,
-                        labelStyle: TextStyle(color: sel ? c.primaryDark : c.textSecondary, fontWeight: FontWeight.w700, fontSize: 12.5),
-                        side: BorderSide(color: sel ? c.primary : Colors.transparent),
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(d),
+                          selected: sel,
+                          onSelected: (_) => setState(() => _departmentFilter = d),
+                          selectedColor: c.primaryLight,
+                          labelStyle: TextStyle(color: sel ? c.primaryDark : c.textSecondary, fontWeight: FontWeight.w700, fontSize: 12.5),
+                          side: BorderSide(color: sel ? c.primary : Colors.transparent),
+                        ),
                       );
-                    },
+                    }).toList(),
                   ),
                 ),
                 const SizedBox(height: 16),

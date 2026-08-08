@@ -5,7 +5,6 @@ import 'widgets/common_widgets.dart';
 import 'widgets/buttons.dart';
 import '../../model/models.dart';
 import '../../controller/calendar_controller.dart';
-import '../../controller/auth_controller.dart';
 import '../../controller/employee_controller.dart';
 
 IconData _iconFor(String type) {
@@ -31,7 +30,12 @@ AppHue _hueFor(String type) {
 }
 
 class CompanyCalendarScreen extends StatefulWidget {
-  const CompanyCalendarScreen({super.key});
+  // Explicit, not derived from authController.role — an HR admin using
+  // "Switch to Employee View" is still role == hrAdmin, so gating on role
+  // alone let them add events from the employee-facing screen too. This
+  // reflects which shell/context the screen was opened from instead.
+  final bool isAdminView;
+  const CompanyCalendarScreen({super.key, this.isAdminView = false});
 
   @override
   State<CompanyCalendarScreen> createState() => _CompanyCalendarScreenState();
@@ -52,7 +56,7 @@ class _CompanyCalendarScreenState extends State<CompanyCalendarScreen> {
     calendarController.load();
   }
 
-  bool get _isHr => authController.role == UserRole.hrAdmin;
+  bool get _isHr => widget.isAdminView;
 
   void _openEventForm({CalendarEvent? existing}) {
     showModalBottomSheet(
@@ -207,6 +211,7 @@ class _CompanyCalendarScreenState extends State<CompanyCalendarScreen> {
                             _selectedDay = null;
                           }),
                           onDaySelected: (d) => setState(() => _selectedDay = d),
+                          onClose: () => setState(() => _selectedDay = null),
                           dateFormat: _dateFormat,
                           isHr: _isHr,
                           onEventTap: _isHr ? _showEventOptions : null,
@@ -255,6 +260,7 @@ class _MonthGridView extends StatelessWidget {
   final List<CalendarEvent> events;
   final ValueChanged<DateTime> onMonthChanged;
   final ValueChanged<DateTime> onDaySelected;
+  final VoidCallback onClose;
   final DateFormat dateFormat;
   final bool isHr;
   final ValueChanged<CalendarEvent>? onEventTap;
@@ -265,6 +271,7 @@ class _MonthGridView extends StatelessWidget {
     required this.events,
     required this.onMonthChanged,
     required this.onDaySelected,
+    required this.onClose,
     required this.dateFormat,
     required this.isHr,
     this.onEventTap,
@@ -291,107 +298,192 @@ class _MonthGridView extends StatelessWidget {
     final totalCells = ((leadingBlank + daysInMonth) / 7).ceil() * 7;
     final selectedEvents = selectedDay != null ? _eventsOn(selectedDay!) : const <CalendarEvent>[];
 
-    return Column(
+    return Stack(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        // The grid itself scrolls (rather than being squeezed into a fixed
+        // Expanded region) so it's never clipped on shorter screens — event
+        // details for the selected day now float over it instead of
+        // competing with it for vertical space.
+        SingleChildScrollView(
+          padding: EdgeInsets.only(bottom: selectedDay != null ? 160 : 24),
+          child: Column(
             children: [
-              IconButton(
-                onPressed: () => onMonthChanged(DateTime(visibleMonth.year, visibleMonth.month - 1)),
-                icon: const Icon(Icons.chevron_left_rounded),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      onPressed: () => onMonthChanged(DateTime(visibleMonth.year, visibleMonth.month - 1)),
+                      icon: const Icon(Icons.chevron_left_rounded),
+                    ),
+                    Text(DateFormat('MMMM yyyy').format(visibleMonth), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                    IconButton(
+                      onPressed: () => onMonthChanged(DateTime(visibleMonth.year, visibleMonth.month + 1)),
+                      icon: const Icon(Icons.chevron_right_rounded),
+                    ),
+                  ],
+                ),
               ),
-              Text(DateFormat('MMMM yyyy').format(visibleMonth), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
-              IconButton(
-                onPressed: () => onMonthChanged(DateTime(visibleMonth.year, visibleMonth.month + 1)),
-                icon: const Icon(Icons.chevron_right_rounded),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                      .map((d) => Expanded(child: Center(child: Text(d, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: c.textMuted)))))
+                      .toList(),
+                ),
               ),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, childAspectRatio: 0.95),
+                  itemCount: totalCells,
+                  itemBuilder: (context, i) {
+                    if (i < leadingBlank) return const SizedBox.shrink();
+                    final dayNum = i - leadingBlank + 1;
+                    if (dayNum > daysInMonth) return const SizedBox.shrink();
+                    final day = DateTime(visibleMonth.year, visibleMonth.month, dayNum);
+                    final dayEvents = _eventsOn(day);
+                    final isToday = _sameDay(day, today);
+                    final isSelected = selectedDay != null && _sameDay(day, selectedDay!);
+                    return GestureDetector(
+                      onTap: dayEvents.isEmpty ? null : () => onDaySelected(day),
+                      child: Container(
+                        margin: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: isSelected ? c.primary : (isToday ? c.primaryLight : null),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              '$dayNum',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: (isToday || isSelected) ? FontWeight.w800 : FontWeight.w500,
+                                color: isSelected ? Colors.white : (isToday ? c.primaryDark : c.textPrimary),
+                              ),
+                            ),
+                            if (dayEvents.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: dayEvents.take(3).map((e) {
+                                  final (color, _) = resolveHue(c, _hueFor(e.type));
+                                  return Container(
+                                    width: 4,
+                                    height: 4,
+                                    margin: const EdgeInsets.symmetric(horizontal: 1),
+                                    decoration: BoxDecoration(shape: BoxShape.circle, color: isSelected ? Colors.white : color),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              if (selectedDay == null) ...[
+                const SizedBox(height: 20),
+                Center(child: Text('Tap a day with a dot to see its events', style: TextStyle(fontSize: 12.5, color: c.textMuted))),
+              ],
             ],
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(
-            children: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-                .map((d) => Expanded(child: Center(child: Text(d, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: c.textMuted)))))
-                .toList(),
+        if (selectedDay != null)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _FloatingDayBanner(
+              day: selectedDay!,
+              events: selectedEvents,
+              dateFormat: dateFormat,
+              isHr: isHr,
+              onEventTap: onEventTap,
+              onClose: onClose,
+            ),
           ),
-        ),
-        const SizedBox(height: 6),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, childAspectRatio: 0.95),
-            itemCount: totalCells,
-            itemBuilder: (context, i) {
-              if (i < leadingBlank) return const SizedBox.shrink();
-              final dayNum = i - leadingBlank + 1;
-              if (dayNum > daysInMonth) return const SizedBox.shrink();
-              final day = DateTime(visibleMonth.year, visibleMonth.month, dayNum);
-              final dayEvents = _eventsOn(day);
-              final isToday = _sameDay(day, today);
-              final isSelected = selectedDay != null && _sameDay(day, selectedDay!);
-              return GestureDetector(
-                onTap: dayEvents.isEmpty ? null : () => onDaySelected(day),
-                child: Container(
-                  margin: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: isSelected ? c.primary : (isToday ? c.primaryLight : null),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        '$dayNum',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: (isToday || isSelected) ? FontWeight.w800 : FontWeight.w500,
-                          color: isSelected ? Colors.white : (isToday ? c.primaryDark : c.textPrimary),
-                        ),
-                      ),
-                      if (dayEvents.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: dayEvents.take(3).map((e) {
-                            final (color, _) = resolveHue(c, _hueFor(e.type));
-                            return Container(
-                              width: 4,
-                              height: 4,
-                              margin: const EdgeInsets.symmetric(horizontal: 1),
-                              decoration: BoxDecoration(shape: BoxShape.circle, color: isSelected ? Colors.white : color),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ],
+      ],
+    );
+  }
+}
+
+class _FloatingDayBanner extends StatelessWidget {
+  final DateTime day;
+  final List<CalendarEvent> events;
+  final DateFormat dateFormat;
+  final bool isHr;
+  final ValueChanged<CalendarEvent>? onEventTap;
+  final VoidCallback onClose;
+
+  const _FloatingDayBanner({
+    required this.day,
+    required this.events,
+    required this.dateFormat,
+    required this.isHr,
+    required this.onClose,
+    this.onEventTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.4),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 20, offset: const Offset(0, 8))],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    DateFormat('EEEE, d MMMM').format(day),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: c.textPrimary),
                   ),
                 ),
-              );
-            },
+                IconButton(
+                  onPressed: onClose,
+                  icon: Icon(Icons.close_rounded, size: 20, color: c.textMuted),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
-        Expanded(
-          child: selectedDay == null
-              ? Center(child: Text('Tap a day with a dot to see its events', style: TextStyle(fontSize: 12.5, color: c.textMuted)))
-              : selectedEvents.isEmpty
-                  ? Center(child: Text('No events on this day', style: TextStyle(fontSize: 12.5, color: c.textMuted)))
-                  : ListView(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                      children: selectedEvents
-                          .map((e) => Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: _EventTile(event: e, dateFormat: dateFormat, onTap: isHr ? () => onEventTap?.call(e) : null),
-                              ))
-                          .toList(),
-                    ),
-        ),
-      ],
+          Flexible(
+            child: events.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                    child: Text('No events on this day', style: TextStyle(fontSize: 12.5, color: c.textMuted)),
+                  )
+                : ListView(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    children: events
+                        .map((e) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: _EventTile(event: e, dateFormat: dateFormat, onTap: isHr ? () => onEventTap?.call(e) : null),
+                            ))
+                        .toList(),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -742,6 +834,14 @@ class _AssigneePickerSheet extends StatefulWidget {
 
 class _AssigneePickerSheetState extends State<_AssigneePickerSheet> {
   late final Map<String, String> _selected = Map.of(widget.initiallySelected);
+  final _searchController = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -749,7 +849,13 @@ class _AssigneePickerSheetState extends State<_AssigneePickerSheet> {
     return ListenableBuilder(
       listenable: employeeController,
       builder: (context, _) {
-        final employees = employeeController.employees;
+        final q = _query.trim().toLowerCase();
+        final employees = q.isEmpty
+            ? employeeController.employees
+            : employeeController.employees.where((e) =>
+                e.name.toLowerCase().contains(q) ||
+                e.jobTitle.toLowerCase().contains(q) ||
+                e.department.toLowerCase().contains(q)).toList();
         return Container(
           constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
           decoration: BoxDecoration(color: c.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
@@ -769,9 +875,24 @@ class _AssigneePickerSheetState extends State<_AssigneePickerSheet> {
                 ],
               ),
               const SizedBox(height: 8),
+              TextField(
+                controller: _searchController,
+                onChanged: (v) => setState(() => _query = v),
+                decoration: InputDecoration(
+                  hintText: 'Search by name, role, or department',
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 8),
               Expanded(
                 child: employees.isEmpty
-                    ? Center(child: Text('No employees found.', style: TextStyle(fontSize: 12.5, color: c.textMuted)))
+                    ? Center(
+                        child: Text(
+                          q.isEmpty ? 'No employees found.' : 'No employees match "$_query".',
+                          style: TextStyle(fontSize: 12.5, color: c.textMuted),
+                        ),
+                      )
                     : ListView.separated(
                         itemCount: employees.length,
                         separatorBuilder: (_, __) => const Divider(height: 1),

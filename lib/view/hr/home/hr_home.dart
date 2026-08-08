@@ -129,32 +129,26 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
             const SectionHeader(title: 'Risk Classification Overview'),
             AppCard(
               padding: const EdgeInsets.all(18),
-              child: Column(
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: (analyticsController.riskDistribution[RiskLevel.low] ?? 0) + 1,
-                        child: Container(height: 10, decoration: BoxDecoration(color: c.riskLow, borderRadius: const BorderRadius.horizontal(left: Radius.circular(6)))),
-                      ),
-                      Expanded(
-                        flex: (analyticsController.riskDistribution[RiskLevel.medium] ?? 0) + 1,
-                        child: Container(height: 10, color: c.riskMedium),
-                      ),
-                      Expanded(
-                        flex: (analyticsController.riskDistribution[RiskLevel.high] ?? 0) + 1,
-                        child: Container(height: 10, decoration: BoxDecoration(color: c.riskHigh, borderRadius: const BorderRadius.horizontal(right: Radius.circular(6)))),
-                      ),
-                    ],
+                  RiskDonutChart(
+                    low: analyticsController.riskDistribution[RiskLevel.low] ?? 0,
+                    medium: analyticsController.riskDistribution[RiskLevel.medium] ?? 0,
+                    high: analyticsController.riskDistribution[RiskLevel.high] ?? 0,
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _LegendDot(color: c.riskLow, label: 'Low', value: '${analyticsController.riskDistribution[RiskLevel.low] ?? 0}'),
-                      _LegendDot(color: c.riskMedium, label: 'Medium', value: '${analyticsController.riskDistribution[RiskLevel.medium] ?? 0}'),
-                      _LegendDot(color: c.riskHigh, label: 'High', value: '${analyticsController.riskDistribution[RiskLevel.high] ?? 0}'),
-                    ],
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _LegendDot(color: c.riskLow, label: 'Low', value: '${analyticsController.riskDistribution[RiskLevel.low] ?? 0}'),
+                        const SizedBox(height: 10),
+                        _LegendDot(color: c.riskMedium, label: 'Medium', value: '${analyticsController.riskDistribution[RiskLevel.medium] ?? 0}'),
+                        const SizedBox(height: 10),
+                        _LegendDot(color: c.riskHigh, label: 'High', value: '${analyticsController.riskDistribution[RiskLevel.high] ?? 0}'),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -281,6 +275,80 @@ class _LegendDot extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Donut chart for the 3-category (Low/Medium/High) risk breakdown. Colour
+/// alone never carries the meaning here — every segment's value is also
+/// shown as text in the adjacent legend, since pie/donut charts otherwise
+/// fail accessibility for colourblind users relying on hue to distinguish
+/// slices.
+class RiskDonutChart extends StatelessWidget {
+  final int low;
+  final int medium;
+  final int high;
+  final double size;
+
+  const RiskDonutChart({super.key, required this.low, required this.medium, required this.high, this.size = 108});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final total = low + medium + high;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _DonutPainter(
+          total == 0 ? [(1.0, c.border)] : [(low / total, c.riskLow), (medium / total, c.riskMedium), (high / total, c.riskHigh)],
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('$total', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: c.textPrimary, fontFeatures: const [FontFeature.tabularFigures()])),
+              Text('Employees', style: TextStyle(fontSize: 9.5, color: c.textMuted, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DonutPainter extends CustomPainter {
+  final List<(double, Color)> segments; // (fraction, color), fractions sum to 1.0
+  const _DonutPainter(this.segments);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+    const strokeWidth = 16.0;
+    const gapRadians = 0.04;
+
+    var startAngle = -3.14159265 / 2;
+    for (final (fraction, color) in segments) {
+      if (fraction <= 0) continue;
+      final sweep = fraction * 2 * 3.14159265;
+      final paint = Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = segments.length > 1 ? StrokeCap.butt : StrokeCap.round;
+      final adjustedSweep = segments.length > 1 ? (sweep - gapRadians).clamp(0.0, sweep) : sweep;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius - strokeWidth / 2),
+        startAngle,
+        adjustedSweep,
+        false,
+        paint,
+      );
+      startAngle += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DonutPainter oldDelegate) => oldDelegate.segments != segments;
 }
 
 class _QuickAction extends StatelessWidget {

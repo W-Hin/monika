@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import '../connection/leave_service.dart';
 import '../model/models.dart';
+import 'analytics_controller.dart';
 
 /// State-management pattern: ChangeNotifier singleton, consumed via
 /// ListenableBuilder — same convention as every other controller in this
@@ -133,6 +135,7 @@ class LeaveController extends ChangeNotifier {
       await LeaveService.incrementUsedDays(userUuid: app.userUuid!, leaveType: dbType, days: app.days);
     }
     await loadAllForHr();
+    unawaited(analyticsController.refreshPendingLeaveCount());
   }
 
   Future<void> loadAllBalancesForHr() async {

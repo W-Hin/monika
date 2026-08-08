@@ -26,12 +26,6 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
   late TextEditingController _emailController;
 
   @override
-  void initState() {
-    super.initState();
-    _emailController = TextEditingController(text: DummyData.employeeUser.email);
-  }
-
-  @override
   void dispose() {
     _emailController.dispose();
     super.dispose();
@@ -45,6 +39,13 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('✓ Profile updated successfully')),
     );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: DummyData.employeeUser.email);
+    deviceRequestController.loadMyPending();
   }
 
   void _requestDeviceChange() {
@@ -116,7 +117,7 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
       body: SafeArea(
         top: false,
         child: ListenableBuilder(
-          listenable: authController,
+          listenable: Listenable.merge([authController, deviceRequestController]),
           builder: (context, _) {
           final user = DummyData.employeeUser;
           return ListView(
@@ -210,8 +211,8 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
                     ),
                   ),
                   TextButton(
-                    onPressed: user.registeredDevice == 'Not yet registered' ? null : _requestDeviceChange,
-                    child: const Text('Request Change'),
+                    onPressed: (user.registeredDevice == 'Not yet registered' || deviceRequestController.myPending) ? null : _requestDeviceChange,
+                    child: Text(deviceRequestController.myPending ? 'Requested' : 'Request Change'),
                   ),
                 ],
               ),

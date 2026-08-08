@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../connection/notification_service.dart';
 import '../model/models.dart';
+import 'device_request_controller.dart';
 
 /// State-management pattern: ChangeNotifier singleton, consumed via
 /// ListenableBuilder — same convention as every other controller in this
@@ -49,6 +50,13 @@ class NotificationController extends ChangeNotifier {
       onInsert: (row) {
         items = [_mapRow(row), ...items];
         notifyListeners();
+        // A device-change decision notification means the employee's
+        // pending request just got resolved — recheck so "Requested"
+        // reverts to "Request Change" without needing to leave and
+        // re-open the Profile screen.
+        if (row['type'] == 'device_change') {
+          deviceRequestController.loadMyPending();
+        }
       },
     );
   }

@@ -77,9 +77,33 @@ class PeController extends ChangeNotifier {
       await loadTemplates();
       return true;
     } catch (e) {
-      errorMessage = e.toString().contains('kpi_templates_department_unique')
-          ? 'A KPI Template already exists for ${departmentName ?? 'All Departments'}. Delete it first if you want to replace it.'
-          : 'Could not create template: $e';
+      errorMessage = 'Could not create template: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Returns true on success. On failure, sets errorMessage and returns
+  /// false rather than throwing.
+  Future<bool> updateTemplate({
+    required KpiTemplate existing,
+    required String name,
+    required String? departmentName,
+    required List<KpiTemplateItem> items,
+  }) async {
+    errorMessage = null;
+    if (existing.dbId == null) return false;
+    try {
+      await PeService.updateTemplate(
+        id: existing.dbId!,
+        name: name,
+        departmentName: departmentName,
+        items: items.map((i) => {'name': i.name, 'weightage': i.weightage, 'category': i.category}).toList(),
+      );
+      await loadTemplates();
+      return true;
+    } catch (e) {
+      errorMessage = 'Could not update template: $e';
       notifyListeners();
       return false;
     }

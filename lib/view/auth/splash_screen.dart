@@ -4,6 +4,7 @@ import '../../controller/auth_controller.dart';
 import '../../model/models.dart';
 import '../employee/employee_shell.dart';
 import '../hr/hr_shell.dart';
+import '../shared/widgets/monika_logo.dart';
 import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -62,7 +63,8 @@ class _SplashScreenState extends State<SplashScreen> {
                   ),
                 ],
               ),
-              child: Icon(Icons.shield_moon_rounded, color: c.primary, size: 44),
+              alignment: Alignment.center,
+              child: MonikaLogoMark(size: 44, color: c.primary),
             ),
             const SizedBox(height: 24),
             const Text(

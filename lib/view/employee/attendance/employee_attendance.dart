@@ -19,6 +19,7 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
     super.initState();
     attendanceController.loadPolicy().then((_) => setState(() {}));
     attendanceController.loadHistory();
+    attendanceController.loadRiskWindow();
   }
 
   @override
@@ -57,11 +58,11 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
                   const SizedBox(height: 18),
                   Row(
                     children: [
-                      _RiskFactor(label: 'Score', value: '94', color: c.primary),
+                      _RiskFactor(label: 'Score', value: '${attendanceController.riskScorePercent}', color: c.primary),
                       const SizedBox(width: 12),
-                      _RiskFactor(label: 'Violations', value: '1', color: c.amber),
+                      _RiskFactor(label: 'Violations', value: '${attendanceController.riskViolations}', color: c.amber),
                       const SizedBox(width: 12),
-                      _RiskFactor(label: 'Late Days', value: '1', color: c.infoBlue),
+                      _RiskFactor(label: 'Late Days', value: '${attendanceController.riskLateDays}', color: c.infoBlue),
                     ],
                   ),
                 ],

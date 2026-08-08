@@ -8,9 +8,20 @@ import '../model/models.dart';
 /// app (no `provider` package).
 class DeviceRequestController extends ChangeNotifier {
   List<DeviceChangeRequest> allRequests = []; // HR
+  bool myPending = false; // employee — do they already have a pending request?
   bool loading = false;
   bool submitting = false;
   String? errorMessage;
+
+  Future<void> loadMyPending() async {
+    try {
+      myPending = await DeviceRequestService.hasPendingRequest();
+      notifyListeners();
+    } catch (_) {
+      // Best-effort — worst case the button just doesn't show "Requested"
+      // until the next successful check.
+    }
+  }
 
   DeviceChangeRequest _mapRow(Map<String, dynamic> row) {
     final joinedName = (row['profiles'] as Map<String, dynamic>?)?['name'] as String?;
@@ -47,6 +58,7 @@ class DeviceRequestController extends ChangeNotifier {
     try {
       await DeviceRequestService.submit(reason);
       submitting = false;
+      myPending = true;
       notifyListeners();
       return true;
     } catch (e) {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors_extension.dart';
 import '../shared/widgets/buttons.dart';
+import '../shared/widgets/monika_logo.dart';
 import '../../controller/auth_controller.dart';
 import '../employee/employee_shell.dart';
 import 'forgot_password.dart';
@@ -74,7 +75,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   color: c.primary,
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: const Icon(Icons.shield_moon_rounded, color: Colors.white, size: 30),
+                alignment: Alignment.center,
+                child: const MonikaLogoMark(size: 30, color: Colors.white),
               ),
               const SizedBox(height: 24),
               Text(
