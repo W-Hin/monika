@@ -106,6 +106,12 @@ class _HrPeScreenState extends State<HrPeScreen> {
 
     final existing = peController.selectedCurrent;
     if (existing != null && existing.kpis.isNotEmpty) {
+      // Matched purely by id — the saved KPI scores below came from
+      // whatever template was picked at the time, even if that template's
+      // department no longer matches this employee's (bad data entry).
+      // Hiding the KPI breakdown in that case would look like the saved
+      // evaluation vanished, so instead _templateMismatch below surfaces
+      // it as a visible warning HR can act on.
       final matchedTemplate = peController.templates.where((t) => t.dbId == existing.templateId);
       setState(() {
         _selectedTemplate = matchedTemplate.isNotEmpty ? matchedTemplate.first : _templateFor(emp.department);
@@ -149,6 +155,17 @@ class _HrPeScreenState extends State<HrPeScreen> {
   List<KpiTemplate> get _compatibleTemplates {
     final dept = _selectedEmployee?.department;
     return peController.templates.where((t) => t.department == dept || t.department == 'All Departments').toList();
+  }
+
+  // True when the currently-shown template belongs to neither the
+  // employee's department nor "All Departments" — a saved evaluation
+  // pointing at a mismatched template (bad data entry) rather than a
+  // fresh, correctly-filtered pick.
+  bool get _templateMismatch {
+    final t = _selectedTemplate;
+    final dept = _selectedEmployee?.department;
+    if (t == null || dept == null) return false;
+    return t.department != dept && t.department != 'All Departments';
   }
 
   void _pickTemplate() {
@@ -415,25 +432,39 @@ class _HrPeScreenState extends State<HrPeScreen> {
                 const SizedBox(height: 10),
                 Builder(builder: (context) {
                   final noneAvailable = _compatibleTemplates.isEmpty;
+                  final mismatch = _templateMismatch;
                   return InkWell(
                     onTap: noneAvailable ? _createTemplate : _pickTemplate,
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+                      decoration: BoxDecoration(
+                        color: mismatch ? c.riskHighBg : c.surfaceMuted,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: Row(
                         children: [
-                          Icon(Icons.fact_check_outlined, size: 16, color: c.textSecondary),
+                          Icon(mismatch ? Icons.warning_amber_rounded : Icons.fact_check_outlined, size: 16, color: mismatch ? c.riskHigh : c.textSecondary),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text('KPI Template: ${_selectedTemplate?.name ?? '—'}', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.textPrimary)),
                           ),
-                          Text(noneAvailable ? 'Create' : 'Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: c.primary)),
+                          Text(
+                            mismatch ? 'Fix' : (noneAvailable ? 'Create' : 'Change'),
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: mismatch ? c.riskHigh : c.primary),
+                          ),
                         ],
                       ),
                     ),
                   );
                 }),
+                if (_templateMismatch) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'This evaluation is linked to a ${_selectedTemplate!.department} template, not ${_selectedEmployee!.department}. Tap "Fix" to reassign the correct one.',
+                    style: TextStyle(fontSize: 11, color: c.riskHigh, fontWeight: FontWeight.w600),
+                  ),
+                ],
                 const SizedBox(height: 16),
 
                 if (_selectedTemplate == null) ...[

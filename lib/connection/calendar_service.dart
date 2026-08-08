@@ -21,12 +21,17 @@ class CalendarService {
     required String eventType,
     required List<String> assignedUuids,
   }) async {
+    // .toUtc() is required here — a local (non-UTC) DateTime's
+    // toIso8601String() omits any timezone suffix, so Postgres casts it
+    // into timestamptz using the session's timezone (UTC on Supabase)
+    // instead of the device's, silently shifting every stored time by
+    // the device's UTC offset.
     final inserted = await _client
         .from('company_events')
         .insert({
           'title': title,
-          'event_date': eventDate.toIso8601String(),
-          'end_date': endDate?.toIso8601String(),
+          'event_date': eventDate.toUtc().toIso8601String(),
+          'end_date': endDate?.toUtc().toIso8601String(),
           'event_type': eventType,
         })
         .select()
@@ -44,8 +49,8 @@ class CalendarService {
   }) async {
     await _client.from('company_events').update({
       'title': title,
-      'event_date': eventDate.toIso8601String(),
-      'end_date': endDate?.toIso8601String(),
+      'event_date': eventDate.toUtc().toIso8601String(),
+      'end_date': endDate?.toUtc().toIso8601String(),
       'event_type': eventType,
     }).eq('id', id);
     await _replaceAssignments(id, assignedUuids);

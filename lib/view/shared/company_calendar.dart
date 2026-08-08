@@ -595,6 +595,7 @@ class _EventFormSheetState extends State<_EventFormSheet> {
   TimeOfDay? _endTime;
   late String _type = widget.existing?.type ?? 'Company Event';
   bool _saving = false;
+  String? _errorText;
   static final _dateFormat = DateFormat('d MMM yyyy');
   static final _timeFormat = DateFormat('h:mm a');
   late final Map<String, String> _assigned = {
@@ -669,16 +670,17 @@ class _EventFormSheetState extends State<_EventFormSheet> {
   }
 
   Future<void> _save() async {
+    // A SnackBar shown while this bottom sheet is still open renders
+    // behind the sheet (the modal route sits above the ScaffoldMessenger's
+    // overlay entry) and is invisible to the user — same pitfall fixed for
+    // the KPI Template sheet. Inline error text avoids it entirely.
+    setState(() => _errorText = null);
     if (_title.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter an event title')),
-      );
+      setState(() => _errorText = 'Please enter an event title.');
       return;
     }
     if (_type != 'Public Holiday' && (_startTime == null || _endTime == null)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a start and end time')),
-      );
+      setState(() => _errorText = 'Please select a start and end time.');
       return;
     }
     setState(() => _saving = true);
@@ -710,9 +712,7 @@ class _EventFormSheetState extends State<_EventFormSheet> {
     if (!mounted) return;
     setState(() => _saving = false);
     if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(calendarController.errorMessage ?? 'Could not save event')),
-      );
+      setState(() => _errorText = calendarController.errorMessage ?? 'Could not save event');
       return;
     }
     Navigator.of(context).pop();
@@ -865,6 +865,15 @@ class _EventFormSheetState extends State<_EventFormSheet> {
                   visualDensity: VisualDensity.compact,
                   onDeleted: () => setState(() => _assigned.remove(e.key)),
                 )).toList(),
+              ),
+            ],
+            if (_errorText != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: c.riskHighBg, borderRadius: BorderRadius.circular(10)),
+                child: Text(_errorText!, style: TextStyle(fontSize: 12.5, color: c.riskHigh, fontWeight: FontWeight.w600)),
               ),
             ],
             const SizedBox(height: 20),

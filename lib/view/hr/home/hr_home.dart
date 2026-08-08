@@ -24,6 +24,49 @@ import '../payroll/hr_payroll.dart';
 import '../../shared/company_calendar.dart';
 import '../../shared/notification.dart';
 
+// Mirrors company_calendar.dart's private _iconFor/_hueFor/_EventTile._when
+// so the dashboard's Upcoming Events badges match the Calendar screen's.
+IconData _eventIcon(String type) {
+  switch (type) {
+    case 'Public Holiday':
+      return Icons.flag_rounded;
+    case 'HR Event':
+      return Icons.insights_rounded;
+    default:
+      return Icons.groups_rounded;
+  }
+}
+
+AppHue _eventHue(String type) {
+  switch (type) {
+    case 'Public Holiday':
+      return AppHue.primary;
+    case 'HR Event':
+      return AppHue.riskMedium;
+    default:
+      return AppHue.infoBlue;
+  }
+}
+
+bool _eventSameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+bool _eventHasTime(DateTime d) => d.hour != 0 || d.minute != 0;
+
+String _eventWhen(CalendarEvent event) {
+  final dateFormat = DateFormat('d MMM yyyy');
+  final timeFormat = DateFormat('h:mm a');
+  final multiDay = event.endDate != null && !_eventSameDay(event.eventDate, event.endDate!);
+  if (multiDay) {
+    return '${dateFormat.format(event.eventDate)} – ${dateFormat.format(event.endDate!)}';
+  }
+  final datePart = dateFormat.format(event.eventDate);
+  if (!_eventHasTime(event.eventDate)) return datePart;
+  final startTime = timeFormat.format(event.eventDate);
+  if (event.endDate != null && _eventHasTime(event.endDate!)) {
+    return '$datePart · $startTime – ${timeFormat.format(event.endDate!)}';
+  }
+  return '$datePart · $startTime';
+}
+
 class HrHomeScreen extends StatefulWidget {
   const HrHomeScreen({super.key});
 
@@ -314,43 +357,58 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
             Builder(builder: (context) {
               final now = DateTime.now();
               final today = DateTime(now.year, now.month, now.day);
+              // Next 31 days only — a dashboard summary shouldn't surface
+              // an event 4 months out just because it happens to be the
+              // 3rd-closest row in the table.
+              final windowEnd = today.add(const Duration(days: 31));
               final upcoming = calendarController.events.where((e) {
                 final end = e.endDate ?? e.eventDate;
-                return !end.isBefore(today);
-              }).take(3).toList();
+                if (end.isBefore(today)) return false;
+                return !e.eventDate.isAfter(windowEnd);
+              }).toList();
               if (upcoming.isEmpty) {
                 return AppCard(
-                  child: Text('No upcoming events', style: TextStyle(fontSize: 12.5, color: c.textMuted)),
+                  child: Text('No upcoming events in the next 31 days', style: TextStyle(fontSize: 12.5, color: c.textMuted)),
                 );
               }
               return Column(
-                children: upcoming.map((e) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: AppCard(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 38,
-                              height: 38,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(color: c.primaryLight, borderRadius: BorderRadius.circular(10)),
-                              child: Icon(Icons.event_rounded, size: 18, color: c.primaryDark),
+                children: upcoming.map((e) {
+                  final (color, bg) = resolveHue(c, _eventHue(e.type));
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: AppCard(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 38,
+                            height: 38,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+                            child: Icon(_eventIcon(e.type), size: 18, color: color),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(e.title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                const SizedBox(height: 3),
+                                Text(_eventWhen(e), style: TextStyle(fontSize: 11.5, color: c.textMuted)),
+                                const SizedBox(height: 5),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(100)),
+                                  child: Text(e.type, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(e.title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                  Text(DateFormat('d MMM yyyy').format(e.eventDate), style: TextStyle(fontSize: 11.5, color: c.textMuted)),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    )).toList(),
+                    ),
+                  );
+                }).toList(),
               );
             }),
           ],

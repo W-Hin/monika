@@ -29,11 +29,14 @@ class CalendarController extends ChangeNotifier {
           return AssignedEmployee(uuid: a['user_id'] as String, name: profile?['name'] as String? ?? '');
         })
         .toList();
+    // .toLocal() matches the .toUtc() applied on write in CalendarService —
+    // without it, a timestamptz read back as a UTC-flagged DateTime would
+    // show the wrong hour (and sometimes the wrong day) once formatted.
     return CalendarEvent(
       dbId: row['id'] as int,
       title: row['title'] as String,
-      eventDate: DateTime.parse(row['event_date'] as String),
-      endDate: row['end_date'] != null ? DateTime.parse(row['end_date'] as String) : null,
+      eventDate: DateTime.parse(row['event_date'] as String).toLocal(),
+      endDate: row['end_date'] != null ? DateTime.parse(row['end_date'] as String).toLocal() : null,
       type: _typeToDisplay[row['event_type']] ?? row['event_type'] as String,
       assignedTo: assignedTo,
     );
