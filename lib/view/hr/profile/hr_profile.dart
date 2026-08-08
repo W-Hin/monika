@@ -14,9 +14,23 @@ import '../leave/leave_balances.dart';
 import '../payroll/hr_payroll.dart';
 import '../../auth/set_password_screen.dart';
 import '../../employee/employee_shell.dart';
+import '../../../controller/employee_controller.dart';
 
-class HrProfileScreen extends StatelessWidget {
+class HrProfileScreen extends StatefulWidget {
   const HrProfileScreen({super.key});
+
+  @override
+  State<HrProfileScreen> createState() => _HrProfileScreenState();
+}
+
+class _HrProfileScreenState extends State<HrProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    if (employeeController.employees.isEmpty) {
+      employeeController.loadEmployees();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -141,12 +155,15 @@ class HrProfileScreen extends StatelessWidget {
 
             // System summary
             const SectionHeader(title: 'System Overview'),
-            Row(
-              children: [
-                Expanded(child: StatCard(label: 'Total Employees', value: '${DummyData.totalEmployees}', icon: Icons.groups_rounded, iconColor: c.primary, iconBg: c.primaryLight)),
-                const SizedBox(width: 12),
-                Expanded(child: StatCard(label: 'Active Modules', value: '10', icon: Icons.widgets_rounded, iconColor: c.infoBlue, iconBg: c.infoBlueBg)),
-              ],
+            ListenableBuilder(
+              listenable: employeeController,
+              builder: (context, _) => Row(
+                children: [
+                  Expanded(child: StatCard(label: 'Total Employees', value: '${employeeController.employees.length}', icon: Icons.groups_rounded, iconColor: c.primary, iconBg: c.primaryLight)),
+                  const SizedBox(width: 12),
+                  Expanded(child: StatCard(label: 'Active Modules', value: '10', icon: Icons.widgets_rounded, iconColor: c.infoBlue, iconBg: c.infoBlueBg)),
+                ],
+              ),
             ),
             const SizedBox(height: 24),
 
