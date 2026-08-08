@@ -79,6 +79,21 @@ class NotificationController extends ChangeNotifier {
     notifyListeners();
     await NotificationService.markAllRead();
   }
+
+  String? announcementError;
+
+  /// Returns the recipient count on success, null on failure (with
+  /// announcementError set for the caller to surface).
+  Future<int?> postAnnouncement({required String title, required String body, String? departmentName}) async {
+    announcementError = null;
+    try {
+      return await NotificationService.postAnnouncement(title: title, body: body, departmentName: departmentName);
+    } catch (e) {
+      announcementError = 'Could not post announcement: $e';
+      notifyListeners();
+      return null;
+    }
+  }
 }
 
 final notificationController = NotificationController();

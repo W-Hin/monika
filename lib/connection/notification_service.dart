@@ -19,6 +19,30 @@ class NotificationService {
     return List<Map<String, dynamic>>.from(rows);
   }
 
+  static Future<int?> departmentIdForName(String? name) async {
+    if (name == null) return null;
+    final row = await _client.from('departments').select('id').eq('name', name).maybeSingle();
+    return row?['id'] as int?;
+  }
+
+  /// HR — posts an announcement to every employee, or just one department.
+  /// Returns how many recipients it reached. Routed through a SECURITY
+  /// DEFINER RPC (see migration 0021) rather than a direct insert, since
+  /// notifications has no client-facing insert policy.
+  static Future<int> postAnnouncement({
+    required String title,
+    required String body,
+    String? departmentName,
+  }) async {
+    final departmentId = await departmentIdForName(departmentName == 'All Employees' ? null : departmentName);
+    final result = await _client.rpc('post_announcement', params: {
+      'p_title': title,
+      'p_body': body,
+      'p_department_id': departmentId,
+    });
+    return result as int;
+  }
+
   static Future<void> markRead(int id) async {
     await _client.from('notifications').update({'is_read': true}).eq('id', id);
   }

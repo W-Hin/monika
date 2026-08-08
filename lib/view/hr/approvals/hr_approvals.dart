@@ -9,7 +9,16 @@ import '../../../controller/leave_controller.dart';
 import '../leave/leave_balances.dart';
 
 class HrApprovalsScreen extends StatefulWidget {
-  const HrApprovalsScreen({super.key});
+  // Explicit, not derived from Navigator.canPop() — this screen is also
+  // an IndexedStack tab root inside HrShell, which itself can be pushed
+  // on top of EmployeeShell (via "Switch to Admin View"). In that state
+  // canPop(context) is true for every tab (they all share HrShell's
+  // position in the stack), so a canPop-based back arrow on the Approvals
+  // *tab* would pop the whole HrShell and eject the admin to their
+  // employee view instead of just leaving this screen. Only the instance
+  // explicitly pushed from a shortcut (e.g. the Dashboard) sets this true.
+  final bool showBackButton;
+  const HrApprovalsScreen({super.key, this.showBackButton = false});
 
   @override
   State<HrApprovalsScreen> createState() => _HrApprovalsScreenState();
@@ -66,7 +75,7 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: Navigator.canPop(context),
+        automaticallyImplyLeading: widget.showBackButton,
         title: const Text('Leave Approvals'),
         actions: [
           IconButton(

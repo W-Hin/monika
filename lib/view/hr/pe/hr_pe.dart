@@ -5,6 +5,7 @@ import '../../shared/widgets/common_widgets.dart';
 import '../../../model/models.dart';
 import '../../../controller/employee_controller.dart';
 import '../../../controller/pe_controller.dart';
+import '../../../connection/policy_service.dart';
 
 class HrPeScreen extends StatefulWidget {
   const HrPeScreen({super.key});
@@ -21,6 +22,12 @@ class _HrPeScreenState extends State<HrPeScreen> {
   bool _initialized = false;
 
   List<Map<String, dynamic>> _kpis = [];
+
+  // Matches policy_settings' defaults until the real values load — kept in
+  // sync with the actual thresholds Policy Config lets HR tune, so this
+  // badge accurately reflects whether submitting will really trigger a
+  // training recommendation (see PeController._triggerTrainingRecommendations).
+  Map<String, double> _thresholds = {'Technical': 65, 'Behavioural': 60, 'Leadership': 60};
 
   final _commentsController = TextEditingController();
 
@@ -69,6 +76,16 @@ class _HrPeScreenState extends State<HrPeScreen> {
       await employeeController.loadEmployees();
     }
     await peController.loadTemplates();
+    try {
+      final policy = await PolicyService.fetch();
+      _thresholds = {
+        'Technical': (policy['technical_threshold'] as num).toDouble(),
+        'Behavioural': (policy['behavioural_threshold'] as num).toDouble(),
+        'Leadership': (policy['leadership_threshold'] as num).toDouble(),
+      };
+    } catch (_) {
+      // Keep the defaults set above — badge stays reasonably accurate.
+    }
     if (!mounted) return;
     if (employeeController.employees.isNotEmpty) {
       await _selectEmployee(employeeController.employees.first);
@@ -529,11 +546,12 @@ class _HrPeScreenState extends State<HrPeScreen> {
                             onChanged: (v) => setState(() => _kpis[i]['score'] = v),
                           ),
                         ),
-                        // Auto trigger badge - informational only for now;
-                        // Training isn't wired to real data yet, so this
-                        // doesn't actually create a training_enrollments
-                        // row (same as before this screen was wired).
-                        if (score < 65)
+                        // Matches PeController._triggerTrainingRecommendations'
+                        // real threshold check — this badge only shows when
+                        // submitting will actually enrol the employee in a
+                        // matching training programme (rule-based, per this
+                        // project's scope), not just a cosmetic hint.
+                        if (score < (_thresholds[kpi['category']] ?? 65))
                           Padding(
                             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                             child: Container(

@@ -42,39 +42,79 @@ class PayrollService {
   }
 
   /// Generates (or regenerates) every active employee's payroll summary
-  /// for the given month. Deduction so far covers only late-arrival
-  /// occurrences (policy_settings.late_deduction x count of 'late'
-  /// attendance_records that month) — there's no reliable source yet for
-  /// "days they should have worked but didn't clock in at all" (that
-  /// needs a working-days/company-calendar concept that isn't wired up
-  /// yet), so absence deduction is deliberately not computed here rather
-  /// than guessed at.
+  /// for the given month. Deducts for:
+  ///  - late arrivals (policy_settings.late_deduction x count of 'late'
+  ///    attendance_records that month)
+  ///  - unexplained absences (policy_settings.absent_deduction x count of
+  ///    weekdays with no attendance record, no public holiday, and no
+  ///    approved leave application covering that day) — days covered by
+  ///    an approved leave are explicitly excluded, they're not absences.
+  /// Only counts days up to today (never penalises days in the month that
+  /// haven't happened yet), and never before the employee's hire date.
   static Future<int> generateForMonth(DateTime month) async {
-    final policy = await _client.from('policy_settings').select('late_deduction').eq('id', 1).single();
+    final policy = await _client.from('policy_settings').select('late_deduction, absent_deduction').eq('id', 1).single();
     final lateDeduction = (policy['late_deduction'] as num).toDouble();
+    final absentDeduction = (policy['absent_deduction'] as num).toDouble();
 
-    final employees = await _client.from('profiles').select('id, base_salary').eq('is_active', true);
+    final employees = await _client.from('profiles').select('id, base_salary, hire_date').eq('is_active', true);
 
     final monthStart = DateTime(month.year, month.month, 1);
     final monthEndExclusive = DateTime(month.year, month.month + 1, 1);
     final monthStartKey = monthStart.toIso8601String().split('T').first;
     final monthEndKey = monthEndExclusive.toIso8601String().split('T').first;
+    final today = DateTime.now();
+    final lastCountableDay = monthEndExclusive.isAfter(today) ? DateTime(today.year, today.month, today.day) : monthEndExclusive.subtract(const Duration(days: 1));
+
+    final holidayRows = await _client
+        .from('company_events')
+        .select('event_date')
+        .eq('event_type', 'public_holiday')
+        .gte('event_date', monthStartKey)
+        .lt('event_date', monthEndKey);
+    final holidayDates = List<Map<String, dynamic>>.from(holidayRows).map((r) => DateTime.parse(r['event_date'] as String)).toSet();
 
     var generatedCount = 0;
     for (final emp in List<Map<String, dynamic>>.from(employees)) {
       final uid = emp['id'] as String;
       final baseSalary = (emp['base_salary'] as num?)?.toDouble();
       if (baseSalary == null) continue; // no salary on file - nothing to generate
+      final hireDate = DateTime.tryParse(emp['hire_date'] as String? ?? '');
 
-      final lateRecords = await _client
+      final attendanceRows = await _client
           .from('attendance_records')
-          .select('id')
+          .select('work_date, status')
           .eq('user_id', uid)
-          .eq('status', 'late')
           .gte('work_date', monthStartKey)
           .lt('work_date', monthEndKey);
-      final lateCount = List.from(lateRecords).length;
-      final deductionAmount = lateCount * lateDeduction;
+      final attendance = List<Map<String, dynamic>>.from(attendanceRows);
+      final lateCount = attendance.where((r) => r['status'] == 'late').length;
+      final attendedDates = attendance.map((r) => DateTime.parse(r['work_date'] as String)).toSet();
+
+      final approvedLeaveRows = await _client
+          .from('leave_applications')
+          .select('start_date, end_date')
+          .eq('user_id', uid)
+          .eq('status', 'approved')
+          .lte('start_date', monthEndKey)
+          .gte('end_date', monthStartKey);
+      final leaveRanges = List<Map<String, dynamic>>.from(approvedLeaveRows)
+          .map((r) => (DateTime.parse(r['start_date'] as String), DateTime.parse(r['end_date'] as String)))
+          .toList();
+      bool onApprovedLeave(DateTime d) => leaveRanges.any((r) => !d.isBefore(r.$1) && !d.isAfter(r.$2));
+
+      var absentCount = 0;
+      for (var d = monthStart; !d.isAfter(lastCountableDay); d = d.add(const Duration(days: 1))) {
+        if (d.weekday == DateTime.saturday || d.weekday == DateTime.sunday) continue;
+        if (holidayDates.any((h) => h.year == d.year && h.month == d.month && h.day == d.day)) continue;
+        if (hireDate != null && d.isBefore(DateTime(hireDate.year, hireDate.month, hireDate.day))) continue;
+        if (attendedDates.any((a) => a.year == d.year && a.month == d.month && a.day == d.day)) continue;
+        if (onApprovedLeave(d)) continue;
+        absentCount++;
+      }
+
+      final lateAmount = lateCount * lateDeduction;
+      final absentAmount = absentCount * absentDeduction;
+      final deductionAmount = lateAmount + absentAmount;
       final netPay = baseSalary - deductionAmount;
 
       final upserted = await _client
@@ -93,12 +133,23 @@ class PayrollService {
       // Regenerate is idempotent - clear any previous items before
       // inserting the current computation's items.
       await _client.from('payroll_deduction_items').delete().eq('payroll_id', payrollId);
+      final items = <Map<String, dynamic>>[];
       if (lateCount > 0) {
-        await _client.from('payroll_deduction_items').insert({
+        items.add({
           'payroll_id': payrollId,
           'label': 'Late arrival ($lateCount occurrence${lateCount > 1 ? 's' : ''})',
-          'amount': deductionAmount,
+          'amount': lateAmount,
         });
+      }
+      if (absentCount > 0) {
+        items.add({
+          'payroll_id': payrollId,
+          'label': 'Unexplained absence ($absentCount day${absentCount > 1 ? 's' : ''})',
+          'amount': absentAmount,
+        });
+      }
+      if (items.isNotEmpty) {
+        await _client.from('payroll_deduction_items').insert(items);
       }
       generatedCount++;
     }

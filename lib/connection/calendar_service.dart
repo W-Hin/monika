@@ -25,8 +25,8 @@ class CalendarService {
         .from('company_events')
         .insert({
           'title': title,
-          'event_date': _dateKey(eventDate),
-          'end_date': endDate != null ? _dateKey(endDate) : null,
+          'event_date': eventDate.toIso8601String(),
+          'end_date': endDate?.toIso8601String(),
           'event_type': eventType,
         })
         .select()
@@ -44,8 +44,8 @@ class CalendarService {
   }) async {
     await _client.from('company_events').update({
       'title': title,
-      'event_date': _dateKey(eventDate),
-      'end_date': endDate != null ? _dateKey(endDate) : null,
+      'event_date': eventDate.toIso8601String(),
+      'end_date': endDate?.toIso8601String(),
       'event_type': eventType,
     }).eq('id', id);
     await _replaceAssignments(id, assignedUuids);
@@ -63,6 +63,4 @@ class CalendarService {
   static Future<void> delete(int id) async {
     await _client.from('company_events').delete().eq('id', id);
   }
-
-  static String _dateKey(DateTime d) => DateTime(d.year, d.month, d.day).toIso8601String().split('T').first;
 }

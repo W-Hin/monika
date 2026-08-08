@@ -494,6 +494,25 @@ class _EventTile extends StatelessWidget {
   final VoidCallback? onTap;
   const _EventTile({required this.event, required this.dateFormat, this.onTap});
 
+  static final _timeFormat = DateFormat('h:mm a');
+
+  bool _sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+  bool _hasTime(DateTime d) => d.hour != 0 || d.minute != 0;
+
+  String _when() {
+    final multiDay = event.endDate != null && !_sameDay(event.eventDate, event.endDate!);
+    if (multiDay) {
+      return '${dateFormat.format(event.eventDate)} – ${dateFormat.format(event.endDate!)}';
+    }
+    final datePart = dateFormat.format(event.eventDate);
+    if (!_hasTime(event.eventDate)) return datePart;
+    final startTime = _timeFormat.format(event.eventDate);
+    if (event.endDate != null && _hasTime(event.endDate!)) {
+      return '$datePart · $startTime – ${_timeFormat.format(event.endDate!)}';
+    }
+    return '$datePart · $startTime';
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -522,7 +541,7 @@ class _EventTile extends StatelessWidget {
                       Icon(Icons.calendar_today_rounded, size: 12, color: c.textMuted),
                       const SizedBox(width: 5),
                       Text(
-                        event.endDate != null ? '${dateFormat.format(event.eventDate)} – ${dateFormat.format(event.endDate!)}' : dateFormat.format(event.eventDate),
+                        _when(),
                         style: TextStyle(fontSize: 12, color: c.textSecondary, fontWeight: FontWeight.w500),
                       ),
                     ],
@@ -572,22 +591,47 @@ class _EventFormSheetState extends State<_EventFormSheet> {
   late final _title = TextEditingController(text: widget.existing?.title);
   late DateTime _eventDate = widget.existing?.eventDate ?? DateTime.now();
   DateTime? _endDate;
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
   late String _type = widget.existing?.type ?? 'Company Event';
   bool _saving = false;
   static final _dateFormat = DateFormat('d MMM yyyy');
+  static final _timeFormat = DateFormat('h:mm a');
   late final Map<String, String> _assigned = {
     for (final a in widget.existing?.assignedTo ?? const <AssignedEmployee>[]) a.uuid: a.name,
   };
 
   bool get _isEditing => widget.existing != null;
 
+  static TimeOfDay? _timeOrNull(DateTime? d) {
+    if (d == null || (d.hour == 0 && d.minute == 0)) return null;
+    return TimeOfDay(hour: d.hour, minute: d.minute);
+  }
+
   @override
   void initState() {
     super.initState();
     _endDate = widget.existing?.endDate;
+    _startTime = _timeOrNull(widget.existing?.eventDate);
+    _endTime = _timeOrNull(widget.existing?.endDate);
     if (employeeController.employees.isEmpty) {
       employeeController.loadEmployees();
     }
+  }
+
+  Future<void> _pickTime({required bool isEnd}) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: (isEnd ? _endTime : _startTime) ?? const TimeOfDay(hour: 9, minute: 0),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isEnd) {
+        _endTime = picked;
+      } else {
+        _startTime = picked;
+      }
+    });
   }
 
   Future<void> _pickAssignees() async {
@@ -632,19 +676,28 @@ class _EventFormSheetState extends State<_EventFormSheet> {
       return;
     }
     setState(() => _saving = true);
+    // A start time with no explicit end date means a same-day timed event
+    // (e.g. "Team Meeting 2-4pm") — the end date defaults to the start
+    // date rather than staying null, so it doesn't read as an open-ended
+    // multi-day span.
+    final effectiveEndDate = _endDate ?? (_endTime != null ? _eventDate : null);
+    final finalStart = DateTime(_eventDate.year, _eventDate.month, _eventDate.day, _startTime?.hour ?? 0, _startTime?.minute ?? 0);
+    final finalEnd = effectiveEndDate != null
+        ? DateTime(effectiveEndDate.year, effectiveEndDate.month, effectiveEndDate.day, _endTime?.hour ?? 0, _endTime?.minute ?? 0)
+        : null;
     final success = _isEditing
         ? await calendarController.update(
             existing: widget.existing!,
             title: _title.text.trim(),
-            eventDate: _eventDate,
-            endDate: _endDate,
+            eventDate: finalStart,
+            endDate: finalEnd,
             displayType: _type,
             assignedUuids: _assigned.keys.toList(),
           )
         : await calendarController.create(
             title: _title.text.trim(),
-            eventDate: _eventDate,
-            endDate: _endDate,
+            eventDate: finalStart,
+            endDate: finalEnd,
             displayType: _type,
             assignedUuids: _assigned.keys.toList(),
           );
@@ -731,6 +784,42 @@ class _EventFormSheetState extends State<_EventFormSheet> {
                 child: TextButton(
                   onPressed: () => setState(() => _endDate = null),
                   child: const Text('Clear end date'),
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
+
+            Text('Time (optional)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _DatePickerField(
+                    label: 'Start Time',
+                    value: _startTime != null ? _timeFormat.format(DateTime(2000, 1, 1, _startTime!.hour, _startTime!.minute)) : 'All day',
+                    onTap: () => _pickTime(isEnd: false),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _DatePickerField(
+                    label: 'End Time',
+                    value: _endTime != null ? _timeFormat.format(DateTime(2000, 1, 1, _endTime!.hour, _endTime!.minute)) : '—',
+                    onTap: () => _pickTime(isEnd: true),
+                  ),
+                ),
+              ],
+            ),
+            if (_startTime != null || _endTime != null) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => setState(() {
+                    _startTime = null;
+                    _endTime = null;
+                  }),
+                  child: const Text('Clear time (all day)'),
                 ),
               ),
             ],

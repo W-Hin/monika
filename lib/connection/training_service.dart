@@ -17,6 +17,33 @@ class TrainingService {
     return List<Map<String, dynamic>>.from(rows);
   }
 
+  /// Rule-based recommendation (per the project's "Rule-Based ... Training
+  /// Prediction" scope, not a real ML model): picks the first training
+  /// programme matching [category] and enrols the employee in it as a
+  /// recommendation. Best-effort — does nothing if no programme exists yet
+  /// for that category, and never overwrites an existing enrollment's
+  /// progress if they're already enrolled.
+  static Future<void> recommendForCategory({
+    required String userUuid,
+    required String category,
+    required String reason,
+  }) async {
+    final candidates = await _client.from('training_programs').select('id').eq('category', category).order('id').limit(1);
+    final list = List<Map<String, dynamic>>.from(candidates);
+    if (list.isEmpty) return;
+    final programId = list.first['id'] as int;
+    await _client.from('training_enrollments').upsert(
+      {
+        'program_id': programId,
+        'user_id': userUuid,
+        'is_recommended': true,
+        'recommendation_reason': reason,
+      },
+      onConflict: 'program_id,user_id',
+      ignoreDuplicates: true,
+    );
+  }
+
   static Future<List<Map<String, dynamic>>> fetchMyEnrollments() async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) return [];

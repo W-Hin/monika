@@ -14,12 +14,38 @@ class EmployeeAttendanceScreen extends StatefulWidget {
 }
 
 class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
+  GpsCheckResult? _gpsResult;
+  WifiCheckResult? _wifiResult;
+  DeviceCheckResult? _deviceResult;
+  bool _checking = false;
+
   @override
   void initState() {
     super.initState();
     attendanceController.loadPolicy().then((_) => setState(() {}));
     attendanceController.loadHistory();
     attendanceController.loadRiskWindow();
+    _runLiveChecks();
+  }
+
+  /// Re-runs the actual GPS/WiFi/device checks so this screen reflects
+  /// live conditions — it previously just showed three cards hardcoded to
+  /// "verified", including "Registered Device" staying checked even after
+  /// HR approved a device-change request and cleared it.
+  Future<void> _runLiveChecks() async {
+    setState(() => _checking = true);
+    final results = await Future.wait([
+      attendanceController.runGpsCheck(),
+      attendanceController.runWifiCheck(),
+      attendanceController.checkDeviceStatus(),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _gpsResult = results[0] as GpsCheckResult;
+      _wifiResult = results[1] as WifiCheckResult;
+      _deviceResult = results[2] as DeviceCheckResult;
+      _checking = false;
+    });
   }
 
   @override
@@ -27,7 +53,19 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
     final c = context.colors;
 
     return Scaffold(
-      appBar: AppBar(automaticallyImplyLeading: false, title: const Text('Attendance')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Attendance'),
+        actions: [
+          IconButton(
+            tooltip: 'Re-check verification status',
+            onPressed: _checking ? null : _runLiveChecks,
+            icon: _checking
+                ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: c.textSecondary))
+                : const Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
       body: SafeArea(
         top: false,
         child: ListenableBuilder(
@@ -97,22 +135,36 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
             _VerificationInfoCard(
               icon: Icons.my_location_rounded,
               title: 'GPS Geofencing',
-              desc: 'Active · ${attendanceController.geofenceRadius}m radius around Main Office',
-              ok: true,
+              desc: _gpsResult?.detail ?? 'Checking your current location…',
+              state: _checking && _gpsResult == null
+                  ? _VerifyState.pending
+                  : (_gpsResult?.passed ?? false)
+                      ? _VerifyState.ok
+                      : _VerifyState.fail,
             ),
             const SizedBox(height: 10),
             _VerificationInfoCard(
               icon: Icons.wifi_rounded,
               title: 'WiFi SSID Verification',
-              desc: 'Active · Connected to ${attendanceController.officeWifiSsid}',
-              ok: true,
+              desc: _wifiResult?.detail ?? 'Checking your WiFi connection…',
+              state: _checking && _wifiResult == null
+                  ? _VerifyState.pending
+                  : (_wifiResult?.passed ?? false)
+                      ? _VerifyState.ok
+                      : _VerifyState.fail,
             ),
             const SizedBox(height: 10),
             _VerificationInfoCard(
               icon: Icons.phone_android_rounded,
               title: 'Registered Device',
-              desc: '${user.registeredDevice} · Bound on ${user.deviceBoundSince}',
-              ok: true,
+              desc: _deviceResult?.detail ?? 'Checking this device…',
+              state: _checking && _deviceResult == null
+                  ? _VerifyState.pending
+                  : user.registeredDevice == 'Not yet registered'
+                      ? _VerifyState.warning
+                      : (_deviceResult?.passed ?? false)
+                          ? _VerifyState.ok
+                          : _VerifyState.fail,
             ),
             const SizedBox(height: 24),
             const SectionHeader(title: 'Recent Records'),
@@ -178,16 +230,33 @@ class _RiskFactor extends StatelessWidget {
   }
 }
 
+enum _VerifyState { pending, ok, warning, fail }
+
 class _VerificationInfoCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String desc;
-  final bool ok;
-  const _VerificationInfoCard({required this.icon, required this.title, required this.desc, required this.ok});
+  final _VerifyState state;
+  const _VerificationInfoCard({required this.icon, required this.title, required this.desc, required this.state});
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final Widget trailing;
+    switch (state) {
+      case _VerifyState.pending:
+        trailing = SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: c.textMuted));
+        break;
+      case _VerifyState.ok:
+        trailing = Icon(Icons.check_circle_rounded, color: c.primary, size: 20);
+        break;
+      case _VerifyState.warning:
+        trailing = Icon(Icons.info_rounded, color: c.amber, size: 20);
+        break;
+      case _VerifyState.fail:
+        trailing = Icon(Icons.error_rounded, color: c.riskHigh, size: 20);
+        break;
+    }
     return AppCard(
       child: Row(
         children: [
@@ -209,7 +278,7 @@ class _VerificationInfoCard extends StatelessWidget {
               ],
             ),
           ),
-          Icon(ok ? Icons.check_circle_rounded : Icons.error_rounded, color: ok ? c.primary : c.riskHigh, size: 20),
+          trailing,
         ],
       ),
     );

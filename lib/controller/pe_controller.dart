@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../connection/pe_service.dart';
+import '../connection/policy_service.dart';
+import '../connection/training_service.dart';
 import '../model/models.dart';
 
 /// State-management pattern: ChangeNotifier singleton, consumed via
@@ -192,11 +195,43 @@ class PeController extends ChangeNotifier {
         scores: kpis.map((k) => {'kpi_name': k.name, 'weightage': k.weightage, 'score': k.score, 'category': k.category}).toList(),
       );
       await loadForEmployee(userUuid);
+      unawaited(_triggerTrainingRecommendations(userUuid: userUuid, kpis: kpis));
       return true;
     } catch (e) {
       errorMessage = 'Could not submit evaluation: $e';
       notifyListeners();
       return false;
+    }
+  }
+
+  static const _categoryToDb = {'Technical': 'technical', 'Behavioural': 'behavioural', 'Leadership': 'leadership'};
+
+  /// Rule-based (per this project's scope, not a real ML model): any KPI
+  /// scored below its category's threshold (from Policy Config) auto-
+  /// enrols the employee in a matching training programme, if one exists.
+  /// Best-effort — a failure here shouldn't undo an already-saved
+  /// evaluation, so errors are swallowed rather than surfaced.
+  Future<void> _triggerTrainingRecommendations({required String userUuid, required List<KpiItem> kpis}) async {
+    try {
+      final policy = await PolicyService.fetch();
+      final thresholds = {
+        'Technical': (policy['technical_threshold'] as num).toDouble(),
+        'Behavioural': (policy['behavioural_threshold'] as num).toDouble(),
+        'Leadership': (policy['leadership_threshold'] as num).toDouble(),
+      };
+      for (final k in kpis) {
+        final threshold = thresholds[k.category];
+        final dbCategory = _categoryToDb[k.category];
+        if (threshold == null || dbCategory == null) continue;
+        if (k.score >= threshold) continue;
+        await TrainingService.recommendForCategory(
+          userUuid: userUuid,
+          category: dbCategory,
+          reason: 'Recommended after scoring ${k.score.toInt()}/100 on "${k.name}" (${k.category}) in this year\'s Performance Evaluation.',
+        );
+      }
+    } catch (_) {
+      // Best-effort, see doc comment.
     }
   }
 }

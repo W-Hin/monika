@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
@@ -8,11 +9,19 @@ import '../../../model/models.dart';
 import '../../../controller/anomaly_controller.dart';
 import '../../../controller/analytics_controller.dart';
 import '../../../controller/notification_controller.dart';
+import '../../../controller/device_request_controller.dart';
+import '../../../controller/calendar_controller.dart';
 import '../analytics/anomaly_detail.dart';
 import '../approvals/hr_approvals.dart';
-import '../analytics/hr_analytics.dart';
 import '../employees/add_employee.dart';
 import '../policy/policy_config.dart';
+import '../devices/hr_device_requests.dart';
+import '../announcements/post_announcement_screen.dart';
+import '../training/hr_training.dart';
+import '../pe/hr_pe.dart';
+import '../leave/leave_balances.dart';
+import '../payroll/hr_payroll.dart';
+import '../../shared/company_calendar.dart';
 import '../../shared/notification.dart';
 
 // Fixed so all 4 stat cards line up evenly — Attendance Rate carries an
@@ -33,6 +42,113 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
     super.initState();
     anomalyController.loadFeed();
     analyticsController.load();
+    deviceRequestController.loadAllForHr();
+    calendarController.load();
+  }
+
+  void _showMoreMenu(BuildContext context) {
+    final c = context.colors;
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        void go(Widget page) {
+          Navigator.of(dialogContext).pop();
+          Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+        }
+
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('More Actions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+                    IconButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      icon: Icon(Icons.close_rounded, size: 20, color: c.textMuted),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 0.85,
+                  children: [
+                    _MoreMenuItem(
+                      icon: Icons.tune_rounded,
+                      label: 'Policies',
+                      color: c.purple,
+                      bg: c.purpleBg,
+                      onTap: () => go(const PolicyConfigScreen()),
+                    ),
+                    _MoreMenuItem(
+                      icon: Icons.calendar_month_rounded,
+                      label: 'Calendar',
+                      color: c.primary,
+                      bg: c.primaryLight,
+                      onTap: () => go(const CompanyCalendarScreen(isAdminView: true)),
+                    ),
+                    _MoreMenuItem(
+                      icon: Icons.phone_android_rounded,
+                      label: 'Device Requests',
+                      color: c.amber,
+                      bg: c.amberBg,
+                      onTap: () => go(const HrDeviceRequestsScreen()),
+                    ),
+                    _MoreMenuItem(
+                      icon: Icons.campaign_rounded,
+                      label: 'Announcement',
+                      color: c.purple,
+                      bg: c.purpleBg,
+                      onTap: () => go(const PostAnnouncementScreen()),
+                    ),
+                    _MoreMenuItem(
+                      icon: Icons.school_rounded,
+                      label: 'Training',
+                      color: c.infoBlue,
+                      bg: c.infoBlueBg,
+                      onTap: () => go(const HrTrainingScreen()),
+                    ),
+                    _MoreMenuItem(
+                      icon: Icons.assessment_rounded,
+                      label: 'Performance',
+                      color: c.amber,
+                      bg: c.amberBg,
+                      onTap: () => go(const HrPeScreen()),
+                    ),
+                    _MoreMenuItem(
+                      icon: Icons.account_balance_wallet_outlined,
+                      label: 'Leave Balances',
+                      color: c.infoBlue,
+                      bg: c.infoBlueBg,
+                      onTap: () => go(const HrLeaveBalancesScreen()),
+                    ),
+                    _MoreMenuItem(
+                      icon: Icons.receipt_long_rounded,
+                      label: 'Payroll',
+                      color: c.purple,
+                      bg: c.purpleBg,
+                      onTap: () => go(const HrPayrollScreen()),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -59,7 +175,7 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
       body: SafeArea(
         top: false,
         child: ListenableBuilder(
-          listenable: Listenable.merge([anomalyController, analyticsController]),
+          listenable: Listenable.merge([anomalyController, analyticsController, deviceRequestController, calendarController]),
           builder: (context, _) => ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
@@ -83,11 +199,11 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
                   child: SizedBox(
                     height: _kStatCardHeight,
                     child: StatCard(
-                      label: 'Attendance Rate',
-                      value: '${(analyticsController.attendanceRate * 100).toInt()}%',
-                      icon: Icons.event_available_rounded,
-                      iconColor: c.infoBlue,
-                      iconBg: c.infoBlueBg,
+                      label: 'Pending Approvals',
+                      value: '${analyticsController.pendingLeaveCount}',
+                      icon: Icons.pending_actions_rounded,
+                      iconColor: c.amber,
+                      iconBg: c.amberBg,
                     ),
                   ),
                 ),
@@ -101,11 +217,11 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
                   child: SizedBox(
                     height: _kStatCardHeight,
                     child: StatCard(
-                      label: 'Pending Approvals',
-                      value: '${analyticsController.pendingLeaveCount}',
-                      icon: Icons.pending_actions_rounded,
-                      iconColor: c.amber,
-                      iconBg: c.amberBg,
+                      label: 'Device Requests',
+                      value: '${deviceRequestController.allRequests.where((r) => r.status == 'pending').length}',
+                      icon: Icons.phone_android_rounded,
+                      iconColor: c.infoBlue,
+                      iconBg: c.infoBlueBg,
                     ),
                   ),
                 ),
@@ -165,7 +281,7 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
                     color: c.infoBlue,
                     bg: c.infoBlueBg,
                     badge: analyticsController.pendingLeaveCount,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HrApprovalsScreen())),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HrApprovalsScreen(showBackButton: true))),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -181,11 +297,11 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _QuickAction(
-                    icon: Icons.tune_rounded,
-                    label: 'Policies',
+                    icon: Icons.apps_rounded,
+                    label: 'More',
                     color: c.purple,
                     bg: c.purpleBg,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PolicyConfigScreen())),
+                    onTap: () => _showMoreMenu(context),
                   ),
                 ),
               ],
@@ -209,45 +325,52 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
 
             const SizedBox(height: 12),
             SectionHeader(
-              title: 'Weekly Attendance Trend',
-              actionLabel: 'Full report',
-              onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HrAnalyticsScreen())),
+              title: 'Upcoming Events',
+              actionLabel: 'View calendar',
+              onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CompanyCalendarScreen(isAdminView: true))),
             ),
-            AppCard(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-              child: SizedBox(
-                height: 120,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: List.generate(analyticsController.weeklyTrend.length, (i) {
-                    final v = analyticsController.weeklyTrend[i];
-                    final isToday = i == analyticsController.weeklyTrend.length - 1;
-                    return Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
+            Builder(builder: (context) {
+              final now = DateTime.now();
+              final today = DateTime(now.year, now.month, now.day);
+              final upcoming = calendarController.events.where((e) {
+                final end = e.endDate ?? e.eventDate;
+                return !end.isBefore(today);
+              }).take(3).toList();
+              if (upcoming.isEmpty) {
+                return AppCard(
+                  child: Text('No upcoming events', style: TextStyle(fontSize: 12.5, color: c.textMuted)),
+                );
+              }
+              return Column(
+                children: upcoming.map((e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: AppCard(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        child: Row(
                           children: [
-                            Text('${(v * 100).toInt()}', style: TextStyle(fontSize: 9, color: c.textMuted, fontWeight: FontWeight.w700, fontFeatures: const [FontFeature.tabularFigures()])),
-                            const SizedBox(height: 4),
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 400),
-                              height: 70 * v,
-                              decoration: BoxDecoration(
-                                color: isToday ? c.primary : c.primary.withValues(alpha: 0.35),
-                                borderRadius: BorderRadius.circular(6),
+                            Container(
+                              width: 38,
+                              height: 38,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(color: c.primaryLight, borderRadius: BorderRadius.circular(10)),
+                              child: Icon(Icons.event_rounded, size: 18, color: c.primaryDark),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(e.title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  Text(DateFormat('d MMM yyyy').format(e.eventDate), style: TextStyle(fontSize: 11.5, color: c.textMuted)),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            Text(analyticsController.weekdayLabels[i], style: TextStyle(fontSize: 10, color: c.textMuted, fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
-                    );
-                  }),
-                ),
-              ),
-            ),
+                    )).toList(),
+              );
+            }),
           ],
           ),
         ),
@@ -349,6 +472,37 @@ class _DonutPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DonutPainter oldDelegate) => oldDelegate.segments != segments;
+}
+
+class _MoreMenuItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color bg;
+  final VoidCallback onTap;
+
+  const _MoreMenuItem({required this.icon, required this.label, required this.color, required this.bg, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(height: 8),
+          Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: c.textPrimary)),
+        ],
+      ),
+    );
+  }
 }
 
 class _QuickAction extends StatelessWidget {

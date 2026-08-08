@@ -193,32 +193,27 @@ class AttendanceController extends ChangeNotifier {
     }
   }
 
+  Future<(String token, String name)> _currentDeviceIdentity() async {
+    final deviceInfo = DeviceInfoPlugin();
+    if (kIsWeb) {
+      final info = await deviceInfo.webBrowserInfo;
+      return (info.vendor ?? info.userAgent ?? 'web-device', '${info.browserName.name} browser');
+    } else if (Platform.isAndroid) {
+      final info = await deviceInfo.androidInfo;
+      return (info.id, '${info.manufacturer} ${info.model}');
+    } else if (Platform.isIOS) {
+      final info = await deviceInfo.iosInfo;
+      return (info.identifierForVendor ?? 'ios-device', info.utsname.machine);
+    } else if (Platform.isWindows) {
+      final info = await deviceInfo.windowsInfo;
+      return (info.deviceId, info.computerName);
+    }
+    return ('unknown-device', 'Unknown device');
+  }
+
   Future<DeviceCheckResult> runDeviceCheck() async {
     try {
-      final deviceInfo = DeviceInfoPlugin();
-      String token;
-      String name;
-      if (kIsWeb) {
-        final info = await deviceInfo.webBrowserInfo;
-        token = info.vendor ?? info.userAgent ?? 'web-device';
-        name = '${info.browserName.name} browser';
-      } else if (Platform.isAndroid) {
-        final info = await deviceInfo.androidInfo;
-        token = info.id;
-        name = '${info.manufacturer} ${info.model}';
-      } else if (Platform.isIOS) {
-        final info = await deviceInfo.iosInfo;
-        token = info.identifierForVendor ?? 'ios-device';
-        name = info.utsname.machine;
-      } else if (Platform.isWindows) {
-        final info = await deviceInfo.windowsInfo;
-        token = info.deviceId;
-        name = info.computerName;
-      } else {
-        token = 'unknown-device';
-        name = 'Unknown device';
-      }
-
+      final (token, name) = await _currentDeviceIdentity();
       final profile = await AuthService.fetchMyProfile();
       final storedToken = profile?['device_token'] as String?;
 
@@ -237,6 +232,33 @@ class AttendanceController extends ChangeNotifier {
         detail: passed
             ? 'Matches your registered device ($name)'
             : 'This device ($name) does not match your registered device — possible shared-device attempt',
+      );
+    } catch (e) {
+      return DeviceCheckResult(passed: false, deviceName: 'Unknown', detail: 'Device check unavailable ($e)');
+    }
+  }
+
+  /// Read-only variant for display purposes (e.g. the Attendance tab's IoT
+  /// Verification card) — never binds an unregistered device the way
+  /// runDeviceCheck() does, since merely viewing that screen shouldn't
+  /// silently pair a new device; only an actual clock-in should.
+  Future<DeviceCheckResult> checkDeviceStatus() async {
+    try {
+      final (token, name) = await _currentDeviceIdentity();
+      final profile = await AuthService.fetchMyProfile();
+      final storedToken = profile?['device_token'] as String?;
+
+      if (storedToken == null) {
+        return DeviceCheckResult(passed: false, deviceToken: token, deviceName: name, detail: 'No device registered yet — this device will be registered on your next successful clock-in');
+      }
+      final passed = storedToken == token;
+      return DeviceCheckResult(
+        passed: passed,
+        deviceToken: token,
+        deviceName: name,
+        detail: passed
+            ? 'Matches your registered device ($name)'
+            : 'This device ($name) does not match your registered device',
       );
     } catch (e) {
       return DeviceCheckResult(passed: false, deviceName: 'Unknown', detail: 'Device check unavailable ($e)');

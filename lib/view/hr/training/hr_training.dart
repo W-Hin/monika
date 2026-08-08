@@ -578,16 +578,50 @@ class _CreateProgramSheet extends StatefulWidget {
 }
 
 class _CreateProgramSheetState extends State<_CreateProgramSheet> {
+  static const _categories = [
+    (name: 'Technical', icon: Icons.code_rounded),
+    (name: 'Behavioural', icon: Icons.groups_rounded),
+    (name: 'Leadership', icon: Icons.trending_up_rounded),
+  ];
+  static const _units = ['Hours', 'Days', 'Weeks', 'Months'];
+  static const _formats = ['Self-paced', 'Instructor-led', 'Workshop'];
+
   late final _title = TextEditingController(text: widget.existing?.title);
   late final _desc = TextEditingController(text: widget.existing?.description);
   late final _duration = TextEditingController(text: widget.existing?.duration);
+  late final _durationValue = TextEditingController(text: '2');
+  String _durationUnit = 'Weeks';
+  String _format = 'Self-paced';
   late String _category = widget.existing?.category ?? 'Technical';
   late bool _mandatory = widget.existing?.isMandatory ?? false;
   bool _saving = false;
 
   bool get _isEditing => widget.existing != null;
 
+  Color _catColor(AppColorsExtension c, String cat) {
+    switch (cat) {
+      case 'Leadership':
+        return c.purple;
+      case 'Behavioural':
+        return c.amber;
+      default:
+        return c.infoBlue;
+    }
+  }
+
+  Color _catBg(AppColorsExtension c, String cat) {
+    switch (cat) {
+      case 'Leadership':
+        return c.purpleBg;
+      case 'Behavioural':
+        return c.amberBg;
+      default:
+        return c.infoBlueBg;
+    }
+  }
+
   Future<void> _save() async {
+    final duration = _isEditing ? _duration.text.trim() : '${_durationValue.text.trim()} $_durationUnit · $_format';
     setState(() => _saving = true);
     final success = await trainingController.saveProgram(
       existingId: widget.existing?.dbId,
@@ -595,7 +629,7 @@ class _CreateProgramSheetState extends State<_CreateProgramSheet> {
       category: _category,
       description: _desc.text.trim(),
       isMandatory: _mandatory,
-      duration: _duration.text.trim(),
+      duration: duration,
       departmentName: widget.existing?.department,
     );
     if (!mounted) return;
@@ -659,6 +693,7 @@ class _CreateProgramSheetState extends State<_CreateProgramSheet> {
             const SizedBox(height: 8),
             TextField(
               controller: _title,
+              onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(
                 hintText: 'e.g. Advanced Leadership Workshop',
               ),
@@ -670,27 +705,112 @@ class _CreateProgramSheetState extends State<_CreateProgramSheet> {
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: ['Technical', 'Behavioural', 'Leadership'].map((cat) {
-                final sel = _category == cat;
-                return ChoiceChip(
-                  label: Text(cat),
-                  selected: sel,
-                  onSelected: (_) => setState(() => _category = cat),
-                  selectedColor: c.primaryLight,
-                  labelStyle: TextStyle(
-                    color: sel ? c.primaryDark : c.textSecondary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12.5,
-                  ),
-                  side: BorderSide(
-                    color: sel ? c.primary : Colors.transparent,
+            Row(
+              children: _categories.map((cat) {
+                final sel = _category == cat.name;
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(right: cat.name != _categories.last.name ? 8 : 0),
+                    child: InkWell(
+                      onTap: () => setState(() => _category = cat.name),
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: sel ? _catBg(c, cat.name) : c.surfaceMuted,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: sel ? _catColor(c, cat.name) : Colors.transparent, width: 1.5),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(cat.icon, size: 20, color: sel ? _catColor(c, cat.name) : c.textMuted),
+                            const SizedBox(height: 6),
+                            Text(
+                              cat.name,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: sel ? _catColor(c, cat.name) : c.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 );
               }).toList(),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 18),
+
+            // Live preview — shows HR exactly what employees will see on
+            // the training list before they commit to creating it.
+            Text('Preview', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: c.textMuted, letterSpacing: 0.5)),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: c.surfaceMuted,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: c.border),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: _catBg(c, _category), borderRadius: BorderRadius.circular(12)),
+                    child: Icon(_categories.firstWhere((cat) => cat.name == _category).icon, color: _catColor(c, _category), size: 19),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _title.text.trim().isEmpty ? 'Untitled Programme' : _title.text.trim(),
+                          style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: _title.text.trim().isEmpty ? c.textMuted : c.textPrimary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(color: _catBg(c, _category), borderRadius: BorderRadius.circular(100)),
+                              child: Text(_category, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _catColor(c, _category))),
+                            ),
+                            if (_mandatory)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(color: c.riskHighBg, borderRadius: BorderRadius.circular(100)),
+                                child: Text('Mandatory', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: c.riskHigh)),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(Icons.schedule_rounded, size: 12, color: c.textMuted),
+                            const SizedBox(width: 4),
+                            Text(
+                              _isEditing ? (_duration.text.trim().isEmpty ? '—' : _duration.text.trim()) : '${_durationValue.text.trim().isEmpty ? '0' : _durationValue.text.trim()} $_durationUnit · $_format',
+                              style: TextStyle(fontSize: 11, color: c.textMuted, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
 
             const Text(
               'Description',
@@ -706,22 +826,69 @@ class _CreateProgramSheetState extends State<_CreateProgramSheet> {
             ),
             const SizedBox(height: 14),
 
-            const Text(
-              'Duration',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _duration,
-              decoration: InputDecoration(
-                hintText: 'e.g. 2 weeks · Self-paced',
-                prefixIcon: Icon(
-                  Icons.schedule_rounded,
-                  size: 18,
-                  color: c.textMuted,
+            if (_isEditing) ...[
+              const Text(
+                'Duration',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _duration,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: 'e.g. 2 weeks · Self-paced',
+                  prefixIcon: Icon(
+                    Icons.schedule_rounded,
+                    size: 18,
+                    color: c.textMuted,
+                  ),
                 ),
               ),
-            ),
+            ] else ...[
+              const Text(
+                'Duration',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  SizedBox(
+                    width: 70,
+                    child: TextField(
+                      controller: _durationValue,
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(isDense: true),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _durationUnit,
+                      isExpanded: true,
+                      decoration: const InputDecoration(isDense: true),
+                      items: _units.map((u) => DropdownMenuItem(value: u, child: Text(u, style: const TextStyle(fontSize: 13)))).toList(),
+                      onChanged: (v) => setState(() => _durationUnit = v ?? _durationUnit),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                children: _formats.map((f) {
+                  final sel = _format == f;
+                  return ChoiceChip(
+                    label: Text(f),
+                    selected: sel,
+                    onSelected: (_) => setState(() => _format = f),
+                    selectedColor: c.primaryLight,
+                    labelStyle: TextStyle(color: sel ? c.primaryDark : c.textSecondary, fontWeight: FontWeight.w700, fontSize: 12.5),
+                    side: BorderSide(color: sel ? c.primary : Colors.transparent),
+                  );
+                }).toList(),
+              ),
+            ],
             const SizedBox(height: 14),
 
             Row(

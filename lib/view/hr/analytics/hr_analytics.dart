@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/common_widgets.dart';
-import '../../../model/models.dart';
 import '../../../controller/analytics_controller.dart';
 
 class HrAnalyticsScreen extends StatefulWidget {
-  const HrAnalyticsScreen({super.key});
+  // See the identical comment on HrApprovalsScreen — explicit flag instead
+  // of Navigator.canPop(), which is ambiguous between "this is a pushed
+  // shortcut" and "this is the IndexedStack tab root while HrShell itself
+  // is pushed on top of EmployeeShell."
+  final bool showBackButton;
+  const HrAnalyticsScreen({super.key, this.showBackButton = false});
 
   @override
   State<HrAnalyticsScreen> createState() => _HrAnalyticsScreenState();
@@ -68,7 +72,7 @@ class _HrAnalyticsScreenState extends State<HrAnalyticsScreen> {
     final c = context.colors;
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: Navigator.canPop(context),
+        automaticallyImplyLeading: widget.showBackButton,
         title: const Text('Analytics & Reports'),
         actions: [
           Padding(
@@ -97,7 +101,6 @@ class _HrAnalyticsScreenState extends State<HrAnalyticsScreen> {
             if (analyticsController.loading && analyticsController.totalEmployees == 0) {
               return const Center(child: CircularProgressIndicator());
             }
-            final risk = analyticsController.riskDistribution;
             final lateEmployees = analyticsController.topLateEmployees;
             final maxLate = lateEmployees.isEmpty ? 1 : lateEmployees.first.count;
 
@@ -184,33 +187,6 @@ class _HrAnalyticsScreenState extends State<HrAnalyticsScreen> {
                 ),
 
                 const SizedBox(height: 24),
-                const SectionHeader(title: 'Risk Classification Distribution'),
-                AppCard(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(flex: (risk[RiskLevel.low] ?? 0) + 1, child: Container(height: 12, decoration: BoxDecoration(color: c.riskLow, borderRadius: const BorderRadius.horizontal(left: Radius.circular(8))))),
-                          Expanded(flex: (risk[RiskLevel.medium] ?? 0) + 1, child: Container(height: 12, color: c.riskMedium)),
-                          Expanded(flex: (risk[RiskLevel.high] ?? 0) + 1, child: Container(height: 12, decoration: BoxDecoration(color: c.riskHigh, borderRadius: const BorderRadius.horizontal(right: Radius.circular(8))))),
-                        ],
-                      ),
-                      const SizedBox(height: 18),
-                      Row(
-                        children: [
-                          Expanded(child: _RiskLegendTile(label: 'Low Risk', count: risk[RiskLevel.low] ?? 0, total: analyticsController.totalEmployees, color: c.riskLow, bg: c.riskLowBg)),
-                          const SizedBox(width: 10),
-                          Expanded(child: _RiskLegendTile(label: 'Medium Risk', count: risk[RiskLevel.medium] ?? 0, total: analyticsController.totalEmployees, color: c.riskMedium, bg: c.riskMediumBg)),
-                          const SizedBox(width: 10),
-                          Expanded(child: _RiskLegendTile(label: 'High Risk', count: risk[RiskLevel.high] ?? 0, total: analyticsController.totalEmployees, color: c.riskHigh, bg: c.riskHighBg)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 24),
                 const SectionHeader(title: 'Late Arrival Frequency'),
                 AppCard(
                   padding: const EdgeInsets.all(16),
@@ -252,33 +228,6 @@ class _HrAnalyticsScreenState extends State<HrAnalyticsScreen> {
             );
           },
         ),
-      ),
-    );
-  }
-}
-
-class _RiskLegendTile extends StatelessWidget {
-  final String label;
-  final int count;
-  final int total;
-  final Color color;
-  final Color bg;
-  const _RiskLegendTile({required this.label, required this.count, required this.total, required this.color, required this.bg});
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.colors;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        children: [
-          Text('$count', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: color, fontFeatures: const [FontFeature.tabularFigures()])),
-          const SizedBox(height: 2),
-          Text(total == 0 ? '0%' : '${((count / total) * 100).toInt()}%', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color.withValues(alpha: 0.7), fontFeatures: const [FontFeature.tabularFigures()])),
-          const SizedBox(height: 4),
-          Text(label, style: TextStyle(fontSize: 10, color: c.textSecondary, fontWeight: FontWeight.w600), textAlign: TextAlign.center),
-        ],
       ),
     );
   }

@@ -18,6 +18,8 @@ IconData _iconFor(String type) {
       return Icons.insights_outlined;
     case 'device_change':
       return Icons.phone_android_rounded;
+    case 'announcement':
+      return Icons.campaign_rounded;
     default:
       return Icons.notifications_none_rounded;
   }
@@ -37,6 +39,8 @@ AppHue _hueFor(String type) {
       return AppHue.amber;
     case 'device_change':
       return AppHue.primary;
+    case 'announcement':
+      return AppHue.purple;
     default:
       return AppHue.infoBlue;
   }
