@@ -62,7 +62,18 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> _loadProfile() async {
-    final row = await AuthService.fetchMyProfile();
+    Map<String, dynamic>? row;
+    try {
+      row = await AuthService.fetchMyProfile();
+    } catch (e) {
+      // A transient failure here (e.g. no network at app startup) must not
+      // leave the splash screen waiting forever — fall back to signed-out
+      // so the user reaches the login screen and can retry.
+      errorMessage = 'Could not load your profile: $e';
+      status = AuthStatus.signedOut;
+      notifyListeners();
+      return;
+    }
     if (row == null) {
       errorMessage = 'No profile found for this account. Contact HR.';
       status = AuthStatus.signedOut;

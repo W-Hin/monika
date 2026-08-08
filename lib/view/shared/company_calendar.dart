@@ -131,6 +131,16 @@ class _CompanyCalendarScreenState extends State<CompanyCalendarScreen> {
             if (calendarController.loading && calendarController.events.isEmpty) {
               return const Center(child: CircularProgressIndicator());
             }
+            if (calendarController.errorMessage != null && calendarController.events.isEmpty) {
+              return Center(
+                child: EmptyState(
+                  icon: Icons.error_outline_rounded,
+                  title: 'Could not load the calendar',
+                  subtitle: calendarController.errorMessage!,
+                  onRetry: calendarController.load,
+                ),
+              );
+            }
             final events = calendarController.events;
             final filtered = _filter == 'All' ? events : events.where((e) => e.type == _filter).toList();
             final holidayCount = events.where((e) => e.type == 'Public Holiday').length;

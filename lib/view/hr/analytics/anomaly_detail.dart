@@ -151,6 +151,7 @@ class _AnomalyCard extends StatelessWidget {
       case 'Shared-device violation': return Icons.devices_rounded;
       case 'Out-of-zone clock-in': return Icons.location_off_rounded;
       case 'WiFi SSID mismatch': return Icons.wifi_off_rounded;
+      case 'Early clock-out': return Icons.logout_rounded;
       default: return Icons.schedule_rounded;
     }
   }

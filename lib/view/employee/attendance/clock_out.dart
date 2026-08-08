@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../../controller/attendance_controller.dart';
+import '../../../model/models.dart';
 
 enum _StepState { pending, checking, success, failed }
 
@@ -18,6 +19,8 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
   bool _isRunning = false;
   bool _isComplete = false;
   String _recordedTime = '';
+  bool _early = false;
+  String? _flagReason;
   String? _submitError;
 
   Future<void> _runValidation() async {
@@ -50,6 +53,8 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
         _isRunning = false;
         _isComplete = true;
         _recordedTime = record.clockOut ?? '';
+        _early = record.status == AttendanceStatus.flagged;
+        _flagReason = record.flagReason;
       });
     } catch (e) {
       if (!mounted) return;
@@ -95,7 +100,7 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: c.riskLowBg,
+                          color: _early ? c.riskHighBg : c.riskLowBg,
                           borderRadius: BorderRadius.circular(18),
                           boxShadow: [c.shadowTinted()],
                         ),
@@ -104,12 +109,13 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                             Container(
                               width: 56,
                               height: 56,
-                              decoration: BoxDecoration(color: c.primary, shape: BoxShape.circle),
-                              child: const Icon(Icons.check_rounded, color: Colors.white, size: 30),
+                              decoration: BoxDecoration(color: _early ? c.riskHigh : c.primary, shape: BoxShape.circle),
+                              child: Icon(_early ? Icons.flag_rounded : Icons.check_rounded, color: Colors.white, size: 30),
                             ),
                             const SizedBox(height: 14),
                             Text(
-                              'Clock-Out Successful',
+                              _early ? 'Clock-Out Recorded — Flagged for Review' : 'Clock-Out Successful',
+                              textAlign: TextAlign.center,
                               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: c.textPrimary),
                             ),
                             const SizedBox(height: 4),
@@ -117,6 +123,14 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                               'Recorded at $_recordedTime',
                               style: TextStyle(fontSize: 12.5, color: c.textSecondary),
                             ),
+                            if (_early && _flagReason != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                _flagReason!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 12, color: c.riskHigh, fontWeight: FontWeight.w600),
+                              ),
+                            ],
                           ],
                         ),
                       ),

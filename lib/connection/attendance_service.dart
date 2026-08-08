@@ -63,10 +63,15 @@ class AttendanceService {
         .single();
   }
 
-  static Future<Map<String, dynamic>> clockOut(int recordId) async {
+  static Future<Map<String, dynamic>> clockOut(int recordId, {bool early = false}) async {
+    final update = <String, dynamic>{'clock_out_at': DateTime.now().toIso8601String()};
+    if (early) {
+      update['status'] = 'flagged';
+      update['flag_reason'] = 'Clocked out earlier than the scheduled end time';
+    }
     return _client
         .from('attendance_records')
-        .update({'clock_out_at': DateTime.now().toIso8601String()})
+        .update(update)
         .eq('id', recordId)
         .select()
         .single();

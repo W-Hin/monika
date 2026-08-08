@@ -16,6 +16,8 @@ IconData _iconFor(String type) {
       return Icons.flag_rounded;
     case 'pe':
       return Icons.insights_outlined;
+    case 'device_change':
+      return Icons.phone_android_rounded;
     default:
       return Icons.notifications_none_rounded;
   }
@@ -33,6 +35,8 @@ AppHue _hueFor(String type) {
       return AppHue.riskHigh;
     case 'pe':
       return AppHue.amber;
+    case 'device_change':
+      return AppHue.primary;
     default:
       return AppHue.infoBlue;
   }
@@ -102,6 +106,16 @@ class _NotificationScreenState extends State<NotificationScreen> {
           builder: (context, _) {
             if (notificationController.loading && notificationController.items.isEmpty) {
               return const Center(child: CircularProgressIndicator());
+            }
+            if (notificationController.errorMessage != null && notificationController.items.isEmpty) {
+              return Center(
+                child: EmptyState(
+                  icon: Icons.error_outline_rounded,
+                  title: 'Could not load notifications',
+                  subtitle: notificationController.errorMessage!,
+                  onRetry: notificationController.load,
+                ),
+              );
             }
             final notifs = notificationController.items;
             if (notifs.isEmpty) {

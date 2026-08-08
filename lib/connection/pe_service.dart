@@ -74,6 +74,14 @@ class PeService {
     }
   }
 
+  /// HR — deletes a KPI template. Its items cascade-delete; any
+  /// performance_evaluations referencing it fall back to a null
+  /// template_id (existing FK is ON DELETE SET NULL) rather than being
+  /// deleted themselves.
+  static Future<void> deleteTemplate(int id) async {
+    await _client.from('kpi_templates').delete().eq('id', id);
+  }
+
   /// Upserts the evaluation (unique on user_id+year, so re-submitting the
   /// same year cleanly replaces it) and replaces its scores.
   static Future<void> submitEvaluation({

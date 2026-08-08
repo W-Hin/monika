@@ -41,9 +41,14 @@ class CalendarController extends ChangeNotifier {
 
   Future<void> load() async {
     loading = true;
+    errorMessage = null;
     notifyListeners();
-    final rows = await CalendarService.fetchAll();
-    events = rows.map(_mapEvent).toList();
+    try {
+      final rows = await CalendarService.fetchAll();
+      events = rows.map(_mapEvent).toList();
+    } catch (e) {
+      errorMessage = 'Could not load calendar events: $e';
+    }
     loading = false;
     notifyListeners();
   }

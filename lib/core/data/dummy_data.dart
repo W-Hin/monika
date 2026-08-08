@@ -34,15 +34,6 @@ class DummyData {
     deviceBoundSince: '03 Apr 2023',
   );
 
-  static final List<AttendanceRecord> attendanceHistory = [
-    const AttendanceRecord(date: 'Mon, 22 Jun', clockIn: '08:57 AM', clockOut: '06:02 PM', status: AttendanceStatus.onTime),
-    const AttendanceRecord(date: 'Fri, 19 Jun', clockIn: '09:08 AM', clockOut: '06:00 PM', status: AttendanceStatus.late, flagReason: 'Clocked in 8 min after grace period'),
-    const AttendanceRecord(date: 'Thu, 18 Jun', clockIn: '08:50 AM', clockOut: '05:58 PM', status: AttendanceStatus.onTime),
-    const AttendanceRecord(date: 'Wed, 17 Jun', clockIn: '—', clockOut: '—', status: AttendanceStatus.leave),
-    const AttendanceRecord(date: 'Tue, 16 Jun', clockIn: '08:45 AM', clockOut: '06:10 PM', status: AttendanceStatus.onTime),
-    const AttendanceRecord(date: 'Mon, 15 Jun', clockIn: '09:02 AM', clockOut: '—', status: AttendanceStatus.flagged, flagReason: 'GPS outside geofence radius'),
-  ];
-
   static final List<LeaveApplication> employeeLeaveApplications = [
     const LeaveApplication(id: 'LV-2201', employeeName: 'Hin Chen Wei', leaveType: 'Annual Leave', startDate: '02 Jul', endDate: '04 Jul', days: 3, reason: 'Family trip to Langkawi', status: LeaveStatus.pending),
     const LeaveApplication(id: 'LV-2187', employeeName: 'Hin Chen Wei', leaveType: 'Medical Leave', startDate: '12 Jun', endDate: '12 Jun', days: 1, reason: 'Fever, MC attached', status: LeaveStatus.approved),

@@ -24,13 +24,6 @@ class _HrPeScreenState extends State<HrPeScreen> {
 
   final _commentsController = TextEditingController();
 
-  String _categoryFor(String kpiName) {
-    if (kpiName.contains('Leadership')) return 'Leadership';
-    if (kpiName.contains('Team') || kpiName.contains('Communication') || kpiName.contains('Customer')) return 'Behavioural';
-    if (kpiName.contains('Attendance')) return 'Operational';
-    return 'Technical';
-  }
-
   KpiTemplate _templateFor(String department) {
     final templates = peController.templates;
     final match = templates.where((t) => t.department == department);
@@ -47,7 +40,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
               'name': i.name,
               'weightage': i.weightage,
               'score': 70.0,
-              'category': _categoryFor(i.name),
+              'category': i.category,
             })
         .toList();
   }
@@ -97,7 +90,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
                   'name': k.name,
                   'weightage': k.weightage,
                   'score': k.score,
-                  'category': _categoryFor(k.name),
+                  'category': k.category,
                 })
             .toList();
         _commentsController.text = existing.comments;
@@ -126,16 +119,29 @@ class _HrPeScreenState extends State<HrPeScreen> {
   }
 
   void _pickTemplate() {
+    // Only templates compatible with the selected employee's department
+    // (their own department's template, or an "All Departments" one) —
+    // otherwise HR could apply e.g. a Sales-authored template to a Design
+    // employee, which never made sense as a choice.
+    final dept = _selectedEmployee?.department;
+    final compatible = peController.templates.where((t) => t.department == dept || t.department == 'All Departments').toList();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _PickerSheet<KpiTemplate>(
         title: 'Select KPI Template',
-        items: peController.templates,
+        items: compatible,
         labelBuilder: (t) => t.name,
         subtitleBuilder: (t) => '${t.department} · ${t.items.length} KPIs',
         onSelected: (t) => setState(() => _loadTemplateDefaults(t)),
+        onDelete: (t) async {
+          final success = await peController.deleteTemplate(t);
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(success ? '✓ Template deleted' : peController.errorMessage ?? 'Could not delete template')),
+          );
+        },
       ),
     );
   }
@@ -633,6 +639,7 @@ class _PickerSheet<T> extends StatelessWidget {
   final String Function(T) labelBuilder;
   final String Function(T) subtitleBuilder;
   final ValueChanged<T> onSelected;
+  final ValueChanged<T>? onDelete;
 
   const _PickerSheet({
     required this.title,
@@ -640,6 +647,7 @@ class _PickerSheet<T> extends StatelessWidget {
     required this.labelBuilder,
     required this.subtitleBuilder,
     required this.onSelected,
+    this.onDelete,
   });
 
   @override
@@ -669,6 +677,33 @@ class _PickerSheet<T> extends StatelessWidget {
                   contentPadding: EdgeInsets.zero,
                   title: Text(labelBuilder(item), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                   subtitle: Text(subtitleBuilder(item), style: TextStyle(fontSize: 12, color: c.textMuted)),
+                  trailing: onDelete == null
+                      ? null
+                      : IconButton(
+                          icon: Icon(Icons.delete_outline_rounded, size: 20, color: c.riskHigh),
+                          onPressed: () async {
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (dialogContext) => AlertDialog(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                title: const Text('Delete this template?'),
+                                content: Text('"${labelBuilder(item)}" will be permanently removed.'),
+                                actions: [
+                                  TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+                                  ElevatedButton(
+                                    onPressed: () => Navigator.of(dialogContext).pop(true),
+                                    style: ElevatedButton.styleFrom(backgroundColor: c.riskHigh),
+                                    child: const Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirmed != true) return;
+                            if (!context.mounted) return;
+                            Navigator.of(context).pop();
+                            onDelete!(item);
+                          },
+                        ),
                   onTap: () {
                     onSelected(item);
                     Navigator.of(context).pop();
@@ -690,13 +725,26 @@ class _CreateTemplateSheet extends StatefulWidget {
   State<_CreateTemplateSheet> createState() => _CreateTemplateSheetState();
 }
 
+class _KpiItemDraft {
+  final nameCtrl = TextEditingController();
+  final weightCtrl = TextEditingController();
+  String category = 'Technical';
+
+  void dispose() {
+    nameCtrl.dispose();
+    weightCtrl.dispose();
+  }
+}
+
 class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
   static const _departments = ['All Departments', 'Engineering', 'Sales', 'Operations', 'Marketing', 'Design', 'Human Resources', 'Finance'];
+  static const _categories = ['Technical', 'Behavioural', 'Leadership'];
 
   final _name = TextEditingController();
   String _department = 'All Departments';
-  final List<(TextEditingController, TextEditingController)> _items = [];
+  final List<_KpiItemDraft> _items = [];
   bool _saving = false;
+  String? _errorText;
 
   @override
   void initState() {
@@ -708,55 +756,54 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
   @override
   void dispose() {
     _name.dispose();
-    for (final (n, w) in _items) {
-      n.dispose();
-      w.dispose();
+    for (final i in _items) {
+      i.dispose();
     }
     super.dispose();
   }
 
   void _addItem() {
-    setState(() => _items.add((TextEditingController(), TextEditingController())));
+    setState(() => _items.add(_KpiItemDraft()));
   }
 
   void _removeItem(int i) {
     setState(() {
-      _items[i].$1.dispose();
-      _items[i].$2.dispose();
+      _items[i].dispose();
       _items.removeAt(i);
     });
   }
 
-  double get _totalWeightage => _items.fold(0.0, (sum, item) => sum + (double.tryParse(item.$2.text) ?? 0));
+  double get _totalWeightage => _items.fold(0.0, (sum, item) => sum + (double.tryParse(item.weightCtrl.text) ?? 0));
 
   Future<void> _save() async {
     final name = _name.text.trim();
     final total = _totalWeightage;
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a template name')));
+      setState(() => _errorText = 'Enter a template name.');
       return;
     }
-    if (_items.any((i) => i.$1.text.trim().isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Every KPI needs a name')));
+    if (_items.any((i) => i.nameCtrl.text.trim().isEmpty)) {
+      setState(() => _errorText = 'Every KPI needs a name.');
       return;
     }
     if ((total - 100).abs() > 0.01) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Weightages must total 100% (currently ${total.toStringAsFixed(0)}%)')));
+      setState(() => _errorText = 'Weightages must total 100% (currently ${total.toStringAsFixed(0)}%).');
       return;
     }
 
-    setState(() => _saving = true);
+    setState(() {
+      _errorText = null;
+      _saving = true;
+    });
     final success = await peController.createTemplate(
       name: name,
       departmentName: _department,
-      items: _items.map((i) => KpiTemplateItem(name: i.$1.text.trim(), weightage: double.tryParse(i.$2.text) ?? 0)).toList(),
+      items: _items.map((i) => KpiTemplateItem(name: i.nameCtrl.text.trim(), weightage: double.tryParse(i.weightCtrl.text) ?? 0, category: i.category)).toList(),
     );
     if (!mounted) return;
     setState(() => _saving = false);
     if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(peController.errorMessage ?? 'Could not create template')),
-      );
+      setState(() => _errorText = peController.errorMessage ?? 'Could not create template.');
       return;
     }
     Navigator.of(context).pop();
@@ -820,31 +867,54 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
             ),
             const SizedBox(height: 10),
             ...List.generate(_items.length, (i) {
-              final (nameCtrl, weightCtrl) = _items[i];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
+              final item = _items[i];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      flex: 3,
-                      child: TextField(
-                        controller: nameCtrl,
-                        decoration: const InputDecoration(hintText: 'KPI name', isDense: true),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: TextField(
+                            controller: item.nameCtrl,
+                            decoration: const InputDecoration(hintText: 'KPI name', isDense: true),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 1,
+                          child: TextField(
+                            controller: item.weightCtrl,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(hintText: '%', isDense: true),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: _items.length > 1 ? () => _removeItem(i) : null,
+                          icon: Icon(Icons.remove_circle_outline_rounded, size: 20, color: c.riskHigh),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: 1,
-                      child: TextField(
-                        controller: weightCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        decoration: const InputDecoration(hintText: '%', isDense: true),
-                        onChanged: (_) => setState(() {}),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _items.length > 1 ? () => _removeItem(i) : null,
-                      icon: Icon(Icons.remove_circle_outline_rounded, size: 20, color: c.riskHigh),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      children: _categories.map((cat) {
+                        final sel = item.category == cat;
+                        return ChoiceChip(
+                          label: Text(cat, style: const TextStyle(fontSize: 11.5)),
+                          selected: sel,
+                          visualDensity: VisualDensity.compact,
+                          onSelected: (_) => setState(() => item.category = cat),
+                          selectedColor: c.primaryLight,
+                          labelStyle: TextStyle(color: sel ? c.primaryDark : c.textSecondary, fontWeight: FontWeight.w700),
+                          side: BorderSide(color: sel ? c.primary : Colors.transparent),
+                        );
+                      }).toList(),
                     ),
                   ],
                 ),
@@ -855,6 +925,15 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
               icon: const Icon(Icons.add_rounded, size: 18),
               label: const Text('Add KPI'),
             ),
+            if (_errorText != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: c.riskHighBg, borderRadius: BorderRadius.circular(10)),
+                child: Text(_errorText!, style: TextStyle(fontSize: 12.5, color: c.riskHigh, fontWeight: FontWeight.w600)),
+              ),
+            ],
             const SizedBox(height: 12),
 
             PrimaryButton(

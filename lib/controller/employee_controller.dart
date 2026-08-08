@@ -5,24 +5,30 @@ import '../model/models.dart';
 class EmployeeController extends ChangeNotifier {
   List<TeamMemberSummary> employees = [];
   bool loading = false;
+  String? errorMessage;
 
   Future<void> loadEmployees() async {
     loading = true;
+    errorMessage = null;
     notifyListeners();
-    final rows = await EmployeeService.fetchAll();
-    final attendanceRows = await EmployeeService.fetchAllAttendanceStatuses();
+    try {
+      final rows = await EmployeeService.fetchAll();
+      final attendanceRows = await EmployeeService.fetchAllAttendanceStatuses();
 
-    final totalByUser = <String, int>{};
-    final presentByUser = <String, int>{};
-    for (final r in attendanceRows) {
-      final uid = r['user_id'] as String;
-      totalByUser[uid] = (totalByUser[uid] ?? 0) + 1;
-      if (r['status'] == 'on_time' || r['status'] == 'late') {
-        presentByUser[uid] = (presentByUser[uid] ?? 0) + 1;
+      final totalByUser = <String, int>{};
+      final presentByUser = <String, int>{};
+      for (final r in attendanceRows) {
+        final uid = r['user_id'] as String;
+        totalByUser[uid] = (totalByUser[uid] ?? 0) + 1;
+        if (r['status'] == 'on_time' || r['status'] == 'late') {
+          presentByUser[uid] = (presentByUser[uid] ?? 0) + 1;
+        }
       }
-    }
 
-    employees = rows.map((row) => _mapEmployee(row, totalByUser, presentByUser)).toList();
+      employees = rows.map((row) => _mapEmployee(row, totalByUser, presentByUser)).toList();
+    } catch (e) {
+      errorMessage = 'Could not load employees: $e';
+    }
     loading = false;
     notifyListeners();
   }

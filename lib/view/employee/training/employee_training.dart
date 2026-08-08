@@ -15,7 +15,7 @@ class EmployeeTrainingScreen extends StatefulWidget {
 
 class _EmployeeTrainingScreenState extends State<EmployeeTrainingScreen> {
   int _tab = 0;
-  final _tabs = const ['Recommended', 'Mandatory', 'All Programs', 'Completed'];
+  final _tabs = const ['All Programs', 'Recommended', 'Mandatory', 'Completed'];
 
   @override
   void initState() {
@@ -43,16 +43,16 @@ class _EmployeeTrainingScreenState extends State<EmployeeTrainingScreen> {
             List<TrainingProgram> list;
             switch (_tab) {
               case 1:
-                list = mandatory;
+                list = recommended;
                 break;
               case 2:
-                list = all;
+                list = mandatory;
                 break;
               case 3:
                 list = completed;
                 break;
               default:
-                list = recommended;
+                list = all;
             }
 
             return Column(
@@ -99,7 +99,7 @@ class _EmployeeTrainingScreenState extends State<EmployeeTrainingScreen> {
                           ? EmptyState(
                               icon: Icons.school_outlined,
                               title: 'No programmes here yet',
-                              subtitle: _tab == 0
+                              subtitle: _tab == 1
                                   ? 'Check back after your next performance evaluation.'
                                   : 'Nothing in this category right now.',
                             )

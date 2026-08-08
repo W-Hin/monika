@@ -38,11 +38,16 @@ class PayrollController extends ChangeNotifier {
 
   Future<void> loadMy() async {
     loading = true;
+    errorMessage = null;
     notifyListeners();
-    final currentRow = await PayrollService.fetchMyCurrentMonth();
-    myCurrentMonth = currentRow != null ? _mapRow(currentRow) : null;
-    final historyRows = await PayrollService.fetchMyHistory();
-    myHistory = historyRows.map(_mapRow).toList();
+    try {
+      final currentRow = await PayrollService.fetchMyCurrentMonth();
+      myCurrentMonth = currentRow != null ? _mapRow(currentRow) : null;
+      final historyRows = await PayrollService.fetchMyHistory();
+      myHistory = historyRows.map(_mapRow).toList();
+    } catch (e) {
+      errorMessage = 'Could not load payroll: $e';
+    }
     loading = false;
     notifyListeners();
   }
@@ -50,9 +55,14 @@ class PayrollController extends ChangeNotifier {
   Future<void> loadAllForHr({DateTime? month}) async {
     if (month != null) hrSelectedMonth = month;
     loading = true;
+    errorMessage = null;
     notifyListeners();
-    final rows = await PayrollService.fetchAllForMonth(hrSelectedMonth);
-    allForMonth = rows.map(_mapRow).toList();
+    try {
+      final rows = await PayrollService.fetchAllForMonth(hrSelectedMonth);
+      allForMonth = rows.map(_mapRow).toList();
+    } catch (e) {
+      errorMessage = 'Could not load payroll: $e';
+    }
     loading = false;
     notifyListeners();
   }

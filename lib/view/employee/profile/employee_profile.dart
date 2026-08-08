@@ -12,6 +12,7 @@ import '../../hr/hr_shell.dart';
 import '../../shared/company_calendar.dart';
 import '../../shared/settings_placeholder.dart';
 import '../pe/pe_detail.dart';
+import '../../../controller/device_request_controller.dart';
 
 class EmployeeProfileScreen extends StatefulWidget {
   const EmployeeProfileScreen({super.key});
@@ -73,10 +74,18 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
           ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('✓ Device change request submitted to HR')),
+            onPressed: () async {
+              final reason = reasonController.text.trim();
+              final navigator = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
+              final success = await deviceRequestController.submit(
+                reason.isEmpty ? 'No reason given' : reason,
+              );
+              navigator.pop();
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text(success ? '✓ Device change request submitted to HR' : deviceRequestController.errorMessage ?? 'Could not submit request'),
+                ),
               );
             },
             child: const Text('Submit Request'),

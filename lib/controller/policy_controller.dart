@@ -46,30 +46,34 @@ class PolicyController extends ChangeNotifier {
 
   Future<void> load() async {
     loading = true;
+    errorMessage = null;
     notifyListeners();
-    final row = await PolicyService.fetch();
+    try {
+      final row = await PolicyService.fetch();
 
-    workStartTime = _timeToHHmm(row['work_start_time'] as String);
-    workEndTime = _timeToHHmm(row['work_end_time'] as String);
-    gracePeriodMinutes = row['grace_period_minutes'] as int;
-    geofenceRadiusMeters = row['geofence_radius_meters'] as int;
-    officeWifiSsid = row['office_wifi_ssid'] as String;
+      workStartTime = _timeToHHmm(row['work_start_time'] as String);
+      workEndTime = _timeToHHmm(row['work_end_time'] as String);
+      gracePeriodMinutes = row['grace_period_minutes'] as int;
+      geofenceRadiusMeters = row['geofence_radius_meters'] as int;
+      officeWifiSsid = row['office_wifi_ssid'] as String;
 
-    lateWeight = (row['late_weight'] as num).toDouble();
-    outOfZoneWeight = (row['out_of_zone_weight'] as num).toDouble();
-    sharedDeviceWeight = (row['shared_device_weight'] as num).toDouble();
-    wifiMismatchWeight = (row['wifi_mismatch_weight'] as num).toDouble();
+      lateWeight = (row['late_weight'] as num).toDouble();
+      outOfZoneWeight = (row['out_of_zone_weight'] as num).toDouble();
+      sharedDeviceWeight = (row['shared_device_weight'] as num).toDouble();
+      wifiMismatchWeight = (row['wifi_mismatch_weight'] as num).toDouble();
 
-    lateDeduction = (row['late_deduction'] as num).toDouble();
-    absentDeduction = (row['absent_deduction'] as num).toDouble();
-    unpaidLeaveDailyRate = (row['unpaid_leave_daily_rate'] as num).toDouble();
+      lateDeduction = (row['late_deduction'] as num).toDouble();
+      absentDeduction = (row['absent_deduction'] as num).toDouble();
+      unpaidLeaveDailyRate = (row['unpaid_leave_daily_rate'] as num).toDouble();
 
-    leadershipThreshold = (row['leadership_threshold'] as num).toDouble();
-    technicalThreshold = (row['technical_threshold'] as num).toDouble();
-    behaviouralThreshold = (row['behavioural_threshold'] as num).toDouble();
-
+      leadershipThreshold = (row['leadership_threshold'] as num).toDouble();
+      technicalThreshold = (row['technical_threshold'] as num).toDouble();
+      behaviouralThreshold = (row['behavioural_threshold'] as num).toDouble();
+      loaded = true;
+    } catch (e) {
+      errorMessage = 'Could not load policy configuration: $e';
+    }
     loading = false;
-    loaded = true;
     notifyListeners();
   }
 

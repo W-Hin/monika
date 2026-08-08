@@ -35,6 +35,7 @@ class AnalyticsController extends ChangeNotifier {
   String peSummary = '';
 
   bool loading = false;
+  String? errorMessage;
 
   static final _weekdayFormat = DateFormat('E');
 
@@ -63,31 +64,36 @@ class AnalyticsController extends ChangeNotifier {
   Future<void> load({String? period}) async {
     if (period != null) this.period = period;
     loading = true;
+    errorMessage = null;
     notifyListeners();
 
-    final (start, endExclusive) = _rangeFor(this.period);
+    try {
+      final (start, endExclusive) = _rangeFor(this.period);
 
-    final attendanceRows = await AnalyticsService.fetchAttendanceRecords(start: start, endExclusive: endExclusive);
-    final anomalyCount = await AnalyticsService.fetchAnomalyCount(start: start, endExclusive: endExclusive);
-    final onLeave = await AnalyticsService.fetchOnLeaveTodayCount();
-    final pending = await AnalyticsService.fetchPendingLeaveCount();
+      final attendanceRows = await AnalyticsService.fetchAttendanceRecords(start: start, endExclusive: endExclusive);
+      final anomalyCount = await AnalyticsService.fetchAnomalyCount(start: start, endExclusive: endExclusive);
+      final onLeave = await AnalyticsService.fetchOnLeaveTodayCount();
+      final pending = await AnalyticsService.fetchPendingLeaveCount();
 
-    final today = DateTime.now();
-    final todayStart = DateTime(today.year, today.month, today.day);
-    final todayCount = await AnalyticsService.fetchAnomalyCount(start: todayStart, endExclusive: todayStart.add(const Duration(days: 1)));
+      final today = DateTime.now();
+      final todayStart = DateTime(today.year, today.month, today.day);
+      final todayCount = await AnalyticsService.fetchAnomalyCount(start: todayStart, endExclusive: todayStart.add(const Duration(days: 1)));
 
-    final onTimeOrLate = attendanceRows.where((r) => r['status'] == 'on_time' || r['status'] == 'late').length;
-    attendanceRate = attendanceRows.isEmpty ? 0 : onTimeOrLate / attendanceRows.length;
-    lateArrivals = attendanceRows.where((r) => r['status'] == 'late').length;
-    flaggedEvents = anomalyCount;
-    flaggedToday = todayCount;
-    onLeaveToday = onLeave;
-    pendingLeaveCount = pending;
+      final onTimeOrLate = attendanceRows.where((r) => r['status'] == 'on_time' || r['status'] == 'late').length;
+      attendanceRate = attendanceRows.isEmpty ? 0 : onTimeOrLate / attendanceRows.length;
+      lateArrivals = attendanceRows.where((r) => r['status'] == 'late').length;
+      flaggedEvents = anomalyCount;
+      flaggedToday = todayCount;
+      onLeaveToday = onLeave;
+      pendingLeaveCount = pending;
 
-    await _loadWeeklyTrend();
-    await _loadRiskDistribution();
-    await _loadTopLateEmployees(start, endExclusive);
-    await _loadExportSummaries(start, endExclusive);
+      await _loadWeeklyTrend();
+      await _loadRiskDistribution();
+      await _loadTopLateEmployees(start, endExclusive);
+      await _loadExportSummaries(start, endExclusive);
+    } catch (e) {
+      errorMessage = 'Could not load analytics: $e';
+    }
 
     loading = false;
     notifyListeners();

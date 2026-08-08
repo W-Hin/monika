@@ -73,6 +73,7 @@ class AppUser {
 }
 
 class AttendanceRecord {
+  final DateTime workDate;
   final String date;
   final String clockIn;
   final String? clockOut;
@@ -80,6 +81,7 @@ class AttendanceRecord {
   final String? flagReason;
 
   const AttendanceRecord({
+    required this.workDate,
     required this.date,
     required this.clockIn,
     this.clockOut,
@@ -118,7 +120,8 @@ class KpiItem {
   final String name;
   final double weightage;
   final double score; // out of 100
-  const KpiItem({required this.name, required this.weightage, required this.score});
+  final String category; // 'Technical' | 'Behavioural' | 'Leadership'
+  const KpiItem({required this.name, required this.weightage, required this.score, this.category = 'Technical'});
 }
 
 class PerformanceEvaluation {
@@ -317,7 +320,8 @@ class TeamMemberSummary {
 class KpiTemplateItem {
   final String name;
   final double weightage;
-  const KpiTemplateItem({required this.name, required this.weightage});
+  final String category; // 'Technical' | 'Behavioural' | 'Leadership'
+  const KpiTemplateItem({required this.name, required this.weightage, this.category = 'Technical'});
 }
 
 class KpiTemplate {
@@ -343,6 +347,24 @@ class TrainingCompletionRecord {
     required this.programTitle,
     required this.progress,
     this.performanceScore,
+  });
+}
+
+class DeviceChangeRequest {
+  final int id;
+  final String userUuid;
+  final String employeeName;
+  final String reason;
+  final String status; // 'pending' | 'approved' | 'rejected'
+  final DateTime createdAt;
+
+  const DeviceChangeRequest({
+    required this.id,
+    required this.userUuid,
+    required this.employeeName,
+    required this.reason,
+    required this.status,
+    required this.createdAt,
   });
 }
 

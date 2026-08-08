@@ -9,6 +9,7 @@ import '../model/models.dart';
 class NotificationController extends ChangeNotifier {
   List<AppNotification> items = [];
   bool loading = false;
+  String? errorMessage;
   RealtimeChannel? _channel;
 
   int get unreadCount => items.where((n) => !n.isRead).length;
@@ -26,9 +27,14 @@ class NotificationController extends ChangeNotifier {
 
   Future<void> load() async {
     loading = true;
+    errorMessage = null;
     notifyListeners();
-    final rows = await NotificationService.fetchMine();
-    items = rows.map(_mapRow).toList();
+    try {
+      final rows = await NotificationService.fetchMine();
+      items = rows.map(_mapRow).toList();
+    } catch (e) {
+      errorMessage = 'Could not load notifications: $e';
+    }
     loading = false;
     notifyListeners();
   }

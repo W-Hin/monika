@@ -10,6 +10,7 @@ import '../pe/hr_pe.dart';
 import '../training/hr_training.dart';
 import '../../shared/company_calendar.dart';
 import '../../shared/settings_placeholder.dart';
+import '../devices/hr_device_requests.dart';
 import '../leave/leave_balances.dart';
 import '../payroll/hr_payroll.dart';
 import '../../auth/set_password_screen.dart';
@@ -147,6 +148,13 @@ class _HrProfileScreenState extends State<HrProfileScreen> {
                     label: 'Company Calendar',
                     color: c.primary,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CompanyCalendarScreen())),
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  _MenuRow(
+                    icon: Icons.phone_android_rounded,
+                    label: 'Device Change Requests',
+                    color: c.amber,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HrDeviceRequestsScreen())),
                   ),
                 ],
               ),

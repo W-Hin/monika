@@ -49,6 +49,7 @@ class AttendanceController extends ChangeNotifier {
   int _geofenceRadius = 100;
   String _officeWifiSsid = 'MONIKA-OFFICE-5G';
   String _workStart = '09:00:00';
+  String _workEnd = '18:00:00';
   int _gracePeriodMinutes = 10;
   bool _policyLoaded = false;
 
@@ -64,22 +65,32 @@ class AttendanceController extends ChangeNotifier {
       _geofenceRadius = (row['geofence_radius_meters'] as num?)?.toInt() ?? _geofenceRadius;
       _officeWifiSsid = row['office_wifi_ssid'] as String? ?? _officeWifiSsid;
       _workStart = row['work_start_time'] as String? ?? _workStart;
+      _workEnd = row['work_end_time'] as String? ?? _workEnd;
       _gracePeriodMinutes = (row['grace_period_minutes'] as num?)?.toInt() ?? _gracePeriodMinutes;
     }
     _policyLoaded = true;
   }
 
   Future<void> loadToday() async {
-    await loadPolicy();
-    final row = await AttendanceService.fetchTodayRecord();
-    _todayRecordId = row?['id'] as int?;
-    todayRecord = row != null ? _mapRecord(row) : null;
+    try {
+      await loadPolicy();
+      final row = await AttendanceService.fetchTodayRecord();
+      _todayRecordId = row?['id'] as int?;
+      todayRecord = row != null ? _mapRecord(row) : null;
+    } catch (_) {
+      // Best-effort — the Home dashboard just shows "Not Clocked In" if
+      // this fails, no error state needed for a background refresh.
+    }
     notifyListeners();
   }
 
   Future<void> loadHistory() async {
-    final rows = await AttendanceService.fetchHistory();
-    history = rows.map(_mapRecord).toList();
+    try {
+      final rows = await AttendanceService.fetchHistory();
+      history = rows.map(_mapRecord).toList();
+    } catch (_) {
+      // Best-effort, same reasoning as loadToday.
+    }
     notifyListeners();
   }
 
@@ -92,6 +103,7 @@ class AttendanceController extends ChangeNotifier {
       orElse: () => AttendanceStatus.onTime,
     );
     return AttendanceRecord(
+      workDate: workDate,
       date: DateFormat('EEE, d MMM').format(workDate),
       clockIn: DateFormat('hh:mm a').format(clockInAt),
       clockOut: clockOutAtRaw != null ? DateFormat('hh:mm a').format(DateTime.parse(clockOutAtRaw).toLocal()) : null,
@@ -342,9 +354,30 @@ class AttendanceController extends ChangeNotifier {
 
   Future<AttendanceRecord?> submitClockOut() async {
     if (_todayRecordId == null) return null;
-    final row = await AttendanceService.clockOut(_todayRecordId!);
+    await loadPolicy();
+    final endParts = _workEnd.split(':');
+    final workEndMinutes = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
+    final now = DateTime.now();
+    final nowMinutes = now.hour * 60 + now.minute;
+    final early = nowMinutes < workEndMinutes - _gracePeriodMinutes;
+
+    final row = await AttendanceService.clockOut(_todayRecordId!, early: early);
     todayRecord = _mapRecord(row);
     notifyListeners();
+
+    if (early) {
+      try {
+        await AnomalyService.createEvent(
+          type: 'early_clockout',
+          details: 'Clocked out ${workEndMinutes - nowMinutes} min before the scheduled end time',
+          severity: 'low',
+          attendanceRecordId: _todayRecordId!,
+        );
+      } catch (_) {
+        // Anomaly bookkeeping is secondary to the clock-out itself.
+      }
+    }
+
     return todayRecord;
   }
 }

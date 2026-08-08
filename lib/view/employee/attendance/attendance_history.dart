@@ -31,11 +31,15 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
         child: ListenableBuilder(
           listenable: attendanceController,
           builder: (context, _) {
-            final records = attendanceController.history;
+            final now = DateTime.now();
+            final records = attendanceController.history.where((r) => r.workDate.year == now.year && r.workDate.month == now.month).toList();
             final flagged = records.where((r) => r.status == AttendanceStatus.flagged).length;
             final late = records.where((r) => r.status == AttendanceStatus.late).length;
-            final onTime = records.where((r) => r.status == AttendanceStatus.onTime).length;
-            final rate = records.isEmpty ? 0 : ((onTime / records.length) * 100).round();
+            // "Present" counts on-time and late alike — being late still
+            // means they showed up. Only flagged clock-ins (or no record at
+            // all) count against the rate.
+            final present = records.where((r) => r.status == AttendanceStatus.onTime || r.status == AttendanceStatus.late).length;
+            final rate = records.isEmpty ? 0 : ((present / records.length) * 100).round();
 
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),

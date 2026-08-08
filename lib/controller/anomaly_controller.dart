@@ -9,12 +9,18 @@ import '../model/models.dart';
 class AnomalyController extends ChangeNotifier {
   List<AnomalyEvent> feed = [];
   bool loading = false;
+  String? errorMessage;
 
   Future<void> loadFeed() async {
     loading = true;
+    errorMessage = null;
     notifyListeners();
-    final rows = await AnomalyService.fetchFeed();
-    feed = rows.map(_mapEvent).toList();
+    try {
+      final rows = await AnomalyService.fetchFeed();
+      feed = rows.map(_mapEvent).toList();
+    } catch (e) {
+      errorMessage = 'Could not load anomaly feed: $e';
+    }
     loading = false;
     notifyListeners();
   }
@@ -47,6 +53,8 @@ class AnomalyController extends ChangeNotifier {
         return 'WiFi SSID mismatch';
       case 'late':
         return 'Repeated late arrival';
+      case 'early_clockout':
+        return 'Early clock-out';
       default:
         return dbType;
     }

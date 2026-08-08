@@ -59,11 +59,16 @@ class TrainingController extends ChangeNotifier {
 
   Future<void> loadMy() async {
     loading = true;
+    errorMessage = null;
     notifyListeners();
-    final catalogRows = await TrainingService.fetchCatalog();
-    final enrollmentRows = await TrainingService.fetchMyEnrollments();
-    final enrollByProgram = {for (final e in enrollmentRows) e['program_id'] as int: e};
-    myPrograms = catalogRows.map((p) => _mergeMy(p, enrollByProgram[p['id'] as int])).toList();
+    try {
+      final catalogRows = await TrainingService.fetchCatalog();
+      final enrollmentRows = await TrainingService.fetchMyEnrollments();
+      final enrollByProgram = {for (final e in enrollmentRows) e['program_id'] as int: e};
+      myPrograms = catalogRows.map((p) => _mergeMy(p, enrollByProgram[p['id'] as int])).toList();
+    } catch (e) {
+      errorMessage = 'Could not load training programmes: $e';
+    }
     loading = false;
     notifyListeners();
   }
@@ -104,43 +109,48 @@ class TrainingController extends ChangeNotifier {
 
   Future<void> loadForHr() async {
     loading = true;
+    errorMessage = null;
     notifyListeners();
-    final catalogRows = await TrainingService.fetchCatalog();
-    final allEnrollRows = await TrainingService.fetchAllEnrollments();
+    try {
+      final catalogRows = await TrainingService.fetchCatalog();
+      final allEnrollRows = await TrainingService.fetchAllEnrollments();
 
-    final countByProgram = <int, int>{};
-    for (final e in allEnrollRows) {
-      final pid = e['program_id'] as int;
-      countByProgram[pid] = (countByProgram[pid] ?? 0) + 1;
+      final countByProgram = <int, int>{};
+      for (final e in allEnrollRows) {
+        final pid = e['program_id'] as int;
+        countByProgram[pid] = (countByProgram[pid] ?? 0) + 1;
+      }
+
+      hrPrograms = catalogRows.map((p) {
+        final deptName = (p['departments'] as Map<String, dynamic>?)?['name'] as String?;
+        final id = p['id'] as int;
+        return TrainingProgram(
+          dbId: id,
+          enrolledCount: countByProgram[id] ?? 0,
+          title: p['title'] as String,
+          category: _categoryToDisplay[p['category']] ?? p['category'] as String,
+          description: p['description'] as String,
+          isMandatory: p['is_mandatory'] as bool,
+          duration: p['duration'] as String,
+          department: deptName,
+        );
+      }).toList();
+
+      completionRecords = allEnrollRows.map((e) {
+        final profile = e['profiles'] as Map<String, dynamic>?;
+        final program = e['training_programs'] as Map<String, dynamic>?;
+        return TrainingCompletionRecord(
+          enrollmentId: e['id'] as int,
+          employeeName: profile?['name'] as String? ?? '',
+          department: '',
+          programTitle: program?['title'] as String? ?? '',
+          progress: (e['progress'] as num).toDouble(),
+          performanceScore: (e['performance_score'] as num?)?.toDouble(),
+        );
+      }).toList();
+    } catch (e) {
+      errorMessage = 'Could not load training data: $e';
     }
-
-    hrPrograms = catalogRows.map((p) {
-      final deptName = (p['departments'] as Map<String, dynamic>?)?['name'] as String?;
-      final id = p['id'] as int;
-      return TrainingProgram(
-        dbId: id,
-        enrolledCount: countByProgram[id] ?? 0,
-        title: p['title'] as String,
-        category: _categoryToDisplay[p['category']] ?? p['category'] as String,
-        description: p['description'] as String,
-        isMandatory: p['is_mandatory'] as bool,
-        duration: p['duration'] as String,
-        department: deptName,
-      );
-    }).toList();
-
-    completionRecords = allEnrollRows.map((e) {
-      final profile = e['profiles'] as Map<String, dynamic>?;
-      final program = e['training_programs'] as Map<String, dynamic>?;
-      return TrainingCompletionRecord(
-        enrollmentId: e['id'] as int,
-        employeeName: profile?['name'] as String? ?? '',
-        department: '',
-        programTitle: program?['title'] as String? ?? '',
-        progress: (e['progress'] as num).toDouble(),
-        performanceScore: (e['performance_score'] as num?)?.toDouble(),
-      );
-    }).toList();
 
     loading = false;
     notifyListeners();

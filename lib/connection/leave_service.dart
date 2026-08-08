@@ -51,11 +51,14 @@ class LeaveService {
     });
   }
 
-  /// HR — every application, joined with the applicant's name.
+  /// HR — every application, joined with the applicant's name. Explicitly
+  /// disambiguated to the user_id FK — leave_applications also has a
+  /// decided_by FK to profiles, so a plain 'profiles(name)' embed is
+  /// ambiguous to PostgREST (PGRST201) and fails outright.
   static Future<List<Map<String, dynamic>>> fetchAllApplications() async {
     final rows = await _client
         .from('leave_applications')
-        .select('*, profiles(name)')
+        .select('*, profiles!leave_applications_user_id_fkey(name)')
         .order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(rows);
   }
