@@ -59,4 +59,16 @@ class EmployeeService {
       'device_bound_at': null,
     }).eq('id', uuid);
   }
+
+  /// Risk score only ever decreases automatically (trg_apply_risk_deduction
+  /// on anomaly_events insert, migration 0022) — there's no scheduled
+  /// decay/recovery, so a clean slate after an employee has addressed
+  /// whatever drove their score down is a deliberate HR action, not
+  /// something the system does on its own.
+  static Future<void> resetRiskScore(String uuid) async {
+    await _client.from('profiles').update({
+      'risk_score': 100,
+      'risk_level': 'low',
+    }).eq('id', uuid);
+  }
 }

@@ -185,6 +185,48 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     );
   }
 
+  void _resetRiskScore() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        final c = dialogContext.colors;
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Reset Risk Score'),
+          content: Text(
+            '${_emp.name}\'s risk score will be reset to 100 (Low Risk). This does not undo any past anomaly events — it only clears the accumulated score, typically after they\'ve addressed whatever drove it down.',
+            style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: c.primary),
+              onPressed: () async {
+                try {
+                  await EmployeeService.resetRiskScore(_emp.uuid);
+                  if (!mounted) return;
+                  setState(() => _emp = _emp.copyWith(risk: RiskLevel.low));
+                  widget.onUpdate(_emp);
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('✓ Risk score reset to 100 (Low Risk)')),
+                  );
+                } catch (e) {
+                  Navigator.of(dialogContext).pop();
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not reset risk score: $e')),
+                  );
+                }
+              },
+              child: const Text('Reset to 100'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _resetDeviceBinding() {
     showDialog(
       context: context,
@@ -335,6 +377,38 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                   ],
                 ),
               ),
+            const SizedBox(height: 24),
+
+            const SectionHeader(title: 'Risk Score'),
+            AppCard(
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(color: c.riskHighBg, borderRadius: BorderRadius.circular(12)),
+                    child: Icon(Icons.shield_outlined, color: c.riskHigh, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        StatusPill.risk(_emp.risk),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Deducted automatically per anomaly; only HR can reset it',
+                          style: TextStyle(fontSize: 11, color: c.textMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _emp.risk == RiskLevel.low ? null : _resetRiskScore,
+                    child: const Text('Reset'),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 24),
 
             const SectionHeader(title: 'Device Binding'),

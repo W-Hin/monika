@@ -23,6 +23,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
   double _outOfZoneWeight = 2;
   double _sharedDeviceWeight = 3;
   double _wifiMismatchWeight = 1;
+  double _earlyClockoutWeight = 0.5;
 
   // Payroll deductions
   final _lateDeduction = TextEditingController(text: '25.00');
@@ -58,6 +59,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
     _outOfZoneWeight = p.outOfZoneWeight;
     _sharedDeviceWeight = p.sharedDeviceWeight;
     _wifiMismatchWeight = p.wifiMismatchWeight;
+    _earlyClockoutWeight = p.earlyClockoutWeight;
     _lateDeduction.text = p.lateDeduction.toStringAsFixed(2);
     _absentDeduction.text = p.absentDeduction.toStringAsFixed(2);
     _unpaidLeaveRate.text = p.unpaidLeaveDailyRate.toStringAsFixed(2);
@@ -79,6 +81,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
       outOfZoneWeight: _outOfZoneWeight,
       sharedDeviceWeight: _sharedDeviceWeight,
       wifiMismatchWeight: _wifiMismatchWeight,
+      earlyClockoutWeight: _earlyClockoutWeight,
       lateDeduction: double.tryParse(_lateDeduction.text.trim()) ?? policyController.lateDeduction,
       absentDeduction: double.tryParse(_absentDeduction.text.trim()) ?? policyController.absentDeduction,
       unpaidLeaveDailyRate: double.tryParse(_unpaidLeaveRate.text.trim()) ?? policyController.unpaidLeaveDailyRate,
@@ -254,6 +257,15 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                   max: 5,
                   onChanged: (v) => setState(() => _sharedDeviceWeight = v),
                   color: c.riskHigh,
+                ),
+                _SliderRow(
+                  label: 'Early Clock-Out',
+                  value: _earlyClockoutWeight,
+                  min: 0.5,
+                  max: 3,
+                  divisions: 5,
+                  onChanged: (v) => setState(() => _earlyClockoutWeight = v),
+                  color: c.riskLow,
                 ),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -582,7 +594,7 @@ class _SliderRow extends StatelessWidget {
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Text(
-                  '${value.toInt()}$suffix',
+                  '${value % 1 == 0 ? value.toInt().toString() : value.toStringAsFixed(1)}$suffix',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,

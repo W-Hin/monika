@@ -11,13 +11,15 @@ import '../connection/policy_service.dart';
 /// by Payroll generation (lib/connection/payroll_service.dart), so
 /// changing it here has a real effect next time payroll is generated.
 /// `lateWeight` / `outOfZoneWeight` / `sharedDeviceWeight` /
-/// `wifiMismatchWeight` (risk score deduction weights) have no consumer
-/// anywhere — profiles.risk_score is never actually auto-decremented by
-/// anything in this app, a separate feature that was never built. The PE
-/// training-trigger thresholds are also not yet read by hr_pe.dart, which
-/// still uses a hardcoded `score < 65` check. Flagging clearly rather than
-/// silently leaving the impression that saving these sliders does more
-/// than it currently does.
+/// `wifiMismatchWeight` / `earlyClockoutWeight` (risk score deduction
+/// weights) are now consumed for real too — `trg_apply_risk_deduction`
+/// (migration 0022) reads them straight from `policy_settings` every time
+/// an anomaly_events row is inserted, so changing a slider here changes
+/// risk_score deductions on the very next anomaly. The PE training-trigger
+/// thresholds are also not yet read by hr_pe.dart, which still uses a
+/// hardcoded `score < 65` check. Flagging clearly rather than silently
+/// leaving the impression that saving these sliders does more than it
+/// currently does.
 class PolicyController extends ChangeNotifier {
   bool loading = false;
   bool loaded = false;
@@ -33,6 +35,7 @@ class PolicyController extends ChangeNotifier {
   double outOfZoneWeight = 2;
   double sharedDeviceWeight = 3;
   double wifiMismatchWeight = 1;
+  double earlyClockoutWeight = 0.5;
 
   double lateDeduction = 25.00;
   double absentDeduction = 120.00;
@@ -61,6 +64,7 @@ class PolicyController extends ChangeNotifier {
       outOfZoneWeight = (row['out_of_zone_weight'] as num).toDouble();
       sharedDeviceWeight = (row['shared_device_weight'] as num).toDouble();
       wifiMismatchWeight = (row['wifi_mismatch_weight'] as num).toDouble();
+      earlyClockoutWeight = (row['early_clockout_weight'] as num).toDouble();
 
       lateDeduction = (row['late_deduction'] as num).toDouble();
       absentDeduction = (row['absent_deduction'] as num).toDouble();
@@ -87,6 +91,7 @@ class PolicyController extends ChangeNotifier {
     required double outOfZoneWeight,
     required double sharedDeviceWeight,
     required double wifiMismatchWeight,
+    required double earlyClockoutWeight,
     required double lateDeduction,
     required double absentDeduction,
     required double unpaidLeaveDailyRate,
@@ -106,6 +111,7 @@ class PolicyController extends ChangeNotifier {
         'out_of_zone_weight': outOfZoneWeight,
         'shared_device_weight': sharedDeviceWeight,
         'wifi_mismatch_weight': wifiMismatchWeight,
+        'early_clockout_weight': earlyClockoutWeight,
         'late_deduction': lateDeduction,
         'absent_deduction': absentDeduction,
         'unpaid_leave_daily_rate': unpaidLeaveDailyRate,

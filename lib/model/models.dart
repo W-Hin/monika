@@ -300,6 +300,7 @@ class TeamMemberSummary {
     bool? isActive,
     String? registeredDevice,
     double? baseSalary,
+    RiskLevel? risk,
   }) =>
       TeamMemberSummary(
         id: id,
@@ -308,7 +309,7 @@ class TeamMemberSummary {
         email: email,
         jobTitle: jobTitle ?? this.jobTitle,
         department: department ?? this.department,
-        risk: risk,
+        risk: risk ?? this.risk,
         attendanceRate: attendanceRate,
         avatarInitials: avatarInitials,
         registeredDevice: registeredDevice ?? this.registeredDevice,
