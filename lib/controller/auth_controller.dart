@@ -123,6 +123,7 @@ class AuthController extends ChangeNotifier {
       role: row['job_title'] as String,
       userRole: userRole,
       riskLevel: riskLevel,
+      riskScore: (row['risk_score'] as num?)?.toInt() ?? 100,
       avatarInitials: row['avatar_initials'] as String,
       employmentDuration: hireDate != null ? _formatEmploymentDuration(hireDate) : '—',
       registeredDevice: row['registered_device_name'] as String? ?? 'Not yet registered',

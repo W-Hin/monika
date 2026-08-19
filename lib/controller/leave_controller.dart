@@ -13,8 +13,23 @@ class LeaveController extends ChangeNotifier {
   List<LeaveApplication> myApplications = [];
   List<LeaveApplication> allApplications = []; // HR
   List<LeaveBalance> allBalances = []; // HR
-  bool loading = false;
-  String? errorMessage;
+
+  // Deliberately separate loading/error state per operation rather than one
+  // shared pair — an HR admin's own EmployeeShell tabs (loadMy) and HrShell
+  // tabs (loadAllForHr/loadAllBalancesForHr) can be mounted *simultaneously*
+  // ("Switch to Admin/Employee View" pushes one shell on top of the other
+  // rather than replacing it, by design — see hr_approvals.dart's comment).
+  // With one shared `loading`/`errorMessage`, a concurrent loadMy() call
+  // could flip `loading` back to false or set a stale `errorMessage` while
+  // loadAllForHr()'s own fetch was still in flight, which is exactly what
+  // made the Approvals list intermittently stay empty after switching views
+  // even though the underlying query had succeeded.
+  bool loadingMy = false;
+  String? myErrorMessage;
+  bool loadingApprovals = false;
+  String? approvalsErrorMessage;
+  bool loadingBalances = false;
+  String? balancesErrorMessage;
 
   static const _typeToDb = {
     'Annual Leave': 'annual',
@@ -69,8 +84,8 @@ class LeaveController extends ChangeNotifier {
   }
 
   Future<void> loadMy() async {
-    loading = true;
-    errorMessage = null;
+    loadingMy = true;
+    myErrorMessage = null;
     notifyListeners();
     try {
       final balanceRow = await LeaveService.fetchMyBalance();
@@ -78,13 +93,13 @@ class LeaveController extends ChangeNotifier {
       final appRows = await LeaveService.fetchMyApplications();
       myApplications = appRows.map(_mapApplication).toList();
     } catch (e) {
-      errorMessage = 'Could not load your leave data: $e';
+      myErrorMessage = 'Could not load your leave data: $e';
     }
-    loading = false;
+    loadingMy = false;
     notifyListeners();
   }
 
-  /// Returns true on success. On failure, sets errorMessage for the
+  /// Returns true on success. On failure, sets myErrorMessage for the
   /// caller to surface and returns false.
   Future<bool> submit({
     required String displayLeaveType,
@@ -92,7 +107,7 @@ class LeaveController extends ChangeNotifier {
     required DateTime endDate,
     required String reason,
   }) async {
-    errorMessage = null;
+    myErrorMessage = null;
     final days = endDate.difference(startDate).inDays + 1;
     try {
       await LeaveService.submitApplication(
@@ -105,23 +120,23 @@ class LeaveController extends ChangeNotifier {
       await loadMy();
       return true;
     } catch (e) {
-      errorMessage = 'Could not submit application: $e';
+      myErrorMessage = 'Could not submit application: $e';
       notifyListeners();
       return false;
     }
   }
 
   Future<void> loadAllForHr() async {
-    loading = true;
-    errorMessage = null;
+    loadingApprovals = true;
+    approvalsErrorMessage = null;
     notifyListeners();
     try {
       final rows = await LeaveService.fetchAllApplications();
       allApplications = rows.map(_mapApplication).toList();
     } catch (e) {
-      errorMessage = 'Could not load leave applications: $e';
+      approvalsErrorMessage = 'Could not load leave applications: $e';
     }
-    loading = false;
+    loadingApprovals = false;
     notifyListeners();
   }
 
@@ -139,16 +154,16 @@ class LeaveController extends ChangeNotifier {
   }
 
   Future<void> loadAllBalancesForHr() async {
-    loading = true;
-    errorMessage = null;
+    loadingBalances = true;
+    balancesErrorMessage = null;
     notifyListeners();
     try {
       final rows = await LeaveService.fetchAllBalances();
       allBalances = rows.map(_mapBalance).toList();
     } catch (e) {
-      errorMessage = 'Could not load leave balances: $e';
+      balancesErrorMessage = 'Could not load leave balances: $e';
     }
-    loading = false;
+    loadingBalances = false;
     notifyListeners();
   }
 

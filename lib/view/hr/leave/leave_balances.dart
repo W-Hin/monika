@@ -80,7 +80,7 @@ class _HrLeaveBalancesScreenState extends State<HrLeaveBalancesScreen> {
         child: ListenableBuilder(
           listenable: leaveController,
           builder: (context, _) {
-            if (leaveController.loading && leaveController.allBalances.isEmpty) {
+            if (leaveController.loadingBalances && leaveController.allBalances.isEmpty) {
               return const Center(child: CircularProgressIndicator());
             }
             final allBalances = leaveController.allBalances;
@@ -95,7 +95,10 @@ class _HrLeaveBalancesScreenState extends State<HrLeaveBalancesScreen> {
             final balances = _departmentFilter == 'All Departments'
                 ? allBalances
                 : allBalances.where((b) => b.department == _departmentFilter).toList();
-            return ListView(
+            return RefreshIndicator(
+              onRefresh: leaveController.loadAllBalancesForHr,
+              child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
                 Builder(
@@ -135,6 +138,7 @@ class _HrLeaveBalancesScreenState extends State<HrLeaveBalancesScreen> {
                 else
                   ListRow(children: balances.map((b) => _BalanceRow(balance: b, onTap: () => _adjustBalance(b))).toList()),
               ],
+              ),
             );
           },
         ),

@@ -4,7 +4,7 @@ enum RiskLevel { low, medium, high }
 
 enum LeaveStatus { pending, approved, rejected }
 
-enum AttendanceStatus { onTime, late, flagged, leave }
+enum AttendanceStatus { onTime, late, flagged }
 
 class AssignedEmployee {
   final String uuid;
@@ -19,6 +19,11 @@ class CalendarEvent {
   final DateTime? endDate;
   final String type; // 'Public Holiday' | 'Company Event' | 'HR Event' (display)
   final List<AssignedEmployee> assignedTo; // empty = visible to everyone
+  // Explicit flag rather than inferring "no time" from eventDate's clock
+  // digits being 00:00 — that heuristic false-positives for pre-migration
+  // rows cast from `date` to `timestamptz`, which land on midnight UTC and
+  // read back as a non-midnight local hour outside the UTC timezone.
+  final bool hasTime;
 
   const CalendarEvent({
     this.dbId,
@@ -27,6 +32,7 @@ class CalendarEvent {
     this.endDate,
     required this.type,
     this.assignedTo = const [],
+    this.hasTime = true,
   });
 }
 
@@ -38,6 +44,7 @@ class AppUser {
   final String role; // job title
   final UserRole userRole;
   final RiskLevel riskLevel;
+  final int riskScore; // 0-100, the real server-computed value riskLevel is banded from
   final String avatarInitials;
   final String employmentDuration;
   final String registeredDevice;
@@ -51,6 +58,7 @@ class AppUser {
     required this.role,
     required this.userRole,
     required this.riskLevel,
+    required this.riskScore,
     required this.avatarInitials,
     required this.employmentDuration,
     required this.registeredDevice,
@@ -65,6 +73,7 @@ class AppUser {
         role: role,
         userRole: userRole,
         riskLevel: riskLevel,
+        riskScore: riskScore,
         avatarInitials: avatarInitials,
         employmentDuration: employmentDuration,
         registeredDevice: registeredDevice ?? this.registeredDevice,

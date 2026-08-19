@@ -11,6 +11,14 @@ class LeaveService {
   static Future<Map<String, dynamic>?> fetchMyBalance() async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) return null;
+    // Lazily provisions this year's row if it doesn't exist yet (e.g. the
+    // calendar rolled over since account creation) — RLS only lets HR
+    // insert leave_balances directly, so this goes through a
+    // SECURITY DEFINER RPC (migration 0025) instead.
+    await _client.rpc('ensure_leave_balance_row', params: {
+      'p_user_id': uid,
+      'p_year': _currentYear,
+    });
     return await _client
         .from('leave_balances')
         .select()
@@ -70,7 +78,7 @@ class LeaveService {
     await _client.from('leave_applications').update({
       'status': approve ? 'approved' : 'rejected',
       'decided_by': _client.auth.currentUser?.id,
-      'decided_at': DateTime.now().toIso8601String(),
+      'decided_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', applicationId);
   }
 
@@ -103,8 +111,12 @@ class LeaveService {
   }
 
   /// HR — every employee's current-year balance, joined with their name
-  /// and department.
+  /// and department. Provisions any missing rows for the current year
+  /// first (bulk RPC, migration 0025) so a fresh calendar year doesn't
+  /// quietly drop employees from this list until each one happens to
+  /// trigger their own lazy-provision via fetchMyBalance().
   static Future<List<Map<String, dynamic>>> fetchAllBalances() async {
+    await _client.rpc('ensure_leave_balances_for_year', params: {'p_year': _currentYear});
     final rows = await _client
         .from('leave_balances')
         .select('*, profiles(name, departments(name))')

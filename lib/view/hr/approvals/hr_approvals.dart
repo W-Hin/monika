@@ -25,6 +25,12 @@ class HrApprovalsScreen extends StatefulWidget {
 }
 
 class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
+  // Guards against a decision being submitted twice for the same
+  // application (e.g. a double-tap while the first decide() call is still
+  // in flight) — the card's Approve/Reject buttons are disabled for any
+  // dbId in this set.
+  final Set<int> _processingIds = {};
+
   @override
   void initState() {
     super.initState();
@@ -39,6 +45,7 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
         approve: approve,
         onConfirm: (reason) async {
           Navigator.of(context).pop();
+          setState(() => _processingIds.add(app.dbId!));
           try {
             await leaveController.decide(app: app, approve: approve);
             if (!mounted) return;
@@ -54,6 +61,8 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Could not update this application: $e'), backgroundColor: context.colors.riskHigh),
             );
+          } finally {
+            if (mounted) setState(() => _processingIds.remove(app.dbId!));
           }
         },
       ),
@@ -63,15 +72,6 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final myUid = Supabase.instance.client.auth.currentUser?.id;
-    // This screen is for reviewing OTHERS' requests - an HR admin's own
-    // leave applications are handled the same way anyone else's are
-    // (their own Employee view, decided by a different HR admin), so
-    // they're excluded here entirely rather than shown with disabled
-    // actions.
-    final reviewable = leaveController.allApplications.where((a) => a.userUuid != myUid).toList();
-    final pending = reviewable.where((a) => a.status == LeaveStatus.pending).toList();
-    final processed = reviewable.where((a) => a.status != LeaveStatus.pending).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -90,20 +90,43 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
         child: ListenableBuilder(
           listenable: leaveController,
           builder: (context, _) {
-            if (leaveController.loading && leaveController.allApplications.isEmpty) {
+            // Deliberately computed inside this builder, not the enclosing
+            // build() method — ListenableBuilder only re-invokes this
+            // callback on leaveController's notifications, so anything
+            // read from the controller has to live in here to actually
+            // stay in sync. Computing it in the outer build() (as this
+            // used to) froze it at whatever allApplications was at mount
+            // time (empty, before the fetch resolved) forever after,
+            // since nothing else ever triggered a full HrApprovalsScreen
+            // rebuild — pull-to-refresh included, which is why refreshing
+            // never fixed it.
+            final myUid = Supabase.instance.client.auth.currentUser?.id;
+            // This screen is for reviewing OTHERS' requests - an HR admin's
+            // own leave applications are handled the same way anyone
+            // else's are (their own Employee view, decided by a different
+            // HR admin), so they're excluded here entirely rather than
+            // shown with disabled actions.
+            final reviewable = leaveController.allApplications.where((a) => a.userUuid != myUid).toList();
+            final pending = reviewable.where((a) => a.status == LeaveStatus.pending).toList();
+            final processed = reviewable.where((a) => a.status != LeaveStatus.pending).toList();
+
+            if (leaveController.loadingApprovals && leaveController.allApplications.isEmpty) {
               return const Center(child: CircularProgressIndicator());
             }
-            if (leaveController.errorMessage != null && leaveController.allApplications.isEmpty) {
+            if (leaveController.approvalsErrorMessage != null && leaveController.allApplications.isEmpty) {
               return Center(
                 child: EmptyState(
                   icon: Icons.error_outline_rounded,
                   title: 'Could not load leave applications',
-                  subtitle: leaveController.errorMessage!,
+                  subtitle: leaveController.approvalsErrorMessage!,
                   onRetry: leaveController.loadAllForHr,
                 ),
               );
             }
-            return ListView(
+            return RefreshIndicator(
+              onRefresh: leaveController.loadAllForHr,
+              child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
                 Row(
@@ -147,6 +170,7 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
                         padding: const EdgeInsets.only(bottom: 12),
                         child: _ApprovalCard(
                           app: a,
+                          isProcessing: _processingIds.contains(a.dbId),
                           onApprove: () => _handleDecision(a, true),
                           onReject: () => _handleDecision(a, false),
                         ),
@@ -164,6 +188,7 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
                   ListRow(children: processed.map((a) => _ProcessedRow(app: a)).toList()),
                 ],
               ],
+              ),
             );
           },
         ),
@@ -174,10 +199,11 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
 
 class _ApprovalCard extends StatelessWidget {
   final LeaveApplication app;
+  final bool isProcessing;
   final VoidCallback onApprove;
   final VoidCallback onReject;
 
-  const _ApprovalCard({required this.app, required this.onApprove, required this.onReject});
+  const _ApprovalCard({required this.app, this.isProcessing = false, required this.onApprove, required this.onReject});
 
   @override
   Widget build(BuildContext context) {
@@ -225,7 +251,7 @@ class _ApprovalCard extends StatelessWidget {
               Expanded(
                 child: SecondaryButton(
                   label: 'Reject',
-                  onPressed: onReject,
+                  onPressed: isProcessing ? null : onReject,
                   icon: Icons.close_rounded,
                 ),
               ),
@@ -234,6 +260,7 @@ class _ApprovalCard extends StatelessWidget {
                 child: PrimaryButton(
                   label: 'Approve',
                   onPressed: onApprove,
+                  isLoading: isProcessing,
                   icon: Icons.check_rounded,
                 ),
               ),

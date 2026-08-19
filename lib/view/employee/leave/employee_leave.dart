@@ -51,13 +51,16 @@ class _EmployeeLeaveScreenState extends State<EmployeeLeaveScreen> {
         child: ListenableBuilder(
           listenable: leaveController,
           builder: (context, _) {
-            if (leaveController.loading && leaveController.myBalance == null) {
+            if (leaveController.loadingMy && leaveController.myBalance == null) {
               return const Center(child: CircularProgressIndicator());
             }
             final balance = leaveController.myBalance;
             final apps = leaveController.myApplications;
 
-            return ListView(
+            return RefreshIndicator(
+              onRefresh: leaveController.loadMy,
+              child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
                 Row(
@@ -92,6 +95,7 @@ class _EmployeeLeaveScreenState extends State<EmployeeLeaveScreen> {
                         child: _LeaveTile(app: a),
                       )),
               ],
+              ),
             );
           },
         ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
+import '../../shared/widgets/common_widgets.dart';
 import '../../../controller/policy_controller.dart';
 
 class PolicyConfigScreen extends StatefulWidget {
@@ -19,11 +20,11 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
   final _officeWifi = TextEditingController(text: 'MONIKA-OFFICE-5G');
 
   // Risk score weights
-  double _lateWeight = 1;
-  double _outOfZoneWeight = 2;
-  double _sharedDeviceWeight = 3;
-  double _wifiMismatchWeight = 1;
-  double _earlyClockoutWeight = 0.5;
+  double _lateWeight = 3;
+  double _outOfZoneWeight = 5;
+  double _sharedDeviceWeight = 10;
+  double _wifiMismatchWeight = 4;
+  double _earlyClockoutWeight = 2;
 
   // Payroll deductions
   final _lateDeduction = TextEditingController(text: '25.00');
@@ -34,14 +35,35 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
   double _leadershipThreshold = 60;
   double _technicalThreshold = 65;
   double _behaviouralThreshold = 60;
+  double _minTenureMonths = 6;
 
   bool _saving = false;
   bool _hydrated = false;
+  bool _hasEdited = false;
 
   @override
   void initState() {
     super.initState();
     policyController.load();
+    for (final controller in [_workStart, _workEnd, _gracePeriod, _geofenceRadius, _officeWifi, _lateDeduction, _absentDeduction, _unpaidLeaveRate]) {
+      controller.addListener(_markEdited);
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final controller in [_workStart, _workEnd, _gracePeriod, _geofenceRadius, _officeWifi, _lateDeduction, _absentDeduction, _unpaidLeaveRate]) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  // Only counts as an edit once the fields have been hydrated from the
+  // real loaded values — the programmatic `.text = ...` assignments inside
+  // _hydrateFromController() also fire this listener, and that's not a
+  // user edit.
+  void _markEdited() {
+    if (_hydrated && !_hasEdited) setState(() => _hasEdited = true);
   }
 
   /// Populates the local editable fields from the just-loaded real
@@ -66,6 +88,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
     _leadershipThreshold = p.leadershipThreshold;
     _technicalThreshold = p.technicalThreshold;
     _behaviouralThreshold = p.behaviouralThreshold;
+    _minTenureMonths = p.minTenureMonths.toDouble();
     _hydrated = true;
   }
 
@@ -88,9 +111,13 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
       leadershipThreshold: _leadershipThreshold,
       technicalThreshold: _technicalThreshold,
       behaviouralThreshold: _behaviouralThreshold,
+      minTenureMonths: _minTenureMonths.round(),
     );
     if (!mounted) return;
-    setState(() => _saving = false);
+    setState(() {
+      _saving = false;
+      if (success) _hasEdited = false;
+    });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(success ? '✓ Policy configuration saved successfully' : policyController.errorMessage ?? 'Could not save policy configuration'),
@@ -101,20 +128,11 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Scaffold(
+    return UnsavedChangesGuard(
+      isDirty: _hasEdited,
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Policy & Configuration'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: PrimaryButton(
-              label: 'Save',
-              onPressed: _save,
-              isLoading: _saving,
-              expand: false,
-            ),
-          ),
-        ],
       ),
       body: SafeArea(
         top: false,
@@ -230,41 +248,41 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                   label: 'Late Arrival',
                   value: _lateWeight,
                   min: 1,
-                  max: 5,
-                  onChanged: (v) => setState(() => _lateWeight = v),
+                  max: 10,
+                  onChanged: (v) => setState(() { _lateWeight = v; _hasEdited = true; }),
                   color: c.riskLow,
                 ),
                 _SliderRow(
                   label: 'WiFi SSID Mismatch',
                   value: _wifiMismatchWeight,
                   min: 1,
-                  max: 5,
-                  onChanged: (v) => setState(() => _wifiMismatchWeight = v),
+                  max: 10,
+                  onChanged: (v) => setState(() { _wifiMismatchWeight = v; _hasEdited = true; }),
                   color: c.riskMedium,
                 ),
                 _SliderRow(
                   label: 'Out-of-Zone Clock-In',
                   value: _outOfZoneWeight,
                   min: 1,
-                  max: 5,
-                  onChanged: (v) => setState(() => _outOfZoneWeight = v),
+                  max: 10,
+                  onChanged: (v) => setState(() { _outOfZoneWeight = v; _hasEdited = true; }),
                   color: c.riskMedium,
                 ),
                 _SliderRow(
                   label: 'Shared-Device Attempt',
                   value: _sharedDeviceWeight,
                   min: 1,
-                  max: 5,
-                  onChanged: (v) => setState(() => _sharedDeviceWeight = v),
+                  max: 15,
+                  onChanged: (v) => setState(() { _sharedDeviceWeight = v; _hasEdited = true; }),
                   color: c.riskHigh,
                 ),
                 _SliderRow(
                   label: 'Early Clock-Out',
                   value: _earlyClockoutWeight,
                   min: 0.5,
-                  max: 3,
-                  divisions: 5,
-                  onChanged: (v) => setState(() => _earlyClockoutWeight = v),
+                  max: 8,
+                  divisions: 15,
+                  onChanged: (v) => setState(() { _earlyClockoutWeight = v; _hasEdited = true; }),
                   color: c.riskLow,
                 ),
                 Container(
@@ -358,7 +376,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                   min: 40,
                   max: 80,
                   divisions: 8,
-                  onChanged: (v) => setState(() => _leadershipThreshold = v),
+                  onChanged: (v) => setState(() { _leadershipThreshold = v; _hasEdited = true; }),
                   color: c.purple,
                   suffix: '/100',
                 ),
@@ -368,7 +386,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                   min: 40,
                   max: 80,
                   divisions: 8,
-                  onChanged: (v) => setState(() => _technicalThreshold = v),
+                  onChanged: (v) => setState(() { _technicalThreshold = v; _hasEdited = true; }),
                   color: c.infoBlue,
                   suffix: '/100',
                 ),
@@ -378,9 +396,19 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                   min: 40,
                   max: 80,
                   divisions: 8,
-                  onChanged: (v) => setState(() => _behaviouralThreshold = v),
+                  onChanged: (v) => setState(() { _behaviouralThreshold = v; _hasEdited = true; }),
                   color: c.amber,
                   suffix: '/100',
+                ),
+                _SliderRow(
+                  label: 'Minimum tenure before eligible',
+                  value: _minTenureMonths,
+                  min: 0,
+                  max: 24,
+                  divisions: 24,
+                  onChanged: (v) => setState(() { _minTenureMonths = v; _hasEdited = true; }),
+                  color: c.textSecondary,
+                  suffix: ' mo',
                 ),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -389,7 +417,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    'Example: If Leadership threshold is 60 and an employee scores 55 on Leadership KPI, a Leadership training programme will be automatically recommended.',
+                    'Example: If Leadership threshold is 60 and an employee scores 55 on Leadership KPI, a Leadership training programme will be automatically recommended. Employees below the minimum tenure are skipped entirely.',
                     style: TextStyle(
                       fontSize: 11.5,
                       color: c.amber,
@@ -411,6 +439,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
             );
           },
         ),
+      ),
       ),
     );
   }

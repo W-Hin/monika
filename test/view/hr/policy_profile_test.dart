@@ -13,6 +13,7 @@ void main() {
 
   testWidgets('PolicyConfigScreen builds', (tester) async {
     await tester.pumpWidget(MaterialApp(theme: AppTheme.light, home: const PolicyConfigScreen()));
+    await tester.pumpAndSettle();
     expect(find.text('Attendance Policy'), findsOneWidget);
   });
 
@@ -21,9 +22,13 @@ void main() {
     await tester.pumpWidget(MaterialApp(theme: AppTheme.light, home: const HrProfileScreen()));
     await tester.pumpAndSettle();
 
-    // Scroll to bring Settings section into view
-    final listViewFinder = find.byType(ListView);
-    await tester.drag(listViewFinder, const Offset(0, -600));
+    // Scroll until the Settings section is visible — a fixed-offset drag
+    // gets thrown off whenever the page above it grows or shrinks.
+    await tester.dragUntilVisible(
+      find.text('Dark Mode'),
+      find.byType(ListView),
+      const Offset(0, -300),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Dark Mode'), findsOneWidget);
@@ -36,9 +41,11 @@ void main() {
     await tester.pumpWidget(MaterialApp(theme: AppTheme.light, home: const HrProfileScreen()));
     await tester.pumpAndSettle();
 
-    // Scroll to bring Settings section into view
-    final listViewFinder = find.byType(ListView);
-    await tester.drag(listViewFinder, const Offset(0, -600));
+    await tester.dragUntilVisible(
+      find.text('Dark Mode'),
+      find.byType(ListView),
+      const Offset(0, -300),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byType(Switch));

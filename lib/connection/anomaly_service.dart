@@ -42,7 +42,7 @@ class AnomalyService {
     await _client.from('anomaly_events').update({
       'reviewed': true,
       'reviewed_by': uid,
-      'reviewed_at': DateTime.now().toIso8601String(),
+      'reviewed_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', id);
   }
 }

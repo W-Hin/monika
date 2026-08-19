@@ -8,16 +8,19 @@ import 'package:monika/view/hr/analytics/anomaly_detail.dart';
 void main() {
   testWidgets('HrApprovalsScreen builds', (tester) async {
     await tester.pumpWidget(MaterialApp(theme: AppTheme.light, home: const HrApprovalsScreen()));
+    await tester.pumpAndSettle();
     expect(find.textContaining('Pending'), findsWidgets);
   });
 
   testWidgets('HrAnalyticsScreen builds', (tester) async {
     await tester.pumpWidget(MaterialApp(theme: AppTheme.light, home: const HrAnalyticsScreen()));
+    await tester.pumpAndSettle();
     expect(find.text('Weekly Attendance Trend'), findsOneWidget);
   });
 
   testWidgets('AnomalyDetailScreen builds', (tester) async {
     await tester.pumpWidget(MaterialApp(theme: AppTheme.light, home: const AnomalyDetailScreen()));
+    await tester.pumpAndSettle();
     expect(find.text('Anomaly & Violation Feed'), findsOneWidget);
   });
 }

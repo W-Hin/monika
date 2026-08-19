@@ -16,10 +16,10 @@ import '../connection/policy_service.dart';
 /// (migration 0022) reads them straight from `policy_settings` every time
 /// an anomaly_events row is inserted, so changing a slider here changes
 /// risk_score deductions on the very next anomaly. The PE training-trigger
-/// thresholds are also not yet read by hr_pe.dart, which still uses a
-/// hardcoded `score < 65` check. Flagging clearly rather than silently
-/// leaving the impression that saving these sliders does more than it
-/// currently does.
+/// thresholds are read for real by both hr_pe.dart's KPI-hit badge and
+/// `PeController._triggerTrainingRecommendations`, which also gates on
+/// `minTenureMonths` — an employee hired more recently than this is never
+/// auto-enrolled in training off a low PE score.
 class PolicyController extends ChangeNotifier {
   bool loading = false;
   bool loaded = false;
@@ -31,11 +31,11 @@ class PolicyController extends ChangeNotifier {
   int geofenceRadiusMeters = 100;
   String officeWifiSsid = 'MONIKA-OFFICE-5G';
 
-  double lateWeight = 1;
-  double outOfZoneWeight = 2;
-  double sharedDeviceWeight = 3;
-  double wifiMismatchWeight = 1;
-  double earlyClockoutWeight = 0.5;
+  double lateWeight = 3;
+  double outOfZoneWeight = 5;
+  double sharedDeviceWeight = 10;
+  double wifiMismatchWeight = 4;
+  double earlyClockoutWeight = 2;
 
   double lateDeduction = 25.00;
   double absentDeduction = 120.00;
@@ -44,6 +44,7 @@ class PolicyController extends ChangeNotifier {
   double leadershipThreshold = 60;
   double technicalThreshold = 65;
   double behaviouralThreshold = 60;
+  int minTenureMonths = 6;
 
   String _timeToHHmm(String raw) => raw.length >= 5 ? raw.substring(0, 5) : raw;
 
@@ -73,6 +74,7 @@ class PolicyController extends ChangeNotifier {
       leadershipThreshold = (row['leadership_threshold'] as num).toDouble();
       technicalThreshold = (row['technical_threshold'] as num).toDouble();
       behaviouralThreshold = (row['behavioural_threshold'] as num).toDouble();
+      minTenureMonths = row['min_tenure_months'] as int;
       loaded = true;
     } catch (e) {
       errorMessage = 'Could not load policy configuration: $e';
@@ -98,6 +100,7 @@ class PolicyController extends ChangeNotifier {
     required double leadershipThreshold,
     required double technicalThreshold,
     required double behaviouralThreshold,
+    required int minTenureMonths,
   }) async {
     errorMessage = null;
     try {
@@ -118,6 +121,7 @@ class PolicyController extends ChangeNotifier {
         'leadership_threshold': leadershipThreshold,
         'technical_threshold': technicalThreshold,
         'behavioural_threshold': behaviouralThreshold,
+        'min_tenure_months': minTenureMonths,
       });
       await load();
       return true;

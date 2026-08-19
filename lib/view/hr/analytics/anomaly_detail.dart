@@ -120,14 +120,18 @@ class _AnomalyDetailScreenState extends State<AnomalyDetailScreen> {
                   ? const Center(child: CircularProgressIndicator())
                   : events.isEmpty
                       ? const EmptyState(icon: Icons.security_rounded, title: 'No violations found', subtitle: 'No anomalies matching the selected filter.')
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                          itemCount: events.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 10),
-                          itemBuilder: (_, i) => _AnomalyCard(
-                            event: events[i],
-                            onViewEmployee: () => _viewEmployee(context, events[i].employeeName),
-                            onMarkReviewed: () => _markReviewed(events[i]),
+                      : RefreshIndicator(
+                          onRefresh: anomalyController.loadFeed,
+                          child: ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                            itemCount: events.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 10),
+                            itemBuilder: (_, i) => _AnomalyCard(
+                              event: events[i],
+                              onViewEmployee: () => _viewEmployee(context, events[i].employeeName),
+                              onMarkReviewed: () => _markReviewed(events[i]),
+                            ),
                           ),
                         ),
             ),

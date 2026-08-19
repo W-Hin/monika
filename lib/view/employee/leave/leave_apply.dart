@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
+import '../../shared/widgets/common_widgets.dart';
 import '../../../controller/leave_controller.dart';
 
 class LeaveApplyScreen extends StatefulWidget {
@@ -16,16 +17,28 @@ class _LeaveApplyScreenState extends State<LeaveApplyScreen> {
   final _reasonController = TextEditingController();
   bool _isSubmitting = false;
   String? _errorText;
+  // Set once submission succeeds so the confirmation dialog on the way out
+  // doesn't fire for data that's already safely saved.
+  bool _submitted = false;
 
+  late final DateTime _initialDate;
   DateTime _startDate = DateTime.now();
   DateTime _endDate = DateTime.now();
 
   final _leaveTypes = const ['Annual Leave', 'Medical Leave', 'Emergency Leave', 'Unpaid Leave'];
   static final _dateFormat = DateFormat('d MMM yyyy');
 
+  bool get _isDirty =>
+      !_submitted &&
+      (_reasonController.text.trim().isNotEmpty ||
+          _selectedType != 'Annual Leave' ||
+          _startDate != _initialDate ||
+          _endDate != _initialDate);
+
   @override
   void initState() {
     super.initState();
+    _initialDate = _startDate;
     leaveController.loadMy();
   }
 
@@ -46,6 +59,11 @@ class _LeaveApplyScreenState extends State<LeaveApplyScreen> {
       'Emergency Leave' => balance.emergencyRemaining,
       _ => null, // Unpaid Leave has no balance pool
     };
+  }
+
+  bool get _exceedsBalance {
+    final remaining = _remainingForType;
+    return remaining != null && _days > remaining;
   }
 
   Future<void> _pickDate({required bool isStart}) async {
@@ -73,6 +91,18 @@ class _LeaveApplyScreenState extends State<LeaveApplyScreen> {
       setState(() => _errorText = 'Please describe the reason for your leave');
       return;
     }
+    if (_exceedsBalance) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'You only have $_remainingForType day(s) of $_selectedType left. '
+            'Please choose a shorter date range or a different leave type.',
+          ),
+          backgroundColor: context.colors.riskHigh,
+        ),
+      );
+      return;
+    }
     setState(() {
       _errorText = null;
       _isSubmitting = true;
@@ -90,11 +120,12 @@ class _LeaveApplyScreenState extends State<LeaveApplyScreen> {
 
     if (!success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(leaveController.errorMessage ?? 'Could not submit application')),
+        SnackBar(content: Text(leaveController.myErrorMessage ?? 'Could not submit application')),
       );
       return;
     }
 
+    setState(() => _submitted = true);
     showDialog(
       context: context,
       builder: (ctx) {
@@ -137,7 +168,9 @@ class _LeaveApplyScreenState extends State<LeaveApplyScreen> {
   Widget build(BuildContext context) {
     final c = context.colors;
     final remaining = _remainingForType;
-    return Scaffold(
+    return UnsavedChangesGuard(
+      isDirty: _isDirty,
+      child: Scaffold(
       appBar: const SimpleAppBar(title: 'Apply for Leave'),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -193,17 +226,30 @@ class _LeaveApplyScreenState extends State<LeaveApplyScreen> {
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(color: c.infoBlueBg, borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(
+                  color: _exceedsBalance ? c.riskHighBg : c.infoBlueBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline_rounded, size: 15, color: c.infoBlue),
+                    Icon(
+                      _exceedsBalance ? Icons.error_outline_rounded : Icons.info_outline_rounded,
+                      size: 15,
+                      color: _exceedsBalance ? c.riskHigh : c.infoBlue,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        remaining != null
-                            ? 'Total: $_days day(s)  ·  Balance after: ${remaining - _days} day(s)'
-                            : 'Total: $_days day(s)',
-                        style: TextStyle(fontSize: 12, color: c.infoBlue, fontWeight: FontWeight.w600),
+                        _exceedsBalance
+                            ? 'Total: $_days day(s)  ·  Exceeds your $remaining day(s) balance by ${_days - remaining!} day(s)'
+                            : remaining != null
+                                ? 'Total: $_days day(s)  ·  Balance after: ${remaining - _days} day(s)'
+                                : 'Total: $_days day(s)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _exceedsBalance ? c.riskHigh : c.infoBlue,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -216,9 +262,7 @@ class _LeaveApplyScreenState extends State<LeaveApplyScreen> {
               TextField(
                 controller: _reasonController,
                 maxLines: 4,
-                onChanged: (_) {
-                  if (_errorText != null) setState(() => _errorText = null);
-                },
+                onChanged: (_) => setState(() => _errorText = null),
                 decoration: InputDecoration(
                   hintText: 'Briefly describe the reason for your leave...',
                   errorText: _errorText,
@@ -234,6 +278,7 @@ class _LeaveApplyScreenState extends State<LeaveApplyScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
