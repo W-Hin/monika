@@ -4,6 +4,7 @@ import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../../model/models.dart';
 import '../../../controller/pe_controller.dart';
+import '../../../connection/policy_service.dart';
 
 class PeDetailScreen extends StatefulWidget {
   const PeDetailScreen({super.key});
@@ -13,10 +14,32 @@ class PeDetailScreen extends StatefulWidget {
 }
 
 class _PeDetailScreenState extends State<PeDetailScreen> {
+  // Matches policy_settings' defaults until the real values load — kept in
+  // sync with the same thresholds hr_pe.dart's KPI Hit/Missed badge uses,
+  // so an employee sees the identical verdict HR saw while scoring them.
+  Map<String, double> _thresholds = {'Technical': 65, 'Behavioural': 60, 'Leadership': 60};
+
   @override
   void initState() {
     super.initState();
     peController.loadMy();
+    _loadThresholds();
+  }
+
+  Future<void> _loadThresholds() async {
+    try {
+      final policy = await PolicyService.fetch();
+      if (!mounted) return;
+      setState(() {
+        _thresholds = {
+          'Technical': (policy['technical_threshold'] as num).toDouble(),
+          'Behavioural': (policy['behavioural_threshold'] as num).toDouble(),
+          'Leadership': (policy['leadership_threshold'] as num).toDouble(),
+        };
+      });
+    } catch (_) {
+      // Keep the defaults set above — badge stays reasonably accurate.
+    }
   }
 
   @override
@@ -35,7 +58,10 @@ class _PeDetailScreenState extends State<PeDetailScreen> {
             final pe = peController.myCurrent;
             final history = peController.myHistory.where((h) => h.dbId != pe?.dbId).toList();
 
-            return ListView(
+            return RefreshIndicator(
+              onRefresh: peController.loadMy,
+              child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
                 if (pe == null)
@@ -97,7 +123,7 @@ class _PeDetailScreenState extends State<PeDetailScreen> {
                   const SectionHeader(title: 'KPI Breakdown'),
                   ...pe.kpis.map((k) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
-                        child: _KpiBar(kpi: k),
+                        child: _KpiBar(kpi: k, threshold: _thresholds[k.category] ?? 65),
                       )),
                   const SizedBox(height: 12),
                   const SectionHeader(title: 'HR Comments'),
@@ -147,6 +173,7 @@ class _PeDetailScreenState extends State<PeDetailScreen> {
                         ),
                       )),
               ],
+              ),
             );
           },
         ),
@@ -157,11 +184,14 @@ class _PeDetailScreenState extends State<PeDetailScreen> {
 
 class _KpiBar extends StatelessWidget {
   final KpiItem kpi;
-  const _KpiBar({required this.kpi});
+  final double threshold;
+  const _KpiBar({required this.kpi, required this.threshold});
 
+  // Matches hr_pe.dart's _scoreColor — same threshold-relative colour bands
+  // HR sees while scoring, so the badge below reads consistently for both.
   Color _getColor(AppColorsExtension c) {
-    if (kpi.score >= 80) return c.primary;
-    if (kpi.score >= 60) return c.amber;
+    if (kpi.score >= threshold) return c.primary;
+    if (kpi.score >= threshold - 10) return c.amber;
     return c.riskHigh;
   }
 
@@ -169,6 +199,7 @@ class _KpiBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     final color = _getColor(c);
+    final hitTarget = kpi.score >= threshold;
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -192,12 +223,22 @@ class _KpiBar extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              '${kpi.score.toStringAsFixed(0)} / 100',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: color),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(hitTarget ? Icons.check_circle_rounded : Icons.cancel_rounded, size: 13, color: color),
+                  const SizedBox(width: 4),
+                  Text(hitTarget ? 'KPI Hit' : 'KPI Missed', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+                ],
+              ),
+              Text(
+                '${kpi.score.toStringAsFixed(0)} / 100',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: color),
+              ),
+            ],
           ),
         ],
       ),

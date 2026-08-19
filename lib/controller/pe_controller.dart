@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../connection/employee_service.dart';
 import '../connection/pe_service.dart';
 import '../connection/policy_service.dart';
 import '../connection/training_service.dart';
@@ -58,8 +59,12 @@ class PeController extends ChangeNotifier {
   }
 
   Future<void> loadTemplates() async {
-    final rows = await PeService.fetchTemplates();
-    templates = rows.map(_mapTemplate).toList();
+    try {
+      final rows = await PeService.fetchTemplates();
+      templates = rows.map(_mapTemplate).toList();
+    } catch (e) {
+      errorMessage = 'Could not load KPI templates: $e';
+    }
     notifyListeners();
   }
 
@@ -206,6 +211,13 @@ class PeController extends ChangeNotifier {
 
   static const _categoryToDb = {'Technical': 'technical', 'Behavioural': 'behavioural', 'Leadership': 'leadership'};
 
+  int _monthsEmployed(DateTime hireDate) {
+    final now = DateTime.now();
+    var months = (now.year - hireDate.year) * 12 + (now.month - hireDate.month);
+    if (now.day < hireDate.day) months--;
+    return months;
+  }
+
   /// Rule-based (per this project's scope, not a real ML model): any KPI
   /// scored below its category's threshold (from Policy Config) auto-
   /// enrols the employee in a matching training programme, if one exists.
@@ -214,6 +226,12 @@ class PeController extends ChangeNotifier {
   Future<void> _triggerTrainingRecommendations({required String userUuid, required List<KpiItem> kpis}) async {
     try {
       final policy = await PolicyService.fetch();
+      final minTenureMonths = policy['min_tenure_months'] as int;
+      if (minTenureMonths > 0) {
+        final profile = await EmployeeService.fetchOne(userUuid);
+        final hireDate = DateTime.tryParse(profile?['hire_date'] as String? ?? '');
+        if (hireDate != null && _monthsEmployed(hireDate) < minTenureMonths) return;
+      }
       final thresholds = {
         'Technical': (policy['technical_threshold'] as num).toDouble(),
         'Behavioural': (policy['behavioural_threshold'] as num).toDouble(),

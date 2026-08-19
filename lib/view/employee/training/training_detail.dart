@@ -46,6 +46,12 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
     }
   }
 
+  Future<void> _refresh() async {
+    await trainingController.loadMy();
+    if (!mounted) return;
+    _syncFromController();
+  }
+
   Future<void> _enroll() async {
     setState(() => _busy = true);
     final success = await trainingController.enroll(_program);
@@ -91,7 +97,10 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
     return Scaffold(
       appBar: const SimpleAppBar(title: 'Training Details'),
       body: SafeArea(
-        child: ListView(
+        child: RefreshIndicator(
+          onRefresh: _refresh,
+          child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
             Row(
@@ -179,6 +188,7 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
               PrimaryButton(label: 'Enrol Now', icon: Icons.how_to_reg_rounded, onPressed: _enroll, isLoading: _busy),
             ],
           ],
+          ),
         ),
       ),
     );

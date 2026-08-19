@@ -208,9 +208,16 @@ class _HrPeScreenState extends State<HrPeScreen> {
     return total;
   }
 
-  Color _scoreColor(double score, AppColorsExtension c) {
-    if (score >= 80) return c.primary;
-    if (score >= 60) return c.amber;
+  // Colour is driven by the same category threshold that decides whether
+  // submitting will trigger a training recommendation (see the badge
+  // below and PeController._triggerTrainingRecommendations) — a fixed
+  // score-quality band (e.g. "60+ is amber") would tell HR something
+  // different from what the score is actually about to do, which is the
+  // exact ambiguity that made it hard to tell whether an employee had
+  // genuinely hit their KPI target just by eyeballing the slider.
+  Color _scoreColor(double score, double threshold, AppColorsExtension c) {
+    if (score >= threshold) return c.primary;
+    if (score >= threshold - 10) return c.amber;
     return c.riskHigh;
   }
 
@@ -545,7 +552,9 @@ class _HrPeScreenState extends State<HrPeScreen> {
                   final i = e.key;
                   final kpi = e.value;
                   final score = kpi['score'] as double;
-                  final color = _scoreColor(score, c);
+                  final threshold = _thresholds[kpi['category']] ?? 65;
+                  final hitTarget = score >= threshold;
+                  final color = _scoreColor(score, threshold, c);
                   return Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     decoration: BoxDecoration(
@@ -582,24 +591,45 @@ class _HrPeScreenState extends State<HrPeScreen> {
                                   ],
                                 ),
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: color.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(100),
-                                ),
-                                child: Text(
-                                  '${score.toInt()} / 100',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w900,
-                                    color: color,
-                                    fontFeatures: const [FontFeature.tabularFigures()],
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: color.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(100),
+                                    ),
+                                    child: Text(
+                                      '${score.toInt()} / 100',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w900,
+                                        color: color,
+                                        fontFeatures: const [FontFeature.tabularFigures()],
+                                      ),
+                                    ),
                                   ),
-                                ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        hitTarget ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                                        size: 12,
+                                        color: color,
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        hitTarget ? 'KPI Hit' : 'KPI Missed',
+                                        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -638,7 +668,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
-                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Icon(
                                     Icons.auto_awesome_rounded,
@@ -646,12 +676,14 @@ class _HrPeScreenState extends State<HrPeScreen> {
                                     color: c.amber,
                                   ),
                                   const SizedBox(width: 6),
-                                  Text(
-                                    'Training recommendation will be triggered for ${kpi['category']}',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: c.amber,
-                                      fontWeight: FontWeight.w600,
+                                  Flexible(
+                                    child: Text(
+                                      'Training recommendation will be triggered for ${kpi['category']}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: c.amber,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                                 ],

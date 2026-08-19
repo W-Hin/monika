@@ -69,7 +69,7 @@ class TrainingService {
     await _client.from('training_enrollments').update({
       'progress': progress,
       'is_completed': completed,
-      if (completed) 'completed_at': DateTime.now().toIso8601String(),
+      if (completed) 'completed_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', enrollmentId);
   }
 

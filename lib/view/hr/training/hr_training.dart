@@ -110,38 +110,41 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
                   child: Column(
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: StatCard(
-                              label: 'Total Programs',
-                              value: '${available.length}',
-                              icon: Icons.school_rounded,
-                              iconColor: c.primary,
-                              iconBg: c.primaryLight,
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: StatCard(
+                                label: 'Total Programs',
+                                value: '${available.length}',
+                                icon: Icons.school_rounded,
+                                iconColor: c.primary,
+                                iconBg: c.primaryLight,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: StatCard(
-                              label: 'Mandatory',
-                              value: '${mandatory.length}',
-                              icon: Icons.assignment_rounded,
-                              iconColor: c.riskHigh,
-                              iconBg: c.riskHighBg,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: StatCard(
+                                label: 'Mandatory',
+                                value: '${mandatory.length}',
+                                icon: Icons.assignment_rounded,
+                                iconColor: c.riskHigh,
+                                iconBg: c.riskHighBg,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: StatCard(
-                              label: 'In Progress',
-                              value: '$inProgressCount',
-                              icon: Icons.auto_awesome_rounded,
-                              iconColor: c.amber,
-                              iconBg: c.amberBg,
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: StatCard(
+                                label: 'In Progress',
+                                value: '$inProgressCount',
+                                icon: Icons.auto_awesome_rounded,
+                                iconColor: c.amber,
+                                iconBg: c.amberBg,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Container(
@@ -171,13 +174,17 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
                                           ]
                                         : null,
                                   ),
-                                  child: Text(
-                                    _tabs[i],
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: sel ? c.textPrimary : c.textMuted,
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      _tabs[i],
+                                      maxLines: 1,
+                                      softWrap: false,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: sel ? c.textPrimary : c.textMuted,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -203,7 +210,10 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
                                       ? 'Tap the + button above to create your first training programme.'
                                       : 'No mandatory training programmes have been created yet.',
                                 )
-                              : ListView(
+                              : RefreshIndicator(
+                                  onRefresh: trainingController.loadForHr,
+                                  child: ListView(
+                                  physics: const AlwaysScrollableScrollPhysics(),
                                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                                   children: (_tab == 0 ? available : mandatory)
                                       .map(
@@ -217,6 +227,7 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
                                         ),
                                       )
                                       .toList(),
+                                  ),
                                 ),
                 ),
               ],
@@ -443,7 +454,10 @@ class _CompletionTab extends StatelessWidget {
     final records = trainingController.completionRecords;
     final rate = trainingController.overallCompletionRate;
 
-    return ListView(
+    return RefreshIndicator(
+      onRefresh: trainingController.loadForHr,
+      child: ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       children: [
         AppCard(
@@ -564,6 +578,7 @@ class _CompletionTab extends StatelessWidget {
           );
         }),
       ],
+      ),
     );
   }
 }

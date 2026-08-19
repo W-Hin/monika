@@ -29,7 +29,10 @@ class _EmployeeTrainingScreenState extends State<EmployeeTrainingScreen> {
     final myDepartment = DummyData.employeeUser.department;
 
     return Scaffold(
-      appBar: AppBar(automaticallyImplyLeading: false, title: const Text('Training & Development')),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Training & Development'),
+      ),
       body: SafeArea(
         top: false,
         child: ListenableBuilder(
@@ -37,7 +40,13 @@ class _EmployeeTrainingScreenState extends State<EmployeeTrainingScreen> {
           builder: (context, _) {
             final all = trainingController.myPrograms;
             final recommended = all.where((t) => t.isRecommended).toList();
-            final mandatory = all.where((t) => t.isMandatory && (t.department == null || t.department == myDepartment)).toList();
+            final mandatory = all
+                .where(
+                  (t) =>
+                      t.isMandatory &&
+                      (t.department == null || t.department == myDepartment),
+                )
+                .toList();
             final completed = all.where((t) => t.isCompleted).toList();
 
             List<TrainingProgram> list;
@@ -61,7 +70,10 @@ class _EmployeeTrainingScreenState extends State<EmployeeTrainingScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
                   child: Container(
                     padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(14)),
+                    decoration: BoxDecoration(
+                      color: c.surfaceMuted,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                     child: Row(
                       children: List.generate(_tabs.length, (i) {
                         final selected = _tab == i;
@@ -72,17 +84,34 @@ class _EmployeeTrainingScreenState extends State<EmployeeTrainingScreen> {
                               duration: const Duration(milliseconds: 200),
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
-                                color: selected ? c.surface : Colors.transparent,
+                                color: selected
+                                    ? c.surface
+                                    : Colors.transparent,
                                 borderRadius: BorderRadius.circular(11),
-                                boxShadow: selected ? [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 6)] : null,
+                                boxShadow: selected
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(
+                                            alpha: 0.06,
+                                          ),
+                                          blurRadius: 6,
+                                        ),
+                                      ]
+                                    : null,
                               ),
-                              child: Text(
-                                _tabs[i],
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: selected ? c.textPrimary : c.textMuted,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  _tabs[i],
+                                  maxLines: 1,
+                                  softWrap: false,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: selected
+                                        ? c.textPrimary
+                                        : c.textMuted,
+                                  ),
                                 ),
                               ),
                             ),
@@ -96,28 +125,37 @@ class _EmployeeTrainingScreenState extends State<EmployeeTrainingScreen> {
                   child: trainingController.loading && all.isEmpty
                       ? const Center(child: CircularProgressIndicator())
                       : list.isEmpty
-                          ? EmptyState(
-                              icon: Icons.school_outlined,
-                              title: 'No programmes here yet',
-                              subtitle: _tab == 1
-                                  ? 'Check back after your next performance evaluation.'
-                                  : 'Nothing in this category right now.',
-                            )
-                          : ListView(
-                              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                              children: list.map((t) => Padding(
+                      ? EmptyState(
+                          icon: Icons.school_outlined,
+                          title: 'No programmes here yet',
+                          subtitle: _tab == 1
+                              ? 'Check back after your next performance evaluation.'
+                              : 'Nothing in this category right now.',
+                        )
+                      : RefreshIndicator(
+                          onRefresh: trainingController.loadMy,
+                          child: ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                            children: list
+                                .map(
+                                  (t) => Padding(
                                     padding: const EdgeInsets.only(bottom: 12),
                                     child: _TrainingCard(
                                       program: t,
                                       onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (_) => TrainingDetailScreen(program: t),
+                                          builder: (_) =>
+                                              TrainingDetailScreen(program: t),
                                         ),
                                       ),
                                     ),
-                                  )).toList(),
-                            ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
                 ),
               ],
             );
@@ -168,50 +206,120 @@ class _TrainingCard extends StatelessWidget {
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(color: _catBg(context), borderRadius: BorderRadius.circular(100)),
-                child: Text(program.category, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: _catColor(context))),
+                decoration: BoxDecoration(
+                  color: _catBg(context),
+                  borderRadius: BorderRadius.circular(100),
+                ),
+                child: Text(
+                  program.category,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: _catColor(context),
+                  ),
+                ),
               ),
               const Spacer(),
               if (program.isCompleted)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                  decoration: BoxDecoration(color: c.riskLowBg, borderRadius: BorderRadius.circular(100)),
-                  child: Text('Completed', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: c.primary)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: c.riskLowBg,
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: Text(
+                    'Completed',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: c.primary,
+                    ),
+                  ),
                 )
               else if (program.isMandatory)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                  decoration: BoxDecoration(color: c.riskHighBg, borderRadius: BorderRadius.circular(100)),
-                  child: Text('Mandatory', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: c.riskHigh)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: c.riskHighBg,
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: Text(
+                    'Mandatory',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: c.riskHigh,
+                    ),
+                  ),
                 ),
             ],
           ),
           const SizedBox(height: 10),
-          Text(program.title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: c.textPrimary)),
+          Text(
+            program.title,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: c.textPrimary,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(program.description, style: TextStyle(fontSize: 12.5, color: c.textSecondary, height: 1.4)),
+          Text(
+            program.description,
+            style: TextStyle(
+              fontSize: 12.5,
+              color: c.textSecondary,
+              height: 1.4,
+            ),
+          ),
           const SizedBox(height: 10),
           Row(
             children: [
               Icon(Icons.schedule_rounded, size: 13, color: c.textMuted),
               const SizedBox(width: 5),
-              Text(program.duration, style: TextStyle(fontSize: 11.5, color: c.textMuted, fontWeight: FontWeight.w600)),
+              Text(
+                program.duration,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: c.textMuted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
-          if (program.isRecommended && program.recommendationReason != null) ...[
+          if (program.isRecommended &&
+              program.recommendationReason != null) ...[
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: c.primaryLight, borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(
+                color: c.primaryLight,
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.auto_awesome_rounded, size: 14, color: c.primaryDark),
+                  Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 14,
+                    color: c.primaryDark,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       program.recommendationReason!,
-                      style: TextStyle(fontSize: 11, color: c.primaryDark, fontWeight: FontWeight.w600, height: 1.3),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: c.primaryDark,
+                        fontWeight: FontWeight.w600,
+                        height: 1.3,
+                      ),
                     ),
                   ),
                 ],
@@ -222,12 +330,26 @@ class _TrainingCard extends StatelessWidget {
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(color: c.riskLowBg, borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(
+                color: c.riskLowBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: Row(
                 children: [
-                  Icon(Icons.workspace_premium_rounded, size: 14, color: c.primary),
+                  Icon(
+                    Icons.workspace_premium_rounded,
+                    size: 14,
+                    color: c.primary,
+                  ),
                   const SizedBox(width: 8),
-                  Text('Performance Score: ${program.performanceScore!.toInt()}/100', style: TextStyle(fontSize: 11.5, color: c.primary, fontWeight: FontWeight.w700)),
+                  Text(
+                    'Performance Score: ${program.performanceScore!.toInt()}/100',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: c.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -235,8 +357,18 @@ class _TrainingCard extends StatelessWidget {
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(10)),
-              child: Text('Awaiting performance score from HR', style: TextStyle(fontSize: 11.5, color: c.textMuted, fontWeight: FontWeight.w600)),
+              decoration: BoxDecoration(
+                color: c.surfaceMuted,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'Awaiting performance score from HR',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: c.textMuted,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ] else if (program.progress > 0) ...[
             const SizedBox(height: 12),
@@ -250,7 +382,14 @@ class _TrainingCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text('${(program.progress * 100).toInt()}% complete', style: TextStyle(fontSize: 11, color: c.textMuted, fontWeight: FontWeight.w600)),
+            Text(
+              '${(program.progress * 100).toInt()}% complete',
+              style: TextStyle(
+                fontSize: 11,
+                color: c.textMuted,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
           if (!program.isCompleted) ...[
             const SizedBox(height: 12),
@@ -258,7 +397,9 @@ class _TrainingCard extends StatelessWidget {
               width: double.infinity,
               child: OutlinedButton(
                 onPressed: onTap,
-                child: Text(program.progress > 0 ? 'Continue' : 'View Details & Enrol'),
+                child: Text(
+                  program.progress > 0 ? 'Continue' : 'View Details & Enrol',
+                ),
               ),
             ),
           ] else ...[
