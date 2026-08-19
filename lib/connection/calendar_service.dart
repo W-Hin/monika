@@ -33,6 +33,7 @@ class CalendarService {
           'event_date': eventDate.toUtc().toIso8601String(),
           'end_date': endDate?.toUtc().toIso8601String(),
           'event_type': eventType,
+          'has_time': eventType != 'public_holiday',
         })
         .select()
         .single();
@@ -52,6 +53,7 @@ class CalendarService {
       'event_date': eventDate.toUtc().toIso8601String(),
       'end_date': endDate?.toUtc().toIso8601String(),
       'event_type': eventType,
+      'has_time': eventType != 'public_holiday',
     }).eq('id', id);
     await _replaceAssignments(id, assignedUuids);
   }

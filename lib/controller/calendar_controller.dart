@@ -39,6 +39,7 @@ class CalendarController extends ChangeNotifier {
       endDate: row['end_date'] != null ? DateTime.parse(row['end_date'] as String).toLocal() : null,
       type: _typeToDisplay[row['event_type']] ?? row['event_type'] as String,
       assignedTo: assignedTo,
+      hasTime: row['has_time'] as bool? ?? true,
     );
   }
 

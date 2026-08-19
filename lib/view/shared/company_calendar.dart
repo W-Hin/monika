@@ -163,14 +163,17 @@ class _CompanyCalendarScreenState extends State<CompanyCalendarScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
                   child: Column(
                     children: [
-                      Row(
-                        children: [
-                          Expanded(child: StatCard(label: 'Public Holidays', value: '$holidayCount', icon: Icons.flag_rounded, iconColor: c.primary, iconBg: c.primaryLight)),
-                          const SizedBox(width: 12),
-                          Expanded(child: StatCard(label: 'Company Events', value: '$eventCount', icon: Icons.groups_rounded, iconColor: c.infoBlue, iconBg: c.infoBlueBg)),
-                          const SizedBox(width: 12),
-                          Expanded(child: StatCard(label: 'HR Events', value: '$hrEventCount', icon: Icons.insights_rounded, iconColor: c.amber, iconBg: c.amberBg)),
-                        ],
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(child: StatCard(label: 'Public Holidays', value: '$holidayCount', icon: Icons.flag_rounded, iconColor: c.primary, iconBg: c.primaryLight)),
+                            const SizedBox(width: 12),
+                            Expanded(child: StatCard(label: 'Company Events', value: '$eventCount', icon: Icons.groups_rounded, iconColor: c.infoBlue, iconBg: c.infoBlueBg)),
+                            const SizedBox(width: 12),
+                            Expanded(child: StatCard(label: 'HR Events', value: '$hrEventCount', icon: Icons.insights_rounded, iconColor: c.amber, iconBg: c.amberBg)),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 14),
                       SingleChildScrollView(
@@ -218,7 +221,10 @@ class _CompanyCalendarScreenState extends State<CompanyCalendarScreen> {
                         )
                       : filtered.isEmpty
                           ? const EmptyState(icon: Icons.calendar_month_outlined, title: 'No events found', subtitle: 'Try a different filter.')
-                          : ListView(
+                          : RefreshIndicator(
+                              onRefresh: calendarController.load,
+                              child: ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
                               padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                               children: grouped.entries.map((entry) {
                                 return Column(
@@ -243,6 +249,7 @@ class _CompanyCalendarScreenState extends State<CompanyCalendarScreen> {
                                   ],
                                 );
                               }).toList(),
+                              ),
                             ),
                 ),
               ],
@@ -497,7 +504,6 @@ class _EventTile extends StatelessWidget {
   static final _timeFormat = DateFormat('h:mm a');
 
   bool _sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
-  bool _hasTime(DateTime d) => d.hour != 0 || d.minute != 0;
 
   String _when() {
     final multiDay = event.endDate != null && !_sameDay(event.eventDate, event.endDate!);
@@ -505,9 +511,9 @@ class _EventTile extends StatelessWidget {
       return '${dateFormat.format(event.eventDate)} – ${dateFormat.format(event.endDate!)}';
     }
     final datePart = dateFormat.format(event.eventDate);
-    if (!_hasTime(event.eventDate)) return datePart;
+    if (!event.hasTime) return datePart;
     final startTime = _timeFormat.format(event.eventDate);
-    if (event.endDate != null && _hasTime(event.endDate!)) {
+    if (event.endDate != null) {
       return '$datePart · $startTime – ${_timeFormat.format(event.endDate!)}';
     }
     return '$datePart · $startTime';
@@ -604,8 +610,14 @@ class _EventFormSheetState extends State<_EventFormSheet> {
 
   bool get _isEditing => widget.existing != null;
 
-  static TimeOfDay? _timeOrNull(DateTime? d) {
-    if (d == null || (d.hour == 0 && d.minute == 0)) return null;
+  // Only trust the existing event's clock digits when it's flagged as
+  // actually having a time — an event with hasTime == false may still
+  // carry a non-midnight eventDate (e.g. a pre-migration row cast to
+  // midnight UTC, which reads back as a non-midnight local hour outside
+  // the UTC timezone), and pre-filling from that would silently invent a
+  // time the event never really had.
+  static TimeOfDay? _timeOrNull(DateTime? d, bool hasTime) {
+    if (d == null || !hasTime) return null;
     return TimeOfDay(hour: d.hour, minute: d.minute);
   }
 
@@ -613,8 +625,9 @@ class _EventFormSheetState extends State<_EventFormSheet> {
   void initState() {
     super.initState();
     _endDate = widget.existing?.endDate;
-    _startTime = _timeOrNull(widget.existing?.eventDate);
-    _endTime = _timeOrNull(widget.existing?.endDate);
+    final existingHasTime = widget.existing?.hasTime ?? false;
+    _startTime = _timeOrNull(widget.existing?.eventDate, existingHasTime);
+    _endTime = _timeOrNull(widget.existing?.endDate, existingHasTime);
     if (employeeController.employees.isEmpty) {
       employeeController.loadEmployees();
     }
