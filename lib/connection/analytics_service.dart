@@ -92,11 +92,11 @@ class AnalyticsService {
     return (total: total, employeeCount: list.length);
   }
 
-  static Future<double?> fetchAveragePeScoreThisYear() async {
+  static Future<({double? average, int count})> fetchAveragePeScoreThisYear() async {
     final rows = await _client.from('performance_evaluations').select('weighted_total').eq('year', DateTime.now().year);
     final list = List<Map<String, dynamic>>.from(rows);
-    if (list.isEmpty) return null;
+    if (list.isEmpty) return (average: null, count: 0);
     final total = list.fold<double>(0, (sum, r) => sum + (r['weighted_total'] as num).toDouble());
-    return total / list.length;
+    return (average: total / list.length, count: list.length);
   }
 }

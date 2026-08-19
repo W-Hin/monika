@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../../controller/analytics_controller.dart';
@@ -22,6 +26,24 @@ class _HrAnalyticsScreenState extends State<HrAnalyticsScreen> {
   void initState() {
     super.initState();
     analyticsController.load();
+  }
+
+  Future<void> _downloadCsv(String title) async {
+    final csv = analyticsController.csvFor(title);
+    final fileName = '${title.replaceAll(' ', '_')}.csv';
+    await Share.shareXFiles(
+      [XFile.fromData(Uint8List.fromList(utf8.encode(csv)), name: fileName, mimeType: 'text/csv')],
+      subject: title,
+    );
+  }
+
+  Future<void> _downloadPdf(String title) async {
+    final bytes = await analyticsController.pdfBytesFor(title);
+    final fileName = '${title.replaceAll(' ', '_')}.pdf';
+    await Share.shareXFiles(
+      [XFile.fromData(bytes, name: fileName, mimeType: 'application/pdf')],
+      subject: title,
+    );
   }
 
   void _generateReport(String title) {
@@ -49,12 +71,40 @@ class _HrAnalyticsScreenState extends State<HrAnalyticsScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Summary above is based on live data. Downloading as a PDF/CSV file isn\'t implemented yet.',
+                          'Summary above is based on live data for the currently selected period.',
                           style: TextStyle(fontSize: 11.5, color: c.primaryDark, height: 1.4),
                         ),
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          Navigator.of(context).pop();
+                          await _downloadCsv(title);
+                        },
+                        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10)),
+                        icon: const Icon(Icons.table_chart_outlined, size: 14),
+                        label: const Text('Export as CSV', style: TextStyle(fontSize: 11.5), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          Navigator.of(context).pop();
+                          await _downloadPdf(title);
+                        },
+                        style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10)),
+                        icon: const Icon(Icons.picture_as_pdf_outlined, size: 14),
+                        label: const Text('Export as PDF', style: TextStyle(fontSize: 11.5), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             );
@@ -104,7 +154,10 @@ class _HrAnalyticsScreenState extends State<HrAnalyticsScreen> {
             final lateEmployees = analyticsController.topLateEmployees;
             final maxLate = lateEmployees.isEmpty ? 1 : lateEmployees.first.count;
 
-            return ListView(
+            return RefreshIndicator(
+              onRefresh: analyticsController.load,
+              child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
                 // KPI Row
@@ -204,6 +257,60 @@ class _HrAnalyticsScreenState extends State<HrAnalyticsScreen> {
 
                 const SizedBox(height: 24),
                 const SectionHeader(title: 'Export Reports'),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Row(
+                    children: [
+                      Text('Month:', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.textSecondary)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 3,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                          decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(10)),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<int>(
+                              isExpanded: true,
+                              value: analyticsController.exportMonth.month,
+                              items: List.generate(12, (i) => i + 1)
+                                  .map((m) => DropdownMenuItem(
+                                        value: m,
+                                        child: Text(
+                                          DateFormat('MMMM').format(DateTime(0, m)),
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                                        ),
+                                      ))
+                                  .toList(),
+                              onChanged: (m) {
+                                if (m != null) analyticsController.setExportMonth(DateTime(analyticsController.exportMonth.year, m, 1));
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        flex: 2,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                          decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(10)),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<int>(
+                              isExpanded: true,
+                              value: analyticsController.exportMonth.year,
+                              items: [DateTime.now().year, DateTime.now().year - 1]
+                                  .map((y) => DropdownMenuItem(value: y, child: Text('$y', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700))))
+                                  .toList(),
+                              onChanged: (y) {
+                                if (y != null) analyticsController.setExportMonth(DateTime(y, analyticsController.exportMonth.month, 1));
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 ...[
                   ('Monthly Attendance Summary', Icons.calendar_month_rounded, c.primary, c.primaryLight),
                   ('Leave Utilisation Report', Icons.beach_access_rounded, c.infoBlue, c.infoBlueBg),
@@ -225,6 +332,7 @@ class _HrAnalyticsScreenState extends State<HrAnalyticsScreen> {
                   ),
                 )),
               ],
+              ),
             );
           },
         ),

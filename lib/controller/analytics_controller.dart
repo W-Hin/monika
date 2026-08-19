@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import '../connection/analytics_service.dart';
 import '../model/models.dart';
+import '../utility/pdf_report_builder.dart';
 import 'employee_controller.dart';
 
 /// State-management pattern: ChangeNotifier singleton, consumed via
@@ -11,6 +12,21 @@ import 'employee_controller.dart';
 /// instead of one being wired and the other still showing dummy data.
 class AnalyticsController extends ChangeNotifier {
   String period = 'This Week';
+
+  // Export Reports' own month filter — deliberately separate from `period`
+  // (which drives the live dashboard above it). Report *labels* reflect the
+  // chosen month; the figures behind them still come from whatever `period`
+  // last loaded, since real per-month aggregation queries aren't wired yet
+  // (TODO: Phase where seed data covers a full year — wire AnalyticsService
+  // methods that take an explicit month range instead of reusing `period`,
+  // and drop the "illustrative" labels on the breakdown tables below once
+  // there's enough real data to fill them honestly).
+  DateTime exportMonth = DateTime(DateTime.now().year, DateTime.now().month, 1);
+
+  void setExportMonth(DateTime month) {
+    exportMonth = DateTime(month.year, month.month, 1);
+    notifyListeners();
+  }
 
   double attendanceRate = 0; // fraction of logged clock-ins that were on_time or late (not flagged)
   int lateArrivals = 0;
@@ -33,6 +49,15 @@ class AnalyticsController extends ChangeNotifier {
   String payrollSummary = '';
   String anomalySummary = '';
   String peSummary = '';
+
+  // Raw figures behind the summary sentences above — kept alongside them so
+  // report exports (PDF/CSV) can show real numbers instead of re-parsing
+  // formatted text.
+  double payrollTotal = 0;
+  int payrollEmployeeCount = 0;
+  int highSeverityCount = 0;
+  double? avgPeScore;
+  int peEvaluationCount = 0;
 
   bool loading = false;
   String? errorMessage;
@@ -150,17 +175,21 @@ class AnalyticsController extends ChangeNotifier {
     leaveSummary = '$pendingLeaveCount leave application(s) currently pending across all departments.';
 
     final payroll = await AnalyticsService.fetchPayrollDeductionsThisMonth();
+    payrollTotal = payroll.total;
+    payrollEmployeeCount = payroll.employeeCount;
     payrollSummary = payroll.employeeCount == 0
         ? 'No payroll has been generated for this month yet.'
         : 'Total deductions this cycle: RM ${payroll.total.toStringAsFixed(2)} across ${payroll.employeeCount} employees.';
 
-    final highSeverity = await AnalyticsService.fetchHighSeverityAnomalyCount(start: start, endExclusive: endExclusive);
-    anomalySummary = '$flaggedEvents anomaly event(s) logged, $highSeverity high severity.';
+    highSeverityCount = await AnalyticsService.fetchHighSeverityAnomalyCount(start: start, endExclusive: endExclusive);
+    anomalySummary = '$flaggedEvents anomaly event(s) logged, $highSeverityCount high severity.';
 
     final avgPe = await AnalyticsService.fetchAveragePeScoreThisYear();
-    peSummary = avgPe == null
+    avgPeScore = avgPe.average;
+    peEvaluationCount = avgPe.count;
+    peSummary = avgPe.average == null
         ? 'No performance evaluations recorded yet this year.'
-        : 'Average weighted PE score across recorded evaluations: ${avgPe.toStringAsFixed(1)}/100.';
+        : 'Average weighted PE score across recorded evaluations: ${avgPe.average!.toStringAsFixed(1)}/100.';
   }
 
   /// Cheap targeted refresh for just the pending-leave badge — called after
@@ -193,6 +222,273 @@ class AnalyticsController extends ChangeNotifier {
         return peSummary;
       default:
         return 'Report generated successfully.';
+    }
+  }
+
+  static String _csvField(String value) {
+    // Quote any field containing a comma, quote, or newline, doubling
+    // embedded quotes — the standard CSV escaping rule (RFC 4180).
+    if (value.contains(',') || value.contains('"') || value.contains('\n')) {
+      return '"${value.replaceAll('"', '""')}"';
+    }
+    return value;
+  }
+
+  static String _csvRow(List<String> fields) => '${fields.map(_csvField).join(',')}\r\n';
+
+  static final _monthYearFormat = DateFormat('MMMM yyyy');
+  String get _exportMonthLabel => _monthYearFormat.format(exportMonth);
+
+  /// Builds the real file behind each report tile's "Download" action.
+  /// Headline figures reuse this controller's real already-loaded numbers;
+  /// see `exportMonth`'s doc comment for why they're not yet filtered to
+  /// the specific chosen month.
+  String csvFor(String reportTitle) {
+    final buffer = StringBuffer();
+    switch (reportTitle) {
+      case 'Monthly Attendance Summary':
+        buffer.write(_csvRow(['Metric', 'Value']));
+        buffer.write(_csvRow(['Month', _exportMonthLabel]));
+        buffer.write(_csvRow(['Attendance Rate', '${(attendanceRate * 100).toInt()}%']));
+        buffer.write(_csvRow(['Late Arrivals', '$lateArrivals']));
+        buffer.write(_csvRow(['Flagged Events', '$flaggedEvents']));
+        buffer.write(_csvRow(['Total Employees', '$totalEmployees']));
+        if (topLateEmployees.isNotEmpty) {
+          buffer.write(_csvRow([]));
+          buffer.write(_csvRow(['Top Late Employees', 'Department', 'Late Count']));
+          for (final e in topLateEmployees) {
+            buffer.write(_csvRow([e.name, e.department, '${e.count}']));
+          }
+        }
+        break;
+      case 'Leave Utilisation Report':
+        buffer.write(_csvRow(['Metric', 'Value']));
+        buffer.write(_csvRow(['Month', _exportMonthLabel]));
+        buffer.write(_csvRow(['Pending Leave Applications', '$pendingLeaveCount']));
+        buffer.write(_csvRow(['Employees On Leave Today', '$onLeaveToday']));
+        break;
+      case 'Payroll Deduction Report':
+        buffer.write(_csvRow(['Metric', 'Value']));
+        buffer.write(_csvRow(['Month', _exportMonthLabel]));
+        buffer.write(_csvRow(['Summary', payrollSummary]));
+        break;
+      case 'Suspicious Activity Report':
+        buffer.write(_csvRow(['Metric', 'Value']));
+        buffer.write(_csvRow(['Month', _exportMonthLabel]));
+        buffer.write(_csvRow(['Flagged Events', '$flaggedEvents']));
+        buffer.write(_csvRow(['Flagged Today', '$flaggedToday']));
+        break;
+      case 'Annual PE Summary':
+        buffer.write(_csvRow(['Metric', 'Value']));
+        buffer.write(_csvRow(['Summary', peSummary]));
+        break;
+      default:
+        buffer.write(_csvRow(['Report', reportTitle]));
+        buffer.write(_csvRow(['Value', summaryFor(reportTitle)]));
+    }
+    return buffer.toString();
+  }
+
+  static final _generatedDate = DateFormat('d MMM yyyy');
+
+  /// Builds the branded PDF behind each report tile's "Download PDF"
+  /// action. Headline/metric figures reuse this controller's real
+  /// already-loaded numbers; per-department and per-employee breakdown
+  /// tables are illustrative placeholder rows (matching the Report Layout
+  /// Mockups artifact) rather than new queries — see PdfReportBuilder's
+  /// doc comment and `exportMonth`'s doc comment for why that scope was
+  /// chosen for this pass.
+  Future<Uint8List> pdfBytesFor(String reportTitle) {
+    final generatedBy = 'Generated ${_generatedDate.format(DateTime.now())}';
+    switch (reportTitle) {
+      case 'Monthly Attendance Summary':
+        return PdfReportBuilder.build(
+          doctype: 'Analytics Export · Monthly Attendance Summary',
+          title: 'Company-Wide Attendance — $_exportMonthLabel',
+          subtitle: 'Month: $_exportMonthLabel',
+          headlineValue: '${(attendanceRate * 100).toInt()}%',
+          headlineLabel: 'Company-wide attendance rate',
+          metrics: [
+            ('Late Arrivals', '$lateArrivals'),
+            ('Flagged Events', '$flaggedEvents'),
+            ('Total Employees', '$totalEmployees'),
+          ],
+          sections: [
+            PdfReportSection.groupedByDepartment(
+              label: 'Per-Department Breakdown, by Employee (illustrative)',
+              headers: ['Employee', 'On-Time', 'Late', 'Flagged', 'Rate'],
+              numericColumns: const [1, 2, 3, 4],
+              groups: const [
+                PdfDeptGroup(department: 'Engineering', summary: '142 on-time, 11 late, 3 flagged — 93%', employeeRows: [
+                  ['Nur Aisyah binti Rahman', '19', '1', '0', '95%'],
+                  ['Muthu Kumar a/l Selvam', '17', '3', '1', '81%'],
+                  ['Tan Wei Ling', '20', '0', '0', '100%'],
+                ]),
+                PdfDeptGroup(department: 'Sales', summary: '98 on-time, 14 late, 5 flagged — 88%', employeeRows: [
+                  ['Farah Izzati binti Kamal', '16', '4', '1', '80%'],
+                  ['Ryan Tan Zhi Hao', '18', '2', '0', '90%'],
+                ]),
+                PdfDeptGroup(department: 'HR', summary: '30 on-time, 1 late, 0 flagged — 97%', employeeRows: [
+                  ['Aisyah Rahman', '20', '1', '0', '95%'],
+                ]),
+                PdfDeptGroup(department: 'Design', summary: '54 on-time, 6 late, 2 flagged — 90%', employeeRows: [
+                  ['Chong Mei Yi', '18', '2', '1', '86%'],
+                  ['Aravind Balasubramaniam', '19', '1', '0', '95%'],
+                ]),
+                PdfDeptGroup(department: 'Operations', summary: '76 on-time, 9 late, 4 flagged — 89%', employeeRows: [
+                  ['Nurul Huda binti Osman', '17', '3', '1', '83%'],
+                  ['Kevin Wong Jun Kai', '19', '1', '1', '90%'],
+                ]),
+                PdfDeptGroup(department: 'Finance', summary: '41 on-time, 3 late, 1 flagged — 95%', employeeRows: [
+                  ['Priya Devi a/p Suresh', '20', '0', '0', '100%'],
+                ]),
+              ],
+            ),
+          ],
+          generatedBy: generatedBy,
+        );
+
+      case 'Leave Utilisation Report':
+        return PdfReportBuilder.build(
+          doctype: 'Analytics Export · Leave Utilisation Report',
+          title: 'Leave Utilisation — $_exportMonthLabel',
+          subtitle: 'Month: $_exportMonthLabel',
+          headlineValue: '$pendingLeaveCount',
+          headlineLabel: 'pending applications company-wide',
+          metrics: [
+            ('Employees On Leave Today', '$onLeaveToday'),
+          ],
+          sections: [
+            PdfReportSection.groupedByDepartment(
+              label: 'Per-Department Balances, by Employee (illustrative)',
+              headers: ['Employee', 'Annual (used/total)', 'Medical (used/total)', 'Emergency (used/total)'],
+              centerColumns: const [1, 2, 3],
+              groups: const [
+                PdfDeptGroup(department: 'Engineering', summary: '168 / 224 annual used company-wide', employeeRows: [
+                  ['Nur Aisyah binti Rahman', '6 / 8', '1 / 14', '0 / 3'],
+                  ['Muthu Kumar a/l Selvam', '4 / 8', '0 / 14', '1 / 3'],
+                  ['Tan Wei Ling', '8 / 8', '2 / 14', '0 / 3'],
+                ]),
+                PdfDeptGroup(department: 'Sales', summary: '120 / 168 annual used company-wide', employeeRows: [
+                  ['Farah Izzati binti Kamal', '5 / 8', '3 / 14', '1 / 3'],
+                  ['Ryan Tan Zhi Hao', '3 / 8', '1 / 14', '0 / 3'],
+                ]),
+                PdfDeptGroup(department: 'HR', summary: '38 / 56 annual used company-wide', employeeRows: [
+                  ['Aisyah Rahman', '5 / 8', '0 / 14', '0 / 3'],
+                ]),
+                PdfDeptGroup(department: 'Design', summary: '64 / 96 annual used company-wide', employeeRows: [
+                  ['Chong Mei Yi', '6 / 8', '2 / 14', '0 / 3'],
+                  ['Aravind Balasubramaniam', '2 / 8', '0 / 14', '1 / 3'],
+                ]),
+              ],
+            ),
+          ],
+          generatedBy: generatedBy,
+        );
+
+      case 'Payroll Deduction Report':
+        return PdfReportBuilder.build(
+          doctype: 'Analytics Export · Payroll Deduction Report',
+          title: 'Payroll Deductions — $_exportMonthLabel',
+          subtitle: '$payrollEmployeeCount employees processed',
+          headlineValue: 'RM ${payrollTotal.toStringAsFixed(2)}',
+          headlineLabel: 'Total deductions this run',
+          sections: [
+            PdfReportSection.table(
+              label: 'Per-Employee Breakdown (illustrative, top 5 by deduction)',
+              headers: ['Name', 'Late', 'Absent', 'Deductions', 'Net Pay'],
+              numericColumns: const [1, 2, 3, 4],
+              rows: const [
+                ['Nur Aisyah binti Rahman', '5', '1', 'RM 245', 'RM 4,255'],
+                ['Muthu Kumar a/l Selvam', '3', '2', 'RM 315', 'RM 3,685'],
+                ['Tan Wei Ling', '6', '0', 'RM 150', 'RM 4,850'],
+                ['Farah Izzati binti Kamal', '2', '1', 'RM 170', 'RM 3,930'],
+                ['Ryan Tan Zhi Hao', '4', '0', 'RM 100', 'RM 4,400'],
+              ],
+            ),
+          ],
+          generatedBy: generatedBy,
+        );
+
+      case 'Suspicious Activity Report':
+        return PdfReportBuilder.build(
+          doctype: 'Analytics Export · Suspicious Activity Report',
+          title: 'Suspicious Activity — $_exportMonthLabel',
+          subtitle: 'Month: $_exportMonthLabel',
+          headlineValue: '$flaggedEvents',
+          headlineLabel: 'anomalies logged, $highSeverityCount high severity',
+          metrics: [
+            ('Flagged Today', '$flaggedToday'),
+          ],
+          sections: [
+            PdfReportSection.table(
+              label: 'Flagged Events (illustrative)',
+              headers: ['Employee', 'Type', 'Severity', 'Date', 'Reviewed'],
+              centerColumns: const [1, 2, 3, 4],
+              rows: const [
+                ['Muthu Kumar a/l Selvam', 'Shared Device', 'High', '14 Aug', '—'],
+                ['Tan Wei Ling', 'Out of Zone', 'Medium', '19 Aug', 'Yes'],
+                ['Nur Aisyah binti Rahman', 'WiFi Mismatch', 'Low', '22 Aug', '—'],
+                ['Farah Izzati binti Kamal', 'Early Clock-Out', 'Low', '25 Aug', 'Yes'],
+                ['Ryan Tan Zhi Hao', 'Out of Zone', 'Medium', '27 Aug', '—'],
+              ],
+            ),
+          ],
+          generatedBy: generatedBy,
+        );
+
+      case 'Annual PE Summary':
+        return PdfReportBuilder.build(
+          doctype: 'Analytics Export · Annual PE Summary',
+          title: 'Annual Performance Evaluation Summary — ${DateTime.now().year}',
+          subtitle: '$peEvaluationCount evaluations completed',
+          headlineValue: avgPeScore?.toStringAsFixed(1) ?? '—',
+          headlineLabel: '/ 100 average weighted score, company-wide',
+          sections: [
+            PdfReportSection.groupedByDepartment(
+              label: 'Per-Department, by Employee (illustrative)',
+              headers: ['Employee', 'Weighted Score', 'Below-Threshold KPIs'],
+              numericColumns: const [1, 2],
+              groups: const [
+                PdfDeptGroup(department: 'Engineering', summary: 'avg 79.1, 6 below-threshold KPIs', employeeRows: [
+                  ['Nur Aisyah binti Rahman', '85.2', '0'],
+                  ['Muthu Kumar a/l Selvam', '71.4', '2'],
+                  ['Tan Wei Ling', '80.6', '1'],
+                ]),
+                PdfDeptGroup(department: 'Sales', summary: 'avg 71.8, 14 below-threshold KPIs', employeeRows: [
+                  ['Farah Izzati binti Kamal', '68.0', '3'],
+                  ['Ryan Tan Zhi Hao', '75.5', '1'],
+                ]),
+                PdfDeptGroup(department: 'HR', summary: 'avg 83.4, 1 below-threshold KPI', employeeRows: [
+                  ['Aisyah Rahman', '83.4', '1'],
+                ]),
+                PdfDeptGroup(department: 'Design', summary: 'avg 75.0, 5 below-threshold KPIs', employeeRows: [
+                  ['Chong Mei Yi', '77.2', '1'],
+                  ['Aravind Balasubramaniam', '72.8', '2'],
+                ]),
+                PdfDeptGroup(department: 'Operations', summary: 'avg 77.6, 8 below-threshold KPIs', employeeRows: [
+                  ['Nurul Huda binti Osman', '74.0', '2'],
+                  ['Kevin Wong Jun Kai', '81.2', '1'],
+                ]),
+                PdfDeptGroup(department: 'Finance', summary: 'avg 81.2, 3 below-threshold KPIs', employeeRows: [
+                  ['Priya Devi a/p Suresh', '81.2', '0'],
+                ]),
+              ],
+            ),
+          ],
+          generatedBy: generatedBy,
+        );
+
+      default:
+        return PdfReportBuilder.build(
+          doctype: 'Analytics Export',
+          title: reportTitle,
+          subtitle: 'Month: $_exportMonthLabel',
+          headlineValue: '—',
+          headlineLabel: summaryFor(reportTitle),
+          sections: const [],
+          generatedBy: generatedBy,
+        );
     }
   }
 }
