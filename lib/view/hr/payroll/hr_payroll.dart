@@ -72,7 +72,10 @@ class _HrPayrollScreenState extends State<HrPayrollScreen> {
             final totalNet = summaries.fold<double>(0, (sum, p) => sum + p.netPay);
             final totalDeductions = summaries.fold<double>(0, (sum, p) => sum + p.deductions);
 
-            return ListView(
+            return RefreshIndicator(
+              onRefresh: payrollController.loadAllForHr,
+              child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
                 Row(
@@ -132,6 +135,7 @@ class _HrPayrollScreenState extends State<HrPayrollScreen> {
                   ListRow(children: summaries.map((p) => _PayrollRow(summary: p)).toList()),
                 ],
               ],
+              ),
             );
           },
         ),

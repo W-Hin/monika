@@ -49,12 +49,22 @@ class PayrollService {
   ///    weekdays with no attendance record, no public holiday, and no
   ///    approved leave application covering that day) — days covered by
   ///    an approved leave are explicitly excluded, they're not absences.
+  ///  - approved unpaid leave (policy_settings.unpaid_leave_daily_rate x
+  ///    count of weekdays covered by an approved 'unpaid' leave
+  ///    application) — unlike annual/medical/emergency, unpaid leave has
+  ///    no balance pool to draw from, so instead of just excusing the
+  ///    absence it costs the employee a day's pay.
   /// Only counts days up to today (never penalises days in the month that
   /// haven't happened yet), and never before the employee's hire date.
   static Future<int> generateForMonth(DateTime month) async {
-    final policy = await _client.from('policy_settings').select('late_deduction, absent_deduction').eq('id', 1).single();
+    final policy = await _client
+        .from('policy_settings')
+        .select('late_deduction, absent_deduction, unpaid_leave_daily_rate')
+        .eq('id', 1)
+        .single();
     final lateDeduction = (policy['late_deduction'] as num).toDouble();
     final absentDeduction = (policy['absent_deduction'] as num).toDouble();
+    final unpaidLeaveDailyRate = (policy['unpaid_leave_daily_rate'] as num).toDouble();
 
     final employees = await _client.from('profiles').select('id, base_salary, hire_date').eq('is_active', true);
 
@@ -92,29 +102,41 @@ class PayrollService {
 
       final approvedLeaveRows = await _client
           .from('leave_applications')
-          .select('start_date, end_date')
+          .select('start_date, end_date, leave_type')
           .eq('user_id', uid)
           .eq('status', 'approved')
           .lte('start_date', monthEndKey)
           .gte('end_date', monthStartKey);
       final leaveRanges = List<Map<String, dynamic>>.from(approvedLeaveRows)
-          .map((r) => (DateTime.parse(r['start_date'] as String), DateTime.parse(r['end_date'] as String)))
+          .map((r) => (
+                DateTime.parse(r['start_date'] as String),
+                DateTime.parse(r['end_date'] as String),
+                r['leave_type'] as String,
+              ))
           .toList();
       bool onApprovedLeave(DateTime d) => leaveRanges.any((r) => !d.isBefore(r.$1) && !d.isAfter(r.$2));
+      bool onUnpaidLeave(DateTime d) =>
+          leaveRanges.any((r) => r.$3 == 'unpaid' && !d.isBefore(r.$1) && !d.isAfter(r.$2));
 
       var absentCount = 0;
+      var unpaidLeaveCount = 0;
       for (var d = monthStart; !d.isAfter(lastCountableDay); d = d.add(const Duration(days: 1))) {
         if (d.weekday == DateTime.saturday || d.weekday == DateTime.sunday) continue;
         if (holidayDates.any((h) => h.year == d.year && h.month == d.month && h.day == d.day)) continue;
         if (hireDate != null && d.isBefore(DateTime(hireDate.year, hireDate.month, hireDate.day))) continue;
         if (attendedDates.any((a) => a.year == d.year && a.month == d.month && a.day == d.day)) continue;
+        if (onUnpaidLeave(d)) {
+          unpaidLeaveCount++;
+          continue;
+        }
         if (onApprovedLeave(d)) continue;
         absentCount++;
       }
 
       final lateAmount = lateCount * lateDeduction;
       final absentAmount = absentCount * absentDeduction;
-      final deductionAmount = lateAmount + absentAmount;
+      final unpaidLeaveAmount = unpaidLeaveCount * unpaidLeaveDailyRate;
+      final deductionAmount = lateAmount + absentAmount + unpaidLeaveAmount;
       final netPay = baseSalary - deductionAmount;
 
       final upserted = await _client
@@ -146,6 +168,13 @@ class PayrollService {
           'payroll_id': payrollId,
           'label': 'Unexplained absence ($absentCount day${absentCount > 1 ? 's' : ''})',
           'amount': absentAmount,
+        });
+      }
+      if (unpaidLeaveCount > 0) {
+        items.add({
+          'payroll_id': payrollId,
+          'label': 'Unpaid leave ($unpaidLeaveCount day${unpaidLeaveCount > 1 ? 's' : ''})',
+          'amount': unpaidLeaveAmount,
         });
       }
       if (items.isNotEmpty) {

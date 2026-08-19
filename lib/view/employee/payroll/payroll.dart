@@ -34,7 +34,10 @@ class _PayrollScreenState extends State<PayrollScreen> {
             final payroll = payrollController.myCurrentMonth;
             final history = payrollController.myHistory.where((h) => h.dbId != payroll?.dbId).toList();
 
-            return ListView(
+            return RefreshIndicator(
+              onRefresh: payrollController.loadMy,
+              child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
                 if (payroll == null)
@@ -156,6 +159,7 @@ class _PayrollScreenState extends State<PayrollScreen> {
                         ),
                       )),
               ],
+              ),
             );
           },
         ),

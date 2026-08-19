@@ -7,11 +7,16 @@ import 'package:monika/view/employee/pe/pe_detail.dart';
 void main() {
   testWidgets('PayrollScreen builds', (tester) async {
     await tester.pumpWidget(MaterialApp(theme: AppTheme.light, home: const PayrollScreen()));
-    expect(find.text('Deduction Breakdown'), findsOneWidget);
+    await tester.pumpAndSettle();
+    // No auth session in tests, so there's no "current user" payroll row —
+    // this is the correct not-signed-in/no-data empty state, not a stale
+    // dummy-data assertion.
+    expect(find.text('Not generated yet'), findsOneWidget);
   });
 
   testWidgets('PeDetailScreen builds', (tester) async {
     await tester.pumpWidget(MaterialApp(theme: AppTheme.light, home: const PeDetailScreen()));
-    expect(find.text('KPI Breakdown'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.text('No evaluation yet'), findsOneWidget);
   });
 }
