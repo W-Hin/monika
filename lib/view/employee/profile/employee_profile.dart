@@ -25,6 +25,8 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
   bool _isEditing = false;
   late TextEditingController _emailController;
 
+  bool get _isDirty => _isEditing && _emailController.text.trim() != DummyData.employeeUser.email;
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -45,6 +47,7 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
   void initState() {
     super.initState();
     _emailController = TextEditingController(text: DummyData.employeeUser.email);
+    _emailController.addListener(() => setState(() {}));
     deviceRequestController.loadMyPending();
   }
 
@@ -100,7 +103,9 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
   Widget build(BuildContext context) {
     final c = context.colors;
 
-    return Scaffold(
+    return UnsavedChangesGuard(
+      isDirty: _isDirty,
+      child: Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: const Text('Profile'),
@@ -120,7 +125,10 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
           listenable: Listenable.merge([authController, deviceRequestController]),
           builder: (context, _) {
           final user = DummyData.employeeUser;
-          return ListView(
+          return RefreshIndicator(
+          onRefresh: deviceRequestController.loadMyPending,
+          child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
             Center(
@@ -278,9 +286,11 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
               ),
             ),
           ],
+          ),
           );
           },
         ),
+      ),
       ),
     );
   }
@@ -301,8 +311,9 @@ class _InfoRow extends StatelessWidget {
         children: [
           Icon(icon, size: 18, color: c.textMuted),
           const SizedBox(width: 14),
-          Expanded(child: Text(label, style: TextStyle(fontSize: 13, color: c.textSecondary))),
-          Flexible(
+          Expanded(flex: 2, child: Text(label, style: TextStyle(fontSize: 13, color: c.textSecondary))),
+          Expanded(
+            flex: 3,
             child: Text(
               value,
               textAlign: TextAlign.right,

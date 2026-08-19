@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
+import '../../shared/widgets/common_widgets.dart';
 
 /// Formats input as a Malaysian mobile number: max 10 digits, dash after
 /// the 3rd (e.g. 012-3456789). Strips anything non-numeric as you type.
@@ -39,8 +40,37 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
   String _jobTitle = _jobTitlesByDepartment['Engineering']!.first;
   String _accountType = 'employee';
   bool _isSubmitting = false;
+  bool _created = false;
 
   final _departments = ['Engineering', 'Sales', 'Operations', 'Marketing', 'Design', 'Human Resources', 'Finance'];
+
+  bool get _isDirty =>
+      !_created &&
+      (_name.text.isNotEmpty ||
+          _email.text.isNotEmpty ||
+          _phone.text.isNotEmpty ||
+          _salary.text != '3500.00' ||
+          _department != 'Engineering' ||
+          _jobTitle != _jobTitlesByDepartment['Engineering']!.first ||
+          _accountType != 'employee');
+
+  @override
+  void initState() {
+    super.initState();
+    for (final controller in [_name, _email, _phone, _salary]) {
+      controller.addListener(_onFieldChanged);
+    }
+  }
+
+  void _onFieldChanged() => setState(() {});
+
+  @override
+  void dispose() {
+    for (final controller in [_name, _email, _phone, _salary]) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
 
   static const _jobTitlesByDepartment = <String, List<String>>{
     'Engineering': ['Software Engineer', 'Senior Engineer', 'Team Lead', 'Backend Engineer', 'Mobile Developer'],
@@ -114,6 +144,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
 
       final emailSent = data is Map && data['emailSent'] == true;
       final emailError = data is Map ? data['emailError'] as String? : null;
+      setState(() => _created = true);
       _showSuccessDialog(tempPassword, emailSent, emailError);
     } catch (e) {
       if (!mounted) return;
@@ -208,7 +239,9 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Scaffold(
+    return UnsavedChangesGuard(
+      isDirty: _isDirty,
+      child: Scaffold(
       appBar: AppBar(title: const Text('Add New Employee')),
       body: SafeArea(
         top: false,
@@ -388,6 +421,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

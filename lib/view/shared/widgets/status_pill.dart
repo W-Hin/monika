@@ -111,7 +111,5 @@ T _attendancePill<T>(AttendanceStatus status, T Function(String, Color, Color, I
       return make('Late', colors.statusPending, colors.riskMediumBg, Icons.schedule);
     case AttendanceStatus.flagged:
       return make('Flagged', colors.statusRejected, colors.riskHighBg, Icons.flag_outlined);
-    case AttendanceStatus.leave:
-      return make('On Leave', colors.infoBlue, colors.infoBlueBg, Icons.beach_access_outlined);
   }
 }

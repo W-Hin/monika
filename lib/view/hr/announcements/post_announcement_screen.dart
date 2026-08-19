@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
+import '../../shared/widgets/common_widgets.dart';
 import '../../../core/data/dummy_data.dart';
 import '../../../controller/notification_controller.dart';
 
@@ -18,7 +19,10 @@ class _PostAnnouncementScreenState extends State<PostAnnouncementScreen> {
   final _message = TextEditingController();
   String _target = 'All Employees';
   bool _sending = false;
+  bool _posted = false;
   String? _error;
+
+  bool get _isDirty => !_posted && (_title.text.trim().isNotEmpty || _message.text.trim().isNotEmpty || _target != 'All Employees');
 
   @override
   void dispose() {
@@ -58,6 +62,7 @@ class _PostAnnouncementScreenState extends State<PostAnnouncementScreen> {
       setState(() => _error = notificationController.announcementError ?? 'Could not post announcement.');
       return;
     }
+    setState(() => _posted = true);
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('✓ Announcement sent to $count employee${count == 1 ? '' : 's'}')),
@@ -67,7 +72,9 @@ class _PostAnnouncementScreenState extends State<PostAnnouncementScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Scaffold(
+    return UnsavedChangesGuard(
+      isDirty: _isDirty,
+      child: Scaffold(
       appBar: AppBar(title: const Text('Post Announcement')),
       body: SafeArea(
         top: false,
@@ -76,7 +83,7 @@ class _PostAnnouncementScreenState extends State<PostAnnouncementScreen> {
           children: [
             Text('Title', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
             const SizedBox(height: 8),
-            TextField(controller: _title, decoration: const InputDecoration(hintText: 'e.g. Office closed for Public Holiday')),
+            TextField(controller: _title, onChanged: (_) => setState(() {}), decoration: const InputDecoration(hintText: 'e.g. Office closed for Public Holiday')),
             const SizedBox(height: 14),
 
             Text('Message', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
@@ -84,6 +91,7 @@ class _PostAnnouncementScreenState extends State<PostAnnouncementScreen> {
             TextField(
               controller: _message,
               maxLines: 5,
+              onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(hintText: 'Write the announcement message...'),
             ),
             const SizedBox(height: 14),
@@ -144,6 +152,7 @@ class _PostAnnouncementScreenState extends State<PostAnnouncementScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

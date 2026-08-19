@@ -20,6 +20,8 @@ IconData _iconFor(String type) {
       return Icons.phone_android_rounded;
     case 'announcement':
       return Icons.campaign_rounded;
+    case 'onboarding':
+      return Icons.waving_hand_rounded;
     default:
       return Icons.notifications_none_rounded;
   }
@@ -41,6 +43,8 @@ AppHue _hueFor(String type) {
       return AppHue.primary;
     case 'announcement':
       return AppHue.purple;
+    case 'onboarding':
+      return AppHue.primary;
     default:
       return AppHue.infoBlue;
   }
@@ -131,7 +135,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 ),
               );
             }
-            return ListView.separated(
+            return RefreshIndicator(
+              onRefresh: notificationController.load,
+              child: ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               itemCount: notifs.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
@@ -190,6 +197,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   ),
                 );
               },
+              ),
             );
           },
         ),

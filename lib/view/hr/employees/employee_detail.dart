@@ -35,6 +35,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     _department = _emp.department;
     _jobTitle = _emp.jobTitle;
     _salaryController = TextEditingController(text: _emp.baseSalary?.toStringAsFixed(2) ?? '');
+    _salaryController.addListener(() => setState(() {}));
     if (!_departments.contains(_department)) _departments.add(_department);
     if (!_jobTitles.contains(_jobTitle)) _jobTitles.add(_jobTitle);
   }
@@ -44,6 +45,10 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     _salaryController.dispose();
     super.dispose();
   }
+
+  bool get _isDirty =>
+      _isEditing &&
+      (_department != _emp.department || _jobTitle != _emp.jobTitle || _salaryController.text != (_emp.baseSalary?.toStringAsFixed(2) ?? ''));
 
   /// The 1st of next calendar month — used as the "official" effective
   /// date communicated in the change-notification email. The database
@@ -227,6 +232,37 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     );
   }
 
+  /// Best-effort — picks up changes another HR admin may have made to this
+  /// employee concurrently (role, department, salary, risk score, device,
+  /// active status). Skipped while actively editing so an in-progress edit
+  /// isn't silently overwritten mid-pull.
+  Future<void> _refresh() async {
+    if (_isEditing) return;
+    try {
+      final row = await EmployeeService.fetchOne(_emp.uuid);
+      if (row == null || !mounted) return;
+      final risk = RiskLevel.values.firstWhere((r) => r.name == row['risk_level'], orElse: () => _emp.risk);
+      final deptName = (row['departments'] as Map<String, dynamic>?)?['name'] as String? ?? _emp.department;
+      setState(() {
+        _emp = _emp.copyWith(
+          jobTitle: row['job_title'] as String? ?? _emp.jobTitle,
+          department: deptName,
+          risk: risk,
+          isActive: row['is_active'] as bool? ?? _emp.isActive,
+          registeredDevice: row['registered_device_name'] as String? ?? 'Not yet registered',
+          baseSalary: (row['base_salary'] as num?)?.toDouble(),
+        );
+        _department = _emp.department;
+        _jobTitle = _emp.jobTitle;
+        _salaryController.text = _emp.baseSalary?.toStringAsFixed(2) ?? '';
+      });
+      widget.onUpdate(_emp);
+    } catch (_) {
+      // Best-effort — worst case the screen just keeps showing stale data
+      // until the next successful refresh.
+    }
+  }
+
   void _resetDeviceBinding() {
     showDialog(
       context: context,
@@ -272,7 +308,9 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return Scaffold(
+    return UnsavedChangesGuard(
+      isDirty: _isDirty,
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Employee Details'),
         actions: [
@@ -285,7 +323,10 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: ListView(
+        child: RefreshIndicator(
+          onRefresh: _refresh,
+          child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
             Center(
@@ -447,7 +488,9 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
               ),
             ),
           ],
+          ),
         ),
+      ),
       ),
     );
   }
@@ -468,8 +511,9 @@ class _InfoRow extends StatelessWidget {
         children: [
           Icon(icon, size: 18, color: c.textMuted),
           const SizedBox(width: 14),
-          Expanded(child: Text(label, style: TextStyle(fontSize: 13, color: c.textSecondary))),
-          Flexible(
+          Expanded(flex: 2, child: Text(label, style: TextStyle(fontSize: 13, color: c.textSecondary))),
+          Expanded(
+            flex: 3,
             child: Text(value, textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
           ),
         ],

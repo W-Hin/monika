@@ -43,7 +43,10 @@ class _HrProfileScreenState extends State<HrProfileScreen> {
       appBar: AppBar(automaticallyImplyLeading: false, title: const Text('Profile')),
       body: SafeArea(
         top: false,
-        child: ListView(
+        child: RefreshIndicator(
+          onRefresh: employeeController.loadEmployees,
+          child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
 
@@ -234,6 +237,7 @@ class _HrProfileScreenState extends State<HrProfileScreen> {
               ),
             ),
           ],
+          ),
         ),
       ),
     );
@@ -255,8 +259,9 @@ class _InfoRow extends StatelessWidget {
         children: [
           Icon(icon, size: 18, color: c.textMuted),
           const SizedBox(width: 14),
-          Expanded(child: Text(label, style: TextStyle(fontSize: 13, color: c.textSecondary))),
-          Flexible(
+          Expanded(flex: 2, child: Text(label, style: TextStyle(fontSize: 13, color: c.textSecondary))),
+          Expanded(
+            flex: 3,
             child: Text(value, textAlign: TextAlign.right, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary), overflow: TextOverflow.ellipsis),
           ),
         ],

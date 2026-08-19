@@ -54,6 +54,7 @@ class StatCard extends StatelessWidget {
   final String? trend;
   final bool trendPositive;
   final bool washed;
+  final double labelFontSize;
 
   const StatCard({
     super.key,
@@ -65,6 +66,7 @@ class StatCard extends StatelessWidget {
     this.trend,
     this.trendPositive = true,
     this.washed = false,
+    this.labelFontSize = 12.5,
   });
 
   @override
@@ -97,7 +99,7 @@ class StatCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 2),
-          Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: c.textSecondary)),
+          Text(label, style: TextStyle(fontSize: labelFontSize, fontWeight: FontWeight.w500, color: c.textSecondary)),
           if (trend != null) ...[
             const SizedBox(height: 6),
             Row(
@@ -260,6 +262,57 @@ class EmptyState extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Wraps a form screen so leaving it (app-bar back, system back gesture,
+/// physical back button) while [isDirty] is true prompts a "Discard
+/// changes?" confirmation instead of silently losing edits.
+class UnsavedChangesGuard extends StatelessWidget {
+  final bool isDirty;
+  final Widget child;
+  const UnsavedChangesGuard({super.key, required this.isDirty, required this.child});
+
+  /// Exposed separately so a screen's own explicit close/back button (not
+  /// just system back navigation) can run the same confirmation before
+  /// calling Navigator.pop() itself.
+  static Future<bool> confirmDiscard(BuildContext context) async {
+    final c = context.colors;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Discard changes?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        content: Text(
+          'You have unsaved changes. Leaving now will discard them.',
+          style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Keep Editing')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: c.riskHigh),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Discard'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: !isDirty,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldDiscard = await confirmDiscard(context);
+        if (shouldDiscard && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: child,
     );
   }
 }
