@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors_extension.dart';
 import '../shared/widgets/buttons.dart';
-import '../shared/widgets/monika_logo.dart';
 import '../../controller/auth_controller.dart';
 import '../employee/employee_shell.dart';
 import 'forgot_password.dart';
@@ -62,22 +61,17 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       backgroundColor: c.background,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Column(
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 24),
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: c.primary,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                alignment: Alignment.center,
-                child: const MonikaLogoMark(size: 30, color: Colors.white),
-              ),
+              Center(child: Image.asset('lib/img/monika_logo_mark.png', height: 64)),
               const SizedBox(height: 24),
               Text(
                 'Welcome back',
@@ -137,8 +131,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: _handleLogin,
                 isLoading: _isLoading,
               ),
-              const SizedBox(height: 24),
             ],
+                ),
+              ),
+            ),
           ),
         ),
       ),

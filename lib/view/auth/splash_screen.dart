@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors_extension.dart';
 import '../../controller/auth_controller.dart';
-import '../../model/models.dart';
 import '../employee/employee_shell.dart';
-import '../hr/hr_shell.dart';
-import '../shared/widgets/monika_logo.dart';
 import 'login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -27,9 +24,15 @@ class _SplashScreenState extends State<SplashScreen> {
     await minSplash;
     if (!mounted) return;
 
-    final Widget destination = authController.status == AuthStatus.signedIn
-        ? (authController.role == UserRole.hrAdmin ? const HrShell() : const EmployeeShell())
-        : const LoginScreen();
+    // Always land on the Employee shell on a fresh app open, even for HR
+    // admin accounts — "Switch to Admin View" (Profile menu) re-enters
+    // HrShell as a fresh push, which reliably loads its own data. Routing
+    // straight into a "resumed" HrShell here was the actual bug: on some
+    // devices Android keeps the process alive across a backgrounding but
+    // the widget tree's cached controller data goes stale, so admin
+    // screens showed 0 records until manually navigated away and back.
+    // Starting fresh from Employee every time sidesteps that entirely.
+    final Widget destination = authController.status == AuthStatus.signedIn ? const EmployeeShell() : const LoginScreen();
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
@@ -64,7 +67,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 ],
               ),
               alignment: Alignment.center,
-              child: MonikaLogoMark(size: 44, color: c.primary),
+              child: Image.asset('lib/img/monika_logo_mark.png', width: 56, height: 56),
             ),
             const SizedBox(height: 24),
             const Text(

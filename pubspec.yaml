@@ -38,13 +38,34 @@ dependencies:
   # Date formatting utilities
   intl: ^0.20.2
 
+  # Lets HR's Analytics report tiles hand off a real CSV file to the OS
+  # share sheet (save / email / send) instead of just showing a summary
+  # dialog with no actual file output.
+  share_plus: ^10.1.4
+
+  # Generates the branded, letterhead-style PDF export for Analytics report
+  # tiles (mirrors the Report Layout Mockups artifact design).
+  pdf: ^3.11.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "lib/img/monika_logo_icon_square.png"
+  remove_alpha_ios: true
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "lib/img/monika_logo_icon_square_transparent.png"
 
 flutter:
   uses-material-design: true
+  assets:
+    - lib/img/
   fonts:
     - family: Inter
       fonts:
