@@ -31,7 +31,18 @@ class DeviceCheckResult {
   final String? deviceToken;
   final String deviceName;
   final String detail;
-  const DeviceCheckResult({required this.passed, this.deviceToken, required this.deviceName, required this.detail});
+  // True only for the shared-device-with-another-account case — unlike a
+  // normal failed device check (which still lets the clock-in through as
+  // a flagged record for HR to review), this one has no legitimate
+  // self-correction and must stop the clock-in outright.
+  final bool blocked;
+  const DeviceCheckResult({
+    required this.passed,
+    this.deviceToken,
+    required this.deviceName,
+    required this.detail,
+    this.blocked = false,
+  });
 }
 
 /// Real IoT attendance validation (GPS geofence + WiFi SSID + device token)
@@ -44,6 +55,26 @@ class AttendanceController extends ChangeNotifier {
   int? _todayRecordId;
   List<AttendanceRecord> history = [];
 
+  // All-time fraction of clock-ins that were on_time or late (not flagged),
+  // across every attendance record — 0% before the first-ever clock-in,
+  // rather than a misleading placeholder.
+  double attendanceRate = 0;
+
+  Future<void> loadAttendanceRate() async {
+    try {
+      final rows = await AttendanceService.fetchAllStatuses();
+      if (rows.isEmpty) {
+        attendanceRate = 0;
+      } else {
+        final present = rows.where((r) => r['status'] == 'on_time' || r['status'] == 'late').length;
+        attendanceRate = present / rows.length;
+      }
+    } catch (_) {
+      // Best-effort, same reasoning as loadToday.
+    }
+    notifyListeners();
+  }
+
   // 90-day window for the Risk Classification card — separate from
   // `history` because that's capped to the most recent 30 rows for the
   // Recent Records list, which would understate the window for anyone
@@ -51,11 +82,6 @@ class AttendanceController extends ChangeNotifier {
   List<AttendanceRecord> riskWindow = [];
   int get riskViolations => riskWindow.where((r) => r.status == AttendanceStatus.flagged).length;
   int get riskLateDays => riskWindow.where((r) => r.status == AttendanceStatus.late).length;
-  int get riskScorePercent {
-    if (riskWindow.isEmpty) return 100;
-    final present = riskWindow.where((r) => r.status == AttendanceStatus.onTime || r.status == AttendanceStatus.late).length;
-    return ((present / riskWindow.length) * 100).round();
-  }
 
   double _officeLat = 3.1390;
   double _officeLng = 101.6869;
@@ -71,17 +97,22 @@ class AttendanceController extends ChangeNotifier {
 
   Future<void> loadPolicy() async {
     if (_policyLoaded) return;
-    final row = await AttendanceService.fetchPolicySettings();
-    if (row != null) {
-      _officeLat = double.tryParse('${row['office_lat']}') ?? _officeLat;
-      _officeLng = double.tryParse('${row['office_lng']}') ?? _officeLng;
-      _geofenceRadius = (row['geofence_radius_meters'] as num?)?.toInt() ?? _geofenceRadius;
-      _officeWifiSsid = row['office_wifi_ssid'] as String? ?? _officeWifiSsid;
-      _workStart = row['work_start_time'] as String? ?? _workStart;
-      _workEnd = row['work_end_time'] as String? ?? _workEnd;
-      _gracePeriodMinutes = (row['grace_period_minutes'] as num?)?.toInt() ?? _gracePeriodMinutes;
+    try {
+      final row = await AttendanceService.fetchPolicySettings();
+      if (row != null) {
+        _officeLat = double.tryParse('${row['office_lat']}') ?? _officeLat;
+        _officeLng = double.tryParse('${row['office_lng']}') ?? _officeLng;
+        _geofenceRadius = (row['geofence_radius_meters'] as num?)?.toInt() ?? _geofenceRadius;
+        _officeWifiSsid = row['office_wifi_ssid'] as String? ?? _officeWifiSsid;
+        _workStart = row['work_start_time'] as String? ?? _workStart;
+        _workEnd = row['work_end_time'] as String? ?? _workEnd;
+        _gracePeriodMinutes = (row['grace_period_minutes'] as num?)?.toInt() ?? _gracePeriodMinutes;
+      }
+      _policyLoaded = true;
+    } catch (_) {
+      // Best-effort, same reasoning as loadToday — callers just keep using
+      // the hardcoded defaults above until the next successful fetch.
     }
-    _policyLoaded = true;
   }
 
   Future<void> loadToday() async {
@@ -107,10 +138,47 @@ class AttendanceController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Attendance History screen's month filter — a dedicated, uncapped
+  // per-month query rather than filtering `history` (capped to the most
+  // recent 30 rows, which would silently hide older months once an
+  // account passes that many total records).
+  List<AttendanceRecord> monthRecords = [];
+  bool loadingMonth = false;
+
+  Future<void> loadForMonth(DateTime month) async {
+    loadingMonth = true;
+    notifyListeners();
+    try {
+      final rows = await AttendanceService.fetchForMonth(month);
+      monthRecords = rows.map(_mapRecord).toList();
+    } catch (_) {
+      // Best-effort, same reasoning as loadToday.
+    }
+    loadingMonth = false;
+    notifyListeners();
+  }
+
   Future<void> loadRiskWindow() async {
     try {
       final rows = await AttendanceService.fetchWindow(days: 90);
       riskWindow = rows.map(_mapRecord).toList();
+    } catch (_) {
+      // Best-effort, same reasoning as loadToday.
+    }
+    notifyListeners();
+  }
+
+  // Separate from riskWindow (fixed 90-day risk-classification scope) —
+  // "Days Present" is meant to read as "so far this calendar year".
+  List<AttendanceRecord> yearWindow = [];
+  int get daysPresentThisYear => yearWindow.where((r) => r.status == AttendanceStatus.onTime || r.status == AttendanceStatus.late).length;
+
+  Future<void> loadYearWindow() async {
+    try {
+      final now = DateTime.now();
+      final daysSinceJan1 = now.difference(DateTime(now.year, 1, 1)).inDays + 1;
+      final rows = await AttendanceService.fetchWindow(days: daysSinceJan1);
+      yearWindow = rows.map(_mapRecord).toList();
     } catch (_) {
       // Best-effort, same reasoning as loadToday.
     }
@@ -218,6 +286,16 @@ class AttendanceController extends ChangeNotifier {
       final storedToken = profile?['device_token'] as String?;
 
       if (storedToken == null) {
+        final boundToOther = await AttendanceService.isDeviceBoundToOther(token);
+        if (boundToOther) {
+          return DeviceCheckResult(
+            passed: false,
+            blocked: true,
+            deviceToken: token,
+            deviceName: name,
+            detail: 'This device is already registered to another employee\'s account. Please contact HR by email to appeal.',
+          );
+        }
         await AttendanceService.bindDevice(deviceToken: token, deviceName: name);
         // Refresh the cached profile so Attendance/Profile screens show the
         // newly-bound device immediately instead of only after re-login.
@@ -311,9 +389,11 @@ class AttendanceController extends ChangeNotifier {
     );
     _todayRecordId = row['id'] as int;
     todayRecord = _mapRecord(row);
-    // Keep the Recent Records list in sync with today's just-created row —
-    // without this it only shows up after the screen is freshly re-created.
+    // Keep the Recent Records list and Home's Attendance Rate stat in sync
+    // with today's just-created row — without this they only show up after
+    // the screen is freshly re-created (e.g. a full app restart).
     await loadHistory();
+    await loadAttendanceRate();
 
     await _raiseAnomalies(
       attendanceRecordId: _todayRecordId!,
@@ -323,6 +403,10 @@ class AttendanceController extends ChangeNotifier {
       devicePassed: devicePassed,
       status: status,
     );
+    // Anomalies above may have just deducted this employee's risk_score
+    // server-side — refresh so the Risk Classification card reflects it
+    // immediately instead of only after the next login.
+    unawaited(authController.refreshProfile());
 
     return todayRecord!;
   }

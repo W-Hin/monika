@@ -32,6 +32,35 @@ class AttendanceService {
     return List<Map<String, dynamic>>.from(rows);
   }
 
+  /// Every record within one specific calendar month, uncapped — used by
+  /// the Attendance History screen's month filter. fetchHistory's cap of
+  /// the most recent 30 rows would silently drop older months once an
+  /// account has accumulated more than 30 records total.
+  static Future<List<Map<String, dynamic>>> fetchForMonth(DateTime month) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return [];
+    final start = DateFormat('yyyy-MM-dd').format(DateTime(month.year, month.month, 1));
+    final endExclusive = DateFormat('yyyy-MM-dd').format(DateTime(month.year, month.month + 1, 1));
+    final rows = await _client
+        .from('attendance_records')
+        .select()
+        .eq('user_id', uid)
+        .gte('work_date', start)
+        .lt('work_date', endExclusive)
+        .order('work_date', ascending: false);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  /// Every attendance record's status, uncapped — used for the Home
+  /// dashboard's all-time Attendance Rate stat, which needs the true
+  /// total rather than fetchHistory's "most recent N rows" cap.
+  static Future<List<Map<String, dynamic>>> fetchAllStatuses() async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return [];
+    final rows = await _client.from('attendance_records').select('status').eq('user_id', uid);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
   /// Every record in the last [days] days, uncapped — used for the Risk
   /// Classification summary, which needs the true count over a fixed
   /// window rather than fetchHistory's "most recent N rows" cap.
@@ -65,7 +94,10 @@ class AttendanceService {
         .insert({
           'user_id': uid,
           'work_date': _todayDate,
-          'clock_in_at': now.toIso8601String(),
+          // toIso8601String() on a local DateTime omits any timezone
+          // suffix, so Postgres would otherwise cast it as if it were
+          // already UTC — .toUtc() first makes the stored instant correct.
+          'clock_in_at': now.toUtc().toIso8601String(),
           'status': status,
           'flag_reason': flagReason,
           'gps_lat': gpsLat,
@@ -80,7 +112,7 @@ class AttendanceService {
   }
 
   static Future<Map<String, dynamic>> clockOut(int recordId, {bool early = false}) async {
-    final update = <String, dynamic>{'clock_out_at': DateTime.now().toIso8601String()};
+    final update = <String, dynamic>{'clock_out_at': DateTime.now().toUtc().toIso8601String()};
     if (early) {
       update['status'] = 'flagged';
       update['flag_reason'] = 'Clocked out earlier than the scheduled end time';
@@ -113,6 +145,20 @@ class AttendanceService {
     return rows.length;
   }
 
+  /// Checked before the first-use auto-bind below — RLS hides every other
+  /// employee's `device_token` from a plain client-side SELECT, so this
+  /// calls a SECURITY DEFINER RPC (migration 0024) that can see across all
+  /// profiles just far enough to answer "does someone else already have
+  /// this device".
+  static Future<bool> isDeviceBoundToOther(String deviceToken) async {
+    final uid = _client.auth.currentUser!.id;
+    final result = await _client.rpc('device_token_bound_to_other', params: {
+      'p_device_token': deviceToken,
+      'p_calling_user_id': uid,
+    });
+    return result as bool;
+  }
+
   /// Called on first successful clock-in when the profile has no device
   /// bound yet. Subsequent clock-ins compare against this instead.
   static Future<void> bindDevice({required String deviceToken, required String deviceName}) async {
@@ -120,7 +166,7 @@ class AttendanceService {
     await _client.from('profiles').update({
       'device_token': deviceToken,
       'registered_device_name': deviceName,
-      'device_bound_at': DateTime.now().toIso8601String(),
+      'device_bound_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', uid);
   }
 }

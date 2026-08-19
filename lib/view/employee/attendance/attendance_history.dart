@@ -15,15 +15,26 @@ class AttendanceHistoryScreen extends StatefulWidget {
 }
 
 class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
+  DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month, 1);
+
   @override
   void initState() {
     super.initState();
-    attendanceController.loadHistory();
+    attendanceController.loadForMonth(_selectedMonth);
+  }
+
+  void _changeMonth(DateTime month) {
+    setState(() => _selectedMonth = month);
+    attendanceController.loadForMonth(month);
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final now = DateTime.now();
+    // A long-tenured account could have years of history — offer this year
+    // and last year, not an unbounded picker.
+    final years = [now.year, now.year - 1];
 
     return Scaffold(
       appBar: const SimpleAppBar(title: 'Attendance History'),
@@ -31,8 +42,7 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
         child: ListenableBuilder(
           listenable: attendanceController,
           builder: (context, _) {
-            final now = DateTime.now();
-            final records = attendanceController.history.where((r) => r.workDate.year == now.year && r.workDate.month == now.month).toList();
+            final records = attendanceController.monthRecords;
             final flagged = records.where((r) => r.status == AttendanceStatus.flagged).length;
             final late = records.where((r) => r.status == AttendanceStatus.late).length;
             // "Present" counts on-time and late alike — being late still
@@ -41,53 +51,115 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
             final present = records.where((r) => r.status == AttendanceStatus.onTime || r.status == AttendanceStatus.late).length;
             final rate = records.isEmpty ? 0 : ((present / records.length) * 100).round();
 
-            return ListView(
+            return RefreshIndicator(
+              onRefresh: () => attendanceController.loadForMonth(_selectedMonth),
+              child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
                 Row(
                   children: [
                     Expanded(
-                      child: StatCard(
-                        label: 'This Month',
-                        value: '$rate%',
-                        icon: Icons.event_available_rounded,
-                        iconColor: c.primary,
-                        iconBg: c.primaryLight,
+                      flex: 3,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                        decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(10)),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<int>(
+                            isExpanded: true,
+                            value: _selectedMonth.month,
+                            items: List.generate(12, (i) => i + 1)
+                                .map((m) => DropdownMenuItem(
+                                      value: m,
+                                      child: Text(DateFormat('MMMM').format(DateTime(0, m)), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+                                    ))
+                                .toList(),
+                            onChanged: (m) {
+                              if (m != null) _changeMonth(DateTime(_selectedMonth.year, m, 1));
+                            },
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Expanded(
-                      child: StatCard(
-                        label: 'Late Arrivals',
-                        value: '$late',
-                        icon: Icons.schedule_rounded,
-                        iconColor: c.amber,
-                        iconBg: c.amberBg,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: StatCard(
-                        label: 'Flagged',
-                        value: '$flagged',
-                        icon: Icons.flag_outlined,
-                        iconColor: c.riskHigh,
-                        iconBg: c.riskHighBg,
+                      flex: 2,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                        decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(10)),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<int>(
+                            isExpanded: true,
+                            value: _selectedMonth.year,
+                            items: years
+                                .map((y) => DropdownMenuItem(value: y, child: Text('$y', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700))))
+                                .toList(),
+                            onChanged: (y) {
+                              if (y != null) _changeMonth(DateTime(y, _selectedMonth.month, 1));
+                            },
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 16),
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: StatCard(
+                          label: 'Attendance Rate',
+                          value: '$rate%',
+                          icon: Icons.event_available_rounded,
+                          iconColor: c.primary,
+                          iconBg: c.primaryLight,
+                          labelFontSize: 11.5,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: StatCard(
+                          label: 'Late Arrivals',
+                          value: '$late',
+                          icon: Icons.schedule_rounded,
+                          iconColor: c.amber,
+                          iconBg: c.amberBg,
+                          labelFontSize: 11.5,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: StatCard(
+                          label: 'Flagged',
+                          value: '$flagged',
+                          icon: Icons.flag_outlined,
+                          iconColor: c.riskHigh,
+                          iconBg: c.riskHighBg,
+                          labelFontSize: 11.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 24),
-                SectionHeader(title: DateFormat('MMMM yyyy').format(DateTime.now())),
-                if (records.isEmpty)
-                  const EmptyState(
+                SectionHeader(title: 'Records — ${DateFormat('MMMM yyyy').format(_selectedMonth)}'),
+                if (attendanceController.loadingMonth)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (records.isEmpty)
+                  EmptyState(
                     icon: Icons.event_busy_rounded,
-                    title: 'No attendance records yet',
-                    subtitle: 'Clock in from the Home tab to start building your history.',
+                    title: 'No records this month',
+                    subtitle: 'No attendance records for ${DateFormat('MMMM yyyy').format(_selectedMonth)}.',
                   )
                 else
                   ListRow(children: records.map((r) => _HistoryRow(record: r)).toList()),
               ],
+              ),
             );
           },
         ),

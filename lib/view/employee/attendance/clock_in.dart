@@ -27,6 +27,7 @@ class _ClockInScreenState extends State<ClockInScreen> {
   bool _flagged = false;
   String? _flagReason;
   String? _submitError;
+  bool _deviceBlocked = false;
 
   GpsCheckResult? _gpsResult;
   WifiCheckResult? _wifiResult;
@@ -104,6 +105,14 @@ class _ClockInScreenState extends State<ClockInScreen> {
           : _StepState.failed;
       _deviceDetail = deviceResult.detail;
     });
+
+    if (deviceResult.blocked) {
+      setState(() {
+        _isRunning = false;
+        _deviceBlocked = true;
+      });
+      return;
+    }
 
     try {
       final record = await attendanceController.submitClockIn(
@@ -249,6 +258,39 @@ class _ClockInScreenState extends State<ClockInScreen> {
                       state: _deviceState,
                     ),
 
+                    if (_deviceBlocked) ...[
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: c.riskHighBg,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [c.shadowTinted()],
+                        ),
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(color: c.riskHigh, shape: BoxShape.circle),
+                              child: const Icon(Icons.block_rounded, color: Colors.white, size: 30),
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              'Clock-In Blocked',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: c.textPrimary),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'This device is already registered to another employee\'s account, so it can\'t be paired with yours. Please contact HR by email to appeal — your attendance has not been recorded.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 12.5, color: c.riskHigh, fontWeight: FontWeight.w600, height: 1.4),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     if (_isComplete) ...[
                       const SizedBox(height: 24),
                       Container(
@@ -333,7 +375,13 @@ class _ClockInScreenState extends State<ClockInScreen> {
                 ),
               ),
 
-              if (!_isComplete && !_showWifiPrompt)
+              if (_deviceBlocked)
+                PrimaryButton(
+                  label: 'Close',
+                  icon: Icons.close_rounded,
+                  onPressed: () => Navigator.of(context).pop(),
+                )
+              else if (!_isComplete && !_showWifiPrompt)
                 PrimaryButton(
                   label: _isRunning ? 'Verifying…' : 'Start Verification',
                   icon: _isRunning ? null : Icons.play_arrow_rounded,

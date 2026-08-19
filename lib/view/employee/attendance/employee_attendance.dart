@@ -5,6 +5,8 @@ import '../../shared/widgets/status_pill.dart';
 import '../../../core/data/dummy_data.dart';
 import '../../../controller/attendance_controller.dart';
 import '../../../controller/auth_controller.dart';
+import '../../../controller/leave_controller.dart';
+import 'attendance_history.dart';
 
 class EmployeeAttendanceScreen extends StatefulWidget {
   const EmployeeAttendanceScreen({super.key});
@@ -25,6 +27,8 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
     attendanceController.loadPolicy().then((_) => setState(() {}));
     attendanceController.loadHistory();
     attendanceController.loadRiskWindow();
+    attendanceController.loadYearWindow();
+    leaveController.loadMy();
     _runLiveChecks();
   }
 
@@ -69,10 +73,18 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
       body: SafeArea(
         top: false,
         child: ListenableBuilder(
-          listenable: Listenable.merge([attendanceController, authController]),
+          listenable: Listenable.merge([attendanceController, authController, leaveController]),
           builder: (context, _) {
           final user = DummyData.employeeUser;
-          return ListView(
+          return RefreshIndicator(
+          onRefresh: () => Future.wait([
+            attendanceController.loadHistory(),
+            attendanceController.loadRiskWindow(),
+            attendanceController.loadYearWindow(),
+            _runLiveChecks(),
+          ]),
+          child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
             AppCard(
@@ -80,23 +92,26 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
               child: Column(
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Risk Classification', style: TextStyle(fontSize: 13, color: c.textSecondary, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 4),
-                          Text('Based on last 90 days', style: TextStyle(fontSize: 11.5, color: c.textMuted)),
-                        ],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Risk Classification', style: TextStyle(fontSize: 13, color: c.textSecondary, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 4),
+                            Text('Deducted per violation; counts below are last 90 days', style: TextStyle(fontSize: 11.5, color: c.textMuted)),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 10),
                       StatusPill.risk(user.riskLevel),
                     ],
                   ),
                   const SizedBox(height: 18),
                   Row(
                     children: [
-                      _RiskFactor(label: 'Score', value: '${attendanceController.riskScorePercent}', color: c.primary),
+                      _RiskFactor(label: 'Score', value: '${user.riskScore}', color: c.primary),
                       const SizedBox(width: 12),
                       _RiskFactor(label: 'Violations', value: '${attendanceController.riskViolations}', color: c.amber),
                       const SizedBox(width: 12),
@@ -111,8 +126,8 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
               children: [
                 Expanded(
                   child: StatCard(
-                    label: 'Days Present',
-                    value: '21',
+                    label: 'Days Present This Year',
+                    value: '${attendanceController.daysPresentThisYear}',
                     icon: Icons.event_available_rounded,
                     iconColor: c.primary,
                     iconBg: c.primaryLight,
@@ -121,8 +136,8 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: StatCard(
-                    label: 'On Leave',
-                    value: '2',
+                    label: 'Leave Taken',
+                    value: '${(leaveController.myBalance?.annualUsed ?? 0) + (leaveController.myBalance?.medicalUsed ?? 0) + (leaveController.myBalance?.emergencyUsed ?? 0)} days',
                     icon: Icons.beach_access_rounded,
                     iconColor: c.infoBlue,
                     iconBg: c.infoBlueBg,
@@ -167,7 +182,11 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
                           : _VerifyState.fail,
             ),
             const SizedBox(height: 24),
-            const SectionHeader(title: 'Recent Records'),
+            SectionHeader(
+              title: 'Recent Records',
+              actionLabel: 'See all',
+              onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AttendanceHistoryScreen())),
+            ),
             if (attendanceController.history.isEmpty)
               const EmptyState(
                 icon: Icons.event_busy_rounded,
@@ -175,7 +194,7 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
                 subtitle: 'Clock in from the Home tab to start building your history.',
               )
             else
-              ...attendanceController.history.map((r) => Padding(
+              ...attendanceController.history.take(7).map((r) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: AppCard(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -197,6 +216,7 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
                 ),
               )),
           ],
+          ),
           );
           },
         ),
