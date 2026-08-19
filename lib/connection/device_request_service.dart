@@ -40,7 +40,7 @@ class DeviceRequestService {
     await _client.from('device_change_requests').update({
       'status': approve ? 'approved' : 'rejected',
       'decided_by': _client.auth.currentUser?.id,
-      'decided_at': DateTime.now().toIso8601String(),
+      'decided_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', requestId);
   }
 }
