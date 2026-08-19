@@ -320,15 +320,19 @@ Deno.serve(async (req) => {
     // Best-effort: a failure here shouldn't undo the account creation
     // that already succeeded, migration 0009 can backfill it later if
     // this somehow doesn't go through.
-    await adminClient.from('leave_balances').insert({
+    // No leave_balances row is seeded here — a new hire starts at 0 leave
+    // and the ensure_leave_balance_row RPC (migration 0029) computes their
+    // real entitlement (tenure-based accrual) the first time the app fetches
+    // their balance, same as every subsequent fetch keeps it current.
+
+    // In-app welcome notification - same best-effort reasoning as the leave
+    // balance row above: a failure here shouldn't undo account creation.
+    await adminClient.from('notifications').insert({
       user_id: created.user.id,
-      year: new Date().getFullYear(),
-      annual_total: 14,
-      annual_used: 0,
-      medical_total: 14,
-      medical_used: 0,
-      emergency_total: 3,
-      emergency_used: 0,
+      type: 'onboarding',
+      title: 'Welcome Onboard!',
+      body: `Hi ${name}, your MONIKA account is ready. Explore your dashboard, set up your profile, and check out your first tasks - we're glad to have you on the team!`,
+      is_read: false,
     });
 
     const emailResult = await sendViaGmail(
