@@ -9,12 +9,14 @@ import '../../../model/models.dart';
 import '../../../controller/attendance_controller.dart';
 import '../../../controller/leave_controller.dart';
 import '../../../controller/notification_controller.dart';
+import '../../../controller/training_controller.dart';
 import '../attendance/clock_in.dart';
 import '../attendance/clock_out.dart';
 import '../leave/leave_apply.dart';
 import '../payroll/payroll.dart';
 import '../pe/pe_detail.dart';
 import '../attendance/attendance_history.dart';
+import '../training/employee_training.dart';
 import '../../shared/notification.dart';
 
 // Fixed so both stat cards line up evenly — Attendance Rate carries an
@@ -36,7 +38,9 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
     super.initState();
     attendanceController.loadToday();
     attendanceController.loadHistory();
+    attendanceController.loadAttendanceRate();
     leaveController.loadMy();
+    trainingController.loadMy();
   }
 
   Future<void> _handleClockIn() async {
@@ -46,6 +50,8 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
   Future<void> _handleClockOut() async {
     await Navigator.push(context, MaterialPageRoute(builder: (_) => const ClockOutScreen()));
   }
+
+  int get _recommendedCount => trainingController.myPrograms.where((t) => t.isRecommended).length;
 
   @override
   Widget build(BuildContext context) {
@@ -71,8 +77,17 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
       body: SafeArea(
         top: false,
         child: ListenableBuilder(
-          listenable: Listenable.merge([attendanceController, leaveController]),
-          builder: (context, _) => ListView(
+          listenable: Listenable.merge([attendanceController, leaveController, trainingController]),
+          builder: (context, _) => RefreshIndicator(
+          onRefresh: () => Future.wait([
+            attendanceController.loadToday(),
+            attendanceController.loadHistory(),
+            attendanceController.loadAttendanceRate(),
+            leaveController.loadMy(),
+            trainingController.loadMy(),
+          ]),
+          child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
             _ClockInCard(
@@ -92,11 +107,10 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
                     height: _kStatCardHeight,
                     child: StatCard(
                       label: 'Attendance Rate',
-                      value: '96%',
+                      value: '${(attendanceController.attendanceRate * 100).toInt()}%',
                       icon: Icons.event_available_rounded,
                       iconColor: c.primary,
                       iconBg: c.primaryLight,
-                      trend: '+2% MoM',
                     ),
                   ),
                 ),
@@ -182,33 +196,48 @@ class _EmployeeHomeScreenState extends State<EmployeeHomeScreen> {
               actionLabel: 'See all',
               onAction: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AttendanceHistoryScreen())),
             ),
-            ...attendanceController.history.take(3).map((r) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _AttendanceTile(record: r),
-            )),
+            if (attendanceController.history.isEmpty)
+              AppCard(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: Text(
+                    'No Recent Attendance',
+                    style: TextStyle(fontSize: 12.5, color: c.textMuted, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              )
+            else
+              ...attendanceController.history.take(3).map((r) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _AttendanceTile(record: r),
+              )),
 
-            const SizedBox(height: 16),
-            AppCard(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: c.amberBg, borderRadius: BorderRadius.circular(12)),
-                    child: Icon(Icons.auto_awesome_rounded, color: c.amber, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      '2 training programmes recommended for you this cycle',
-                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.textPrimary, height: 1.3),
+            if (_recommendedCount > 0) ...[
+              const SizedBox(height: 16),
+              AppCard(
+                padding: const EdgeInsets.all(16),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EmployeeTrainingScreen())),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: c.amberBg, borderRadius: BorderRadius.circular(12)),
+                      child: Icon(Icons.auto_awesome_rounded, color: c.amber, size: 20),
                     ),
-                  ),
-                  Icon(Icons.chevron_right_rounded, color: c.textMuted),
-                ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '$_recommendedCount training programme${_recommendedCount == 1 ? '' : 's'} recommended for you this cycle',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: c.textPrimary, height: 1.3),
+                      ),
+                    ),
+                    Icon(Icons.chevron_right_rounded, color: c.textMuted),
+                  ],
+                ),
               ),
-            ),
+            ],
           ],
+          ),
           ),
         ),
       ),

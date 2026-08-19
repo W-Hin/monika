@@ -49,7 +49,6 @@ AppHue _eventHue(String type) {
 }
 
 bool _eventSameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
-bool _eventHasTime(DateTime d) => d.hour != 0 || d.minute != 0;
 
 String _eventWhen(CalendarEvent event) {
   final dateFormat = DateFormat('d MMM yyyy');
@@ -59,9 +58,9 @@ String _eventWhen(CalendarEvent event) {
     return '${dateFormat.format(event.eventDate)} – ${dateFormat.format(event.endDate!)}';
   }
   final datePart = dateFormat.format(event.eventDate);
-  if (!_eventHasTime(event.eventDate)) return datePart;
+  if (!event.hasTime) return datePart;
   final startTime = timeFormat.format(event.eventDate);
-  if (event.endDate != null && _eventHasTime(event.endDate!)) {
+  if (event.endDate != null) {
     return '$datePart · $startTime – ${timeFormat.format(event.endDate!)}';
   }
   return '$datePart · $startTime';
@@ -214,7 +213,15 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
         top: false,
         child: ListenableBuilder(
           listenable: Listenable.merge([anomalyController, analyticsController, deviceRequestController, calendarController]),
-          builder: (context, _) => ListView(
+          builder: (context, _) => RefreshIndicator(
+          onRefresh: () => Future.wait([
+            anomalyController.loadFeed(),
+            analyticsController.load(),
+            deviceRequestController.loadAllForHr(),
+            calendarController.load(),
+          ]),
+          child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
             Row(
@@ -413,6 +420,7 @@ class _HrHomeScreenState extends State<HrHomeScreen> {
             }),
           ],
           ),
+          ),
         ),
       ),
     );
@@ -544,7 +552,7 @@ class _MoreMenuItem extends StatelessWidget {
             child: Icon(icon, color: color, size: 22),
           ),
           const SizedBox(height: 8),
-          Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: c.textPrimary)),
+          Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: c.textPrimary)),
         ],
       ),
     );
