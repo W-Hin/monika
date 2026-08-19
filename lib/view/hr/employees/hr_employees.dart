@@ -125,17 +125,21 @@ class _HrEmployeesScreenState extends State<HrEmployeesScreen> {
                       subtitle: 'Try a different search, or add a new employee.',
                     );
                   }
-                  return ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                    children: [
-                      ListRow(children: filtered.map((emp) => _EmployeeRow(
-                        emp: emp,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => EmployeeDetailScreen(employee: emp, onUpdate: employeeController.updateLocal)),
-                        ),
-                      )).toList()),
-                    ],
+                  return RefreshIndicator(
+                    onRefresh: employeeController.loadEmployees,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                      children: [
+                        ListRow(children: filtered.map((emp) => _EmployeeRow(
+                          emp: emp,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => EmployeeDetailScreen(employee: emp, onUpdate: employeeController.updateLocal)),
+                          ),
+                        )).toList()),
+                      ],
+                    ),
                   );
                 },
               ),

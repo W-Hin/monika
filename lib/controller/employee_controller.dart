@@ -47,11 +47,10 @@ class EmployeeController extends ChangeNotifier {
     final total = totalByUser[uuid] ?? 0;
     final present = presentByUser[uuid] ?? 0;
     // Fraction of this employee's logged clock-ins that were on_time or
-    // late (not flagged) - real now, computed from attendance_records.
-    // No attendance history yet (e.g. a brand new hire) defaults to 1.0
-    // rather than 0, so a new employee doesn't look like a risk before
-    // they've ever had the chance to clock in.
-    final attendanceRate = total == 0 ? 1.0 : present / total;
+    // late (not flagged). No attendance history yet (e.g. a brand new
+    // hire) is honestly 0%, not a placeholder 100% — matches the same
+    // all-time computation on the employee's own Home dashboard.
+    final attendanceRate = total == 0 ? 0.0 : present / total;
     return TeamMemberSummary(
       id: row['employee_code'] as String,
       uuid: uuid,
