@@ -54,6 +54,13 @@ class PayrollService {
   ///    application) — unlike annual/medical/emergency, unpaid leave has
   ///    no balance pool to draw from, so instead of just excusing the
   ///    absence it costs the employee a day's pay.
+  ///  - risk_score_penalties queued for this pay_month (percent x
+  ///    base_salary) — inserted by apply_risk_deduction() the instant an
+  ///    employee's risk score hits 0 (migration 0032). Re-queried from that
+  ///    ledger table each time rather than a one-shot flag, so it survives
+  ///    a regeneration of this month the same way late/absence/unpaid-leave
+  ///    do (all re-derived from source data, never a "already applied"
+  ///    flag that a regen could silently lose).
   /// Only counts days up to today (never penalises days in the month that
   /// haven't happened yet), and never before the employee's hire date.
   static Future<int> generateForMonth(DateTime month) async {
@@ -133,10 +140,19 @@ class PayrollService {
         absentCount++;
       }
 
+      final riskPenaltyRows = await _client
+          .from('risk_score_penalties')
+          .select('percent')
+          .eq('user_id', uid)
+          .eq('pay_month', monthStartKey);
+      final riskPenaltyPercent = List<Map<String, dynamic>>.from(riskPenaltyRows)
+          .fold<double>(0, (sum, r) => sum + (r['percent'] as num).toDouble());
+
       final lateAmount = lateCount * lateDeduction;
       final absentAmount = absentCount * absentDeduction;
       final unpaidLeaveAmount = unpaidLeaveCount * unpaidLeaveDailyRate;
-      final deductionAmount = lateAmount + absentAmount + unpaidLeaveAmount;
+      final riskPenaltyAmount = baseSalary * riskPenaltyPercent / 100;
+      final deductionAmount = lateAmount + absentAmount + unpaidLeaveAmount + riskPenaltyAmount;
       final netPay = baseSalary - deductionAmount;
 
       final upserted = await _client
@@ -175,6 +191,13 @@ class PayrollService {
           'payroll_id': payrollId,
           'label': 'Unpaid leave ($unpaidLeaveCount day${unpaidLeaveCount > 1 ? 's' : ''})',
           'amount': unpaidLeaveAmount,
+        });
+      }
+      if (riskPenaltyPercent > 0) {
+        items.add({
+          'payroll_id': payrollId,
+          'label': 'Risk score penalty (${riskPenaltyPercent.toStringAsFixed(0)}% of salary)',
+          'amount': riskPenaltyAmount,
         });
       }
       if (items.isNotEmpty) {

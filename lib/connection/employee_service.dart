@@ -60,15 +60,19 @@ class EmployeeService {
     }).eq('id', uuid);
   }
 
-  /// Risk score only ever decreases automatically (trg_apply_risk_deduction
-  /// on anomaly_events insert, migration 0022) — there's no scheduled
-  /// decay/recovery, so a clean slate after an employee has addressed
-  /// whatever drove their score down is a deliberate HR action, not
-  /// something the system does on its own.
+  /// A clean slate after an employee has addressed whatever drove their
+  /// score down is a deliberate HR action available any time, independent
+  /// of the automatic reset apply_risk_deduction()/reset_stale_risk_scores()
+  /// already apply every policy_settings.risk_reset_period_months
+  /// (migration 0032). Resets risk_period_start too, restarting that
+  /// automatic-reset clock from now — otherwise a manual reset right
+  /// before the automatic one was due would immediately look "overdue"
+  /// again to the proactive cron job.
   static Future<void> resetRiskScore(String uuid) async {
     await _client.from('profiles').update({
       'risk_score': 100,
       'risk_level': 'low',
+      'risk_period_start': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', uuid);
   }
 }

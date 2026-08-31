@@ -20,11 +20,14 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
   final _officeWifi = TextEditingController(text: 'MONIKA-OFFICE-5G');
 
   // Risk score weights
-  double _lateWeight = 3;
-  double _outOfZoneWeight = 5;
-  double _sharedDeviceWeight = 10;
-  double _wifiMismatchWeight = 4;
-  double _earlyClockoutWeight = 2;
+  double _lateWeight = Defaults.lateWeight;
+  double _outOfZoneWeight = Defaults.outOfZoneWeight;
+  double _sharedDeviceWeight = Defaults.sharedDeviceWeight;
+  double _wifiMismatchWeight = Defaults.wifiMismatchWeight;
+  double _earlyClockoutWeight = Defaults.earlyClockoutWeight;
+  double _unexplainedAbsenceWeight = Defaults.unexplainedAbsenceWeight;
+  double _riskResetPeriodMonths = Defaults.riskResetPeriodMonths.toDouble();
+  double _riskPenaltyPercent = Defaults.riskPenaltyPercent;
 
   // Payroll deductions
   final _lateDeduction = TextEditingController(text: '25.00');
@@ -82,6 +85,9 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
     _sharedDeviceWeight = p.sharedDeviceWeight;
     _wifiMismatchWeight = p.wifiMismatchWeight;
     _earlyClockoutWeight = p.earlyClockoutWeight;
+    _unexplainedAbsenceWeight = p.unexplainedAbsenceWeight;
+    _riskResetPeriodMonths = p.riskResetPeriodMonths.toDouble();
+    _riskPenaltyPercent = p.riskPenaltyPercent;
     _lateDeduction.text = p.lateDeduction.toStringAsFixed(2);
     _absentDeduction.text = p.absentDeduction.toStringAsFixed(2);
     _unpaidLeaveRate.text = p.unpaidLeaveDailyRate.toStringAsFixed(2);
@@ -105,6 +111,9 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
       sharedDeviceWeight: _sharedDeviceWeight,
       wifiMismatchWeight: _wifiMismatchWeight,
       earlyClockoutWeight: _earlyClockoutWeight,
+      unexplainedAbsenceWeight: _unexplainedAbsenceWeight,
+      riskResetPeriodMonths: _riskResetPeriodMonths.round(),
+      riskPenaltyPercent: _riskPenaltyPercent,
       lateDeduction: double.tryParse(_lateDeduction.text.trim()) ?? policyController.lateDeduction,
       absentDeduction: double.tryParse(_absentDeduction.text.trim()) ?? policyController.absentDeduction,
       unpaidLeaveDailyRate: double.tryParse(_unpaidLeaveRate.text.trim()) ?? policyController.unpaidLeaveDailyRate,
@@ -125,6 +134,52 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
     );
   }
 
+  /// Restores every field to Defaults (the same constants policy_settings'
+  /// columns default to) and saves immediately — HR confirms once via the
+  /// dialog rather than a silent local-only reset they'd still need to
+  /// remember to press Save on.
+  Future<void> _confirmResetToDefaults() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Reset to Default?'),
+        content: const Text('Every field on this screen will be restored to MONIKA\'s system default values and saved immediately. This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text('Reset', style: TextStyle(color: context.colors.riskHigh)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _workStart.text = '09:00';
+      _workEnd.text = '18:00';
+      _gracePeriod.text = '10';
+      _geofenceRadius.text = '100';
+      _officeWifi.text = 'MONIKA-OFFICE-5G';
+      _lateWeight = Defaults.lateWeight;
+      _outOfZoneWeight = Defaults.outOfZoneWeight;
+      _sharedDeviceWeight = Defaults.sharedDeviceWeight;
+      _wifiMismatchWeight = Defaults.wifiMismatchWeight;
+      _earlyClockoutWeight = Defaults.earlyClockoutWeight;
+      _unexplainedAbsenceWeight = Defaults.unexplainedAbsenceWeight;
+      _riskResetPeriodMonths = Defaults.riskResetPeriodMonths.toDouble();
+      _riskPenaltyPercent = Defaults.riskPenaltyPercent;
+      _lateDeduction.text = Defaults.lateDeduction.toStringAsFixed(2);
+      _absentDeduction.text = Defaults.absentDeduction.toStringAsFixed(2);
+      _unpaidLeaveRate.text = Defaults.unpaidLeaveDailyRate.toStringAsFixed(2);
+      _leadershipThreshold = Defaults.leadershipThreshold;
+      _technicalThreshold = Defaults.technicalThreshold;
+      _behaviouralThreshold = Defaults.behaviouralThreshold;
+      _minTenureMonths = Defaults.minTenureMonths.toDouble();
+    });
+    await _save();
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -133,6 +188,13 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
       child: Scaffold(
       appBar: AppBar(
         title: const Text('Policy & Configuration'),
+        actions: [
+          IconButton(
+            tooltip: 'Reset to Default',
+            onPressed: _confirmResetToDefaults,
+            icon: const Icon(Icons.restart_alt_rounded),
+          ),
+        ],
       ),
       body: SafeArea(
         top: false,
@@ -248,7 +310,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                   label: 'Late Arrival',
                   value: _lateWeight,
                   min: 1,
-                  max: 10,
+                  max: 20,
                   onChanged: (v) => setState(() { _lateWeight = v; _hasEdited = true; }),
                   color: c.riskLow,
                 ),
@@ -256,7 +318,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                   label: 'WiFi SSID Mismatch',
                   value: _wifiMismatchWeight,
                   min: 1,
-                  max: 10,
+                  max: 25,
                   onChanged: (v) => setState(() { _wifiMismatchWeight = v; _hasEdited = true; }),
                   color: c.riskMedium,
                 ),
@@ -264,7 +326,7 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                   label: 'Out-of-Zone Clock-In',
                   value: _outOfZoneWeight,
                   min: 1,
-                  max: 10,
+                  max: 30,
                   onChanged: (v) => setState(() { _outOfZoneWeight = v; _hasEdited = true; }),
                   color: c.riskMedium,
                 ),
@@ -272,18 +334,45 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                   label: 'Shared-Device Attempt',
                   value: _sharedDeviceWeight,
                   min: 1,
-                  max: 15,
+                  max: 50,
                   onChanged: (v) => setState(() { _sharedDeviceWeight = v; _hasEdited = true; }),
                   color: c.riskHigh,
                 ),
                 _SliderRow(
                   label: 'Early Clock-Out',
                   value: _earlyClockoutWeight,
-                  min: 0.5,
-                  max: 8,
-                  divisions: 15,
+                  min: 1,
+                  max: 20,
                   onChanged: (v) => setState(() { _earlyClockoutWeight = v; _hasEdited = true; }),
                   color: c.riskLow,
+                ),
+                _SliderRow(
+                  label: 'Unexplained Absence',
+                  value: _unexplainedAbsenceWeight,
+                  min: 1,
+                  max: 30,
+                  onChanged: (v) => setState(() { _unexplainedAbsenceWeight = v; _hasEdited = true; }),
+                  color: c.riskMedium,
+                ),
+                const SizedBox(height: 4),
+                _SliderRow(
+                  label: 'Automatic Reset Period',
+                  value: _riskResetPeriodMonths,
+                  min: 1,
+                  max: 12,
+                  divisions: 11,
+                  onChanged: (v) => setState(() { _riskResetPeriodMonths = v; _hasEdited = true; }),
+                  color: c.infoBlue,
+                  suffix: ' mo',
+                ),
+                _SliderRow(
+                  label: 'Salary Penalty at Score 0',
+                  value: _riskPenaltyPercent,
+                  min: 1,
+                  max: 20,
+                  onChanged: (v) => setState(() { _riskPenaltyPercent = v; _hasEdited = true; }),
+                  color: c.riskHigh,
+                  suffix: '%',
                 ),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -292,11 +381,13 @@ class _PolicyConfigScreenState extends State<PolicyConfigScreen> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    'Risk Tiers: Score ≥ 80 = Low Risk   |   50–79 = Medium Risk   |   < 50 = High Risk',
+                    'Risk Tiers: Score ≥ 80 = Low Risk   |   50–79 = Medium Risk   |   < 50 = High Risk\n'
+                    'A score hitting 0 immediately resets to 100 and applies the salary penalty above at the next payroll run. Every employee\'s score also resets to 100 on its own after the automatic reset period, even without hitting 0.',
                     style: TextStyle(
                       fontSize: 11.5,
                       color: c.textSecondary,
                       fontWeight: FontWeight.w600,
+                      height: 1.4,
                     ),
                     textAlign: TextAlign.center,
                   ),
