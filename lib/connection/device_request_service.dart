@@ -12,16 +12,19 @@ class DeviceRequestService {
     await _client.from('device_change_requests').insert({'user_id': uid, 'reason': reason});
   }
 
-  static Future<bool> hasPendingRequest() async {
+  /// The employee's own most recent requests (pending, cancelled, or
+  /// decided) — used to derive both "do they already have one pending"
+  /// and "are they in the post-cancel cooldown window" in one round trip.
+  static Future<List<Map<String, dynamic>>> fetchMyRecent({int limit = 5}) async {
     final uid = _client.auth.currentUser?.id;
-    if (uid == null) return false;
-    final row = await _client
+    if (uid == null) return [];
+    final rows = await _client
         .from('device_change_requests')
-        .select('id')
+        .select()
         .eq('user_id', uid)
-        .eq('status', 'pending')
-        .maybeSingle();
-    return row != null;
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return List<Map<String, dynamic>>.from(rows);
   }
 
   /// HR — every request, joined with the requester's name. Explicitly
@@ -39,6 +42,18 @@ class DeviceRequestService {
   static Future<void> decide({required int requestId, required bool approve}) async {
     await _client.from('device_change_requests').update({
       'status': approve ? 'approved' : 'rejected',
+      'decided_by': _client.auth.currentUser?.id,
+      'decided_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', requestId);
+  }
+
+  /// FR6.7 — the employee who submitted it, or HR, withdrawing a request
+  /// before it's been approved/rejected. Distinct from decide()'s
+  /// approve/reject: cancelling isn't HR passing judgement on the request,
+  /// it's the request being pulled before that ever happens.
+  static Future<void> cancel(int requestId) async {
+    await _client.from('device_change_requests').update({
+      'status': 'cancelled',
       'decided_by': _client.auth.currentUser?.id,
       'decided_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', requestId);

@@ -99,6 +99,34 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
     );
   }
 
+  Future<void> _cancelDeviceRequest() async {
+    final c = context.colors;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Cancel This Request?'),
+        content: Text(
+          'You can submit a new device change request again 24 hours after cancelling.',
+          style: TextStyle(fontSize: 12.5, color: c.textSecondary, height: 1.4),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Keep Request')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text('Cancel Request', style: TextStyle(color: c.riskHigh)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final success = await deviceRequestController.cancelMine();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(success ? '✓ Request cancelled' : deviceRequestController.errorMessage ?? 'Could not cancel request')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -218,10 +246,24 @@ class _EmployeeProfileScreenState extends State<EmployeeProfileScreen> {
                       ],
                     ),
                   ),
-                  TextButton(
-                    onPressed: (user.registeredDevice == 'Not yet registered' || deviceRequestController.myPending) ? null : _requestDeviceChange,
-                    child: Text(deviceRequestController.myPending ? 'Requested' : 'Request Change'),
-                  ),
+                  Builder(builder: (context) {
+                    if (deviceRequestController.myPending) {
+                      return TextButton(
+                        onPressed: _cancelDeviceRequest,
+                        child: const Text('Cancel Request'),
+                      );
+                    }
+                    final cooldownUntil = deviceRequestController.myCooldownUntil;
+                    if (cooldownUntil != null) {
+                      final remaining = cooldownUntil.difference(DateTime.now());
+                      final label = remaining.inHours >= 1 ? 'Available in ${remaining.inHours}h' : 'Available in ${remaining.inMinutes.clamp(1, 59)}m';
+                      return TextButton(onPressed: null, child: Text(label));
+                    }
+                    return TextButton(
+                      onPressed: user.registeredDevice == 'Not yet registered' ? null : _requestDeviceChange,
+                      child: const Text('Request Change'),
+                    );
+                  }),
                 ],
               ),
             ),

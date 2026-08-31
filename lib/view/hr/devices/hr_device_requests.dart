@@ -89,6 +89,33 @@ class _HrDeviceRequestsScreenState extends State<HrDeviceRequestsScreen> {
     );
   }
 
+  Future<void> _handleCancel(DeviceChangeRequest request) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Cancel This Request?'),
+        content: Text(
+          'This withdraws ${request.employeeName}\'s request without recording it as approved or rejected. They can submit a new one again after 24 hours.',
+          style: TextStyle(fontSize: 12.5, color: context.colors.textSecondary, height: 1.4),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Keep Request')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text('Cancel Request', style: TextStyle(color: context.colors.riskHigh)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final success = await deviceRequestController.cancelForHr(request);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(success ? '✓ Request cancelled' : deviceRequestController.errorMessage ?? 'Could not cancel this request')),
+    );
+  }
+
   Future<void> _handleDecision(
     DeviceChangeRequest request,
     bool approve,
@@ -239,6 +266,7 @@ class _HrDeviceRequestsScreenState extends State<HrDeviceRequestsScreen> {
                           isSelf: r.userUuid == Supabase.instance.client.auth.currentUser?.id,
                           onApprove: () => _handleDecision(r, true),
                           onReject: () => _handleDecision(r, false),
+                          onCancel: () => _handleCancel(r),
                         ),
                       ),
                     ),
@@ -326,11 +354,13 @@ class _RequestCard extends StatelessWidget {
   final bool isSelf;
   final VoidCallback onApprove;
   final VoidCallback onReject;
+  final VoidCallback onCancel;
   const _RequestCard({
     required this.request,
     required this.isSelf,
     required this.onApprove,
     required this.onReject,
+    required this.onCancel,
   });
 
   @override
@@ -433,7 +463,7 @@ class _RequestCard extends StatelessWidget {
                 ],
               ),
             )
-          else
+          else ...[
             Row(
               children: [
                 Expanded(
@@ -453,6 +483,13 @@ class _RequestCard extends StatelessWidget {
                 ),
               ],
             ),
+            Center(
+              child: TextButton(
+                onPressed: onCancel,
+                child: Text('Cancel Request Instead', style: TextStyle(color: c.textMuted, fontSize: 12)),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -521,6 +558,7 @@ class _ProcessedRow extends StatelessWidget {
         .take(2)
         .join();
     final approved = request.status == 'approved';
+    final cancelled = request.status == 'cancelled';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -540,7 +578,7 @@ class _ProcessedRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  request.reason,
+                  cancelled ? 'Cancelled' : request.reason,
                   style: TextStyle(fontSize: 11.5, color: c.textMuted),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -549,9 +587,17 @@ class _ProcessedRow extends StatelessWidget {
             ),
           ),
           Icon(
-            approved ? Icons.check_circle_rounded : Icons.cancel_rounded,
+            approved
+                ? Icons.check_circle_rounded
+                : cancelled
+                    ? Icons.undo_rounded
+                    : Icons.cancel_rounded,
             size: 18,
-            color: approved ? c.primary : c.riskHigh,
+            color: approved
+                ? c.primary
+                : cancelled
+                    ? c.textMuted
+                    : c.riskHigh,
           ),
         ],
       ),
