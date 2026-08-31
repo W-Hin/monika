@@ -64,6 +64,7 @@ class EmployeeController extends ChangeNotifier {
       registeredDevice: row['registered_device_name'] as String? ?? 'Not yet registered',
       isActive: row['is_active'] as bool? ?? true,
       baseSalary: (row['base_salary'] as num?)?.toDouble(),
+      isIntern: row['is_intern'] as bool? ?? false,
     );
   }
 

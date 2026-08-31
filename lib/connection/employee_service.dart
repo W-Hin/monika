@@ -35,12 +35,14 @@ class EmployeeService {
     required String jobTitle,
     required String departmentName,
     double? baseSalary,
+    bool? isIntern,
   }) async {
     final dept = await _client.from('departments').select('id').eq('name', departmentName).single();
     await _client.from('profiles').update({
       'job_title': jobTitle,
       'department_id': dept['id'],
       'base_salary': baseSalary,
+      if (isIntern != null) 'is_intern': isIntern,
     }).eq('id', uuid);
   }
 

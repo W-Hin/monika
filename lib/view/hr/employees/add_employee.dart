@@ -39,6 +39,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
   String _department = 'Engineering';
   String _jobTitle = _jobTitlesByDepartment['Engineering']!.first;
   String _accountType = 'employee';
+  bool _isIntern = false;
   bool _isSubmitting = false;
   bool _created = false;
 
@@ -52,7 +53,8 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
           _salary.text != '3500.00' ||
           _department != 'Engineering' ||
           _jobTitle != _jobTitlesByDepartment['Engineering']!.first ||
-          _accountType != 'employee');
+          _accountType != 'employee' ||
+          _isIntern);
 
   @override
   void initState() {
@@ -128,6 +130,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
           'avatarInitials': _initialsFrom(_name.text),
           'hireDate': DateFormat('yyyy-MM-dd').format(DateTime.now()),
           'baseSalary': double.tryParse(_salary.text.trim()),
+          'isIntern': _isIntern,
         },
       );
 
@@ -350,6 +353,29 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
                 icon: Icons.work_history_outlined,
                 onChanged: (v) => setState(() => _jobTitle = v!),
               ),
+              if (_accountType == 'employee') ...[
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    children: [
+                      Icon(Icons.school_outlined, size: 18, color: c.textMuted),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Intern', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
+                            Text('Lets HR target company events (e.g. an ice-breaking event) at every intern', style: TextStyle(fontSize: 11, color: c.textMuted)),
+                          ],
+                        ),
+                      ),
+                      Switch(value: _isIntern, onChanged: (v) => setState(() => _isIntern = v)),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
 
               // Payroll

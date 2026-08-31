@@ -295,6 +295,10 @@ class TeamMemberSummary {
   final String registeredDevice;
   final bool isActive;
   final double? baseSalary;
+  // Department-independent — an intern still belongs to a real department,
+  // this just additionally flags them so HR can target company events
+  // (e.g. an ice-breaking event) at every intern regardless of department.
+  final bool isIntern;
 
   const TeamMemberSummary({
     required this.id,
@@ -309,6 +313,7 @@ class TeamMemberSummary {
     required this.registeredDevice,
     this.isActive = true,
     this.baseSalary,
+    this.isIntern = false,
   });
 
   TeamMemberSummary copyWith({
@@ -318,6 +323,7 @@ class TeamMemberSummary {
     String? registeredDevice,
     double? baseSalary,
     RiskLevel? risk,
+    bool? isIntern,
   }) =>
       TeamMemberSummary(
         id: id,
@@ -332,6 +338,7 @@ class TeamMemberSummary {
         registeredDevice: registeredDevice ?? this.registeredDevice,
         isActive: isActive ?? this.isActive,
         baseSalary: baseSalary ?? this.baseSalary,
+        isIntern: isIntern ?? this.isIntern,
       );
 }
 

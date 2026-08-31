@@ -1000,6 +1000,54 @@ class _AssigneePickerSheetState extends State<_AssigneePickerSheet> {
                 ),
               ),
               const SizedBox(height: 8),
+              // Quick bulk pick for company-wide, cross-department groups
+              // like interns — the alternative is HR manually checking each
+              // one individually, which doesn't scale and drifts as new
+              // interns join.
+              Builder(builder: (context) {
+                final interns = employeeController.employees.where((e) => e.isIntern).toList();
+                if (interns.isEmpty) return const SizedBox.shrink();
+                final allInternsSelected = interns.every((e) => _selected.containsKey(e.uuid));
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(100),
+                    onTap: () => setState(() {
+                      if (allInternsSelected) {
+                        for (final e in interns) {
+                          _selected.remove(e.uuid);
+                        }
+                      } else {
+                        for (final e in interns) {
+                          _selected[e.uuid] = e.name;
+                        }
+                      }
+                    }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: allInternsSelected ? c.primary : c.primaryLight,
+                        borderRadius: BorderRadius.circular(100),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            allInternsSelected ? Icons.check_circle_rounded : Icons.school_outlined,
+                            size: 15,
+                            color: allInternsSelected ? Colors.white : c.primaryDark,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            allInternsSelected ? 'All interns selected (${interns.length})' : 'Select all interns (${interns.length})',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: allInternsSelected ? Colors.white : c.primaryDark),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
               Expanded(
                 child: employees.isEmpty
                     ? Center(
@@ -1017,7 +1065,10 @@ class _AssigneePickerSheetState extends State<_AssigneePickerSheet> {
                           return CheckboxListTile(
                             value: checked,
                             contentPadding: EdgeInsets.zero,
-                            title: Text(e.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                            // Explicit colors, not CheckboxListTile's ambient
+                            // defaults — those resolved to white-on-white
+                            // once a row was checked (found in both themes).
+                            title: Text(e.name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.textPrimary)),
                             subtitle: Text('${e.jobTitle} · ${e.department}', style: TextStyle(fontSize: 12, color: c.textMuted)),
                             onChanged: (v) => setState(() {
                               if (v == true) {

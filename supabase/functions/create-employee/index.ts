@@ -243,6 +243,7 @@ Deno.serve(async (req) => {
       avatarInitials,
       hireDate,
       baseSalary,
+      isIntern,
     } = await req.json();
 
     if (!email || !password || !name || !employeeCode || !userRole || !jobTitle || !departmentName || !avatarInitials || !hireDate) {
@@ -307,6 +308,7 @@ Deno.serve(async (req) => {
       avatar_initials: avatarInitials,
       hire_date: hireDate,
       base_salary: baseSalary ?? null,
+      is_intern: isIntern ?? false,
       must_change_password: true,
     });
 
