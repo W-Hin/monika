@@ -55,6 +55,7 @@ class PeController extends ChangeNotifier {
                 category: s['category'] as String? ?? 'Technical',
               ))
           .toList(),
+      isDraft: row['is_draft'] as bool? ?? false,
     );
   }
 
@@ -198,12 +199,65 @@ class PeController extends ChangeNotifier {
         comments: comments,
         weightedTotal: weightedTotal,
         scores: kpis.map((k) => {'kpi_name': k.name, 'weightage': k.weightage, 'score': k.score, 'category': k.category}).toList(),
+        isDraft: false,
       );
       await loadForEmployee(userUuid);
       unawaited(_triggerTrainingRecommendations(userUuid: userUuid, kpis: kpis));
       return true;
     } catch (e) {
       errorMessage = 'Could not submit evaluation: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// FR10.6 — saves in-progress scoring without it counting as a real
+  /// evaluation: doesn't trigger training recommendations (those are tied
+  /// to a genuine, finished PE result) and stays invisible on the
+  /// employee's own PE screen (PeService.fetchMyCurrentYear/fetchMyHistory
+  /// both filter is_draft out) until HR actually submits.
+  Future<bool> saveDraft({
+    required String userUuid,
+    required int? templateId,
+    required List<KpiItem> kpis,
+    required String comments,
+  }) async {
+    errorMessage = null;
+    var weightedTotal = 0.0;
+    for (final k in kpis) {
+      weightedTotal += k.score * k.weightage / 100;
+    }
+    try {
+      await PeService.submitEvaluation(
+        userUuid: userUuid,
+        templateId: templateId,
+        year: DateTime.now().year,
+        comments: comments,
+        weightedTotal: weightedTotal,
+        scores: kpis.map((k) => {'kpi_name': k.name, 'weightage': k.weightage, 'score': k.score, 'category': k.category}).toList(),
+        isDraft: true,
+      );
+      await loadForEmployee(userUuid);
+      return true;
+    } catch (e) {
+      errorMessage = 'Could not save draft: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// FR10.6 — discards a draft outright, leaving no evaluation record for
+  /// this employee/year behind. Only ever called on a draft (see
+  /// PeService.deleteEvaluation's own doc comment).
+  Future<bool> discardDraft(PerformanceEvaluation draft) async {
+    if (draft.dbId == null) return false;
+    errorMessage = null;
+    try {
+      await PeService.deleteEvaluation(draft.dbId!);
+      if (draft.userUuid != null) await loadForEmployee(draft.userUuid!);
+      return true;
+    } catch (e) {
+      errorMessage = 'Could not discard draft: $e';
       notifyListeners();
       return false;
     }

@@ -15,6 +15,8 @@ class PeService {
     return List<Map<String, dynamic>>.from(rows);
   }
 
+  /// Excludes drafts — an evaluation HR hasn't finished scoring yet
+  /// shouldn't appear to the employee it's about as if it were final.
   static Future<Map<String, dynamic>?> fetchMyCurrentYear() async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) return null;
@@ -23,9 +25,11 @@ class PeService {
         .select('*, performance_evaluation_scores(*)')
         .eq('user_id', uid)
         .eq('year', DateTime.now().year)
+        .eq('is_draft', false)
         .maybeSingle();
   }
 
+  /// Excludes drafts — see fetchMyCurrentYear's doc comment.
   static Future<List<Map<String, dynamic>>> fetchMyHistory() async {
     final uid = _client.auth.currentUser?.id;
     if (uid == null) return [];
@@ -33,6 +37,7 @@ class PeService {
         .from('performance_evaluations')
         .select('*, performance_evaluation_scores(*)')
         .eq('user_id', uid)
+        .eq('is_draft', false)
         .order('year', ascending: false);
     return List<Map<String, dynamic>>.from(rows);
   }
@@ -104,7 +109,10 @@ class PeService {
   }
 
   /// Upserts the evaluation (unique on user_id+year, so re-submitting the
-  /// same year cleanly replaces it) and replaces its scores.
+  /// same year cleanly replaces it) and replaces its scores. [isDraft] true
+  /// saves progress without it counting as final — see PeController.submit
+  /// vs PeController.saveDraft for what differs downstream (training
+  /// recommendations only fire on a real, non-draft submit).
   static Future<void> submitEvaluation({
     required String userUuid,
     required int? templateId,
@@ -112,6 +120,7 @@ class PeService {
     required String comments,
     required double weightedTotal,
     required List<Map<String, dynamic>> scores,
+    bool isDraft = false,
   }) async {
     final upserted = await _client
         .from('performance_evaluations')
@@ -121,6 +130,7 @@ class PeService {
           'year': year,
           'comments': comments,
           'weighted_total': weightedTotal,
+          'is_draft': isDraft,
         }, onConflict: 'user_id,year')
         .select()
         .single();
@@ -132,5 +142,13 @@ class PeService {
             scores.map((s) => {...s, 'evaluation_id': evalId}).toList(),
           );
     }
+  }
+
+  /// Discards a draft outright — its scores cascade-delete with it. Not
+  /// used for a real submitted evaluation (there's no UI path to call this
+  /// on anything but a draft; deleting a finalised PE record isn't a
+  /// feature this app offers).
+  static Future<void> deleteEvaluation(int evaluationId) async {
+    await _client.from('performance_evaluations').delete().eq('id', evaluationId);
   }
 }

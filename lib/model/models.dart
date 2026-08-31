@@ -140,6 +140,7 @@ class PerformanceEvaluation {
   final String year;
   final List<KpiItem> kpis;
   final String comments;
+  final bool isDraft;
 
   const PerformanceEvaluation({
     this.dbId,
@@ -148,6 +149,7 @@ class PerformanceEvaluation {
     required this.year,
     required this.kpis,
     required this.comments,
+    this.isDraft = false,
   });
 
   double get weightedTotal {

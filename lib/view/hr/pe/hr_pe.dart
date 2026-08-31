@@ -19,6 +19,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
   KpiTemplate? _selectedTemplate;
   final _year = DateTime.now().year.toString();
   bool _isSubmitting = false;
+  bool _savingDraft = false;
   bool _initialized = false;
 
   List<Map<String, dynamic>> _kpis = [];
@@ -27,7 +28,11 @@ class _HrPeScreenState extends State<HrPeScreen> {
   // sync with the actual thresholds Policy Config lets HR tune, so this
   // badge accurately reflects whether submitting will really trigger a
   // training recommendation (see PeController._triggerTrainingRecommendations).
-  Map<String, double> _thresholds = {'Technical': 65, 'Behavioural': 60, 'Leadership': 60};
+  Map<String, double> _thresholds = {
+    'Technical': 65,
+    'Behavioural': 60,
+    'Leadership': 60,
+  };
 
   final _commentsController = TextEditingController();
 
@@ -36,10 +41,14 @@ class _HrPeScreenState extends State<HrPeScreen> {
   /// deliberately allowed now, so if it's ambiguous HR must pick explicitly
   /// via the template picker rather than the app silently guessing.
   KpiTemplate? _templateFor(String department) {
-    final deptMatches = peController.templates.where((t) => t.department == department).toList();
+    final deptMatches = peController.templates
+        .where((t) => t.department == department)
+        .toList();
     if (deptMatches.length == 1) return deptMatches.first;
     if (deptMatches.isEmpty) {
-      final allDept = peController.templates.where((t) => t.department == 'All Departments').toList();
+      final allDept = peController.templates
+          .where((t) => t.department == 'All Departments')
+          .toList();
       if (allDept.length == 1) return allDept.first;
     }
     return null;
@@ -50,13 +59,15 @@ class _HrPeScreenState extends State<HrPeScreen> {
     _kpis = template == null
         ? []
         : template.items
-            .map((i) => {
+              .map(
+                (i) => {
                   'name': i.name,
                   'weightage': i.weightage,
                   'score': 70.0,
                   'category': i.category,
-                })
-            .toList();
+                },
+              )
+              .toList();
   }
 
   @override
@@ -112,16 +123,22 @@ class _HrPeScreenState extends State<HrPeScreen> {
       // Hiding the KPI breakdown in that case would look like the saved
       // evaluation vanished, so instead _templateMismatch below surfaces
       // it as a visible warning HR can act on.
-      final matchedTemplate = peController.templates.where((t) => t.dbId == existing.templateId);
+      final matchedTemplate = peController.templates.where(
+        (t) => t.dbId == existing.templateId,
+      );
       setState(() {
-        _selectedTemplate = matchedTemplate.isNotEmpty ? matchedTemplate.first : _templateFor(emp.department);
+        _selectedTemplate = matchedTemplate.isNotEmpty
+            ? matchedTemplate.first
+            : _templateFor(emp.department);
         _kpis = existing.kpis
-            .map((k) => {
-                  'name': k.name,
-                  'weightage': k.weightage,
-                  'score': k.score,
-                  'category': k.category,
-                })
+            .map(
+              (k) => {
+                'name': k.name,
+                'weightage': k.weightage,
+                'score': k.score,
+                'category': k.category,
+              },
+            )
             .toList();
         _commentsController.text = existing.comments;
       });
@@ -154,7 +171,9 @@ class _HrPeScreenState extends State<HrPeScreen> {
   // employee, which never made sense as a choice.
   List<KpiTemplate> get _compatibleTemplates {
     final dept = _selectedEmployee?.department;
-    return peController.templates.where((t) => t.department == dept || t.department == 'All Departments').toList();
+    return peController.templates
+        .where((t) => t.department == dept || t.department == 'All Departments')
+        .toList();
   }
 
   // True when the currently-shown template belongs to neither the
@@ -193,7 +212,13 @@ class _HrPeScreenState extends State<HrPeScreen> {
           final success = await peController.deleteTemplate(t);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(success ? '✓ Template deleted' : peController.errorMessage ?? 'Could not delete template')),
+            SnackBar(
+              content: Text(
+                success
+                    ? '✓ Template deleted'
+                    : peController.errorMessage ?? 'Could not delete template',
+              ),
+            ),
           );
         },
       ),
@@ -227,7 +252,14 @@ class _HrPeScreenState extends State<HrPeScreen> {
     setState(() => _isSubmitting = true);
 
     final kpiItems = _kpis
-        .map((k) => KpiItem(name: k['name'] as String, weightage: k['weightage'] as double, score: k['score'] as double))
+        .map(
+          (k) => KpiItem(
+            name: k['name'] as String,
+            weightage: k['weightage'] as double,
+            score: k['score'] as double,
+            category: k['category'] as String,
+          ),
+        )
         .toList();
     final success = await peController.submit(
       userUuid: employee.uuid,
@@ -241,7 +273,12 @@ class _HrPeScreenState extends State<HrPeScreen> {
 
     if (!success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(peController.errorMessage ?? 'Could not submit evaluation'), backgroundColor: context.colors.riskHigh),
+        SnackBar(
+          content: Text(
+            peController.errorMessage ?? 'Could not submit evaluation',
+          ),
+          backgroundColor: context.colors.riskHigh,
+        ),
       );
       return;
     }
@@ -250,9 +287,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -295,6 +330,90 @@ class _HrPeScreenState extends State<HrPeScreen> {
     );
   }
 
+  Future<void> _saveDraft() async {
+    final employee = _selectedEmployee;
+    if (employee == null) return;
+    setState(() => _savingDraft = true);
+
+    final kpiItems = _kpis
+        .map(
+          (k) => KpiItem(
+            name: k['name'] as String,
+            weightage: k['weightage'] as double,
+            score: k['score'] as double,
+            category: k['category'] as String,
+          ),
+        )
+        .toList();
+    final success = await peController.saveDraft(
+      userUuid: employee.uuid,
+      templateId: _selectedTemplate?.dbId,
+      kpis: kpiItems,
+      comments: _commentsController.text.trim(),
+    );
+
+    if (!mounted) return;
+    setState(() => _savingDraft = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? '✓ Draft saved for ${employee.name} — resume anytime before submitting'
+              : peController.errorMessage ?? 'Could not save draft',
+        ),
+        backgroundColor: success ? null : context.colors.riskHigh,
+      ),
+    );
+  }
+
+  Future<void> _discardDraft() async {
+    final draft = peController.selectedCurrent;
+    final employee = _selectedEmployee;
+    if (draft == null || employee == null || !draft.isDraft) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Discard This Draft?'),
+        content: Text(
+          'The in-progress $_year evaluation for ${employee.name} will be permanently deleted. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(
+              'Discard',
+              style: TextStyle(color: context.colors.riskHigh),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final success = await peController.discardDraft(draft);
+    if (!mounted) return;
+    if (success) {
+      setState(() {
+        _loadTemplateDefaults(_templateFor(employee.department));
+        _commentsController.text = '';
+      });
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? '✓ Draft discarded'
+              : peController.errorMessage ?? 'Could not discard draft',
+        ),
+      ),
+    );
+  }
+
   void _createTemplate() {
     showModalBottomSheet(
       context: context,
@@ -328,7 +447,13 @@ class _HrPeScreenState extends State<HrPeScreen> {
           final success = await peController.deleteTemplate(t);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(success ? '✓ Template deleted' : peController.errorMessage ?? 'Could not delete template')),
+            SnackBar(
+              content: Text(
+                success
+                    ? '✓ Template deleted'
+                    : peController.errorMessage ?? 'Could not delete template',
+              ),
+            ),
           );
         },
       ),
@@ -354,8 +479,15 @@ class _HrPeScreenState extends State<HrPeScreen> {
               onPressed: _createTemplate,
               icon: Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: c.primary, borderRadius: BorderRadius.circular(10)),
-                child: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
+                decoration: BoxDecoration(
+                  color: c.primary,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.add_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
               ),
             ),
           ),
@@ -377,7 +509,10 @@ class _HrPeScreenState extends State<HrPeScreen> {
               );
             }
 
-            final history = peController.selectedHistory.where((h) => h.dbId != peController.selectedCurrent?.dbId).toList();
+            final history = peController.selectedHistory
+                .where((h) => h.dbId != peController.selectedCurrent?.dbId)
+                .toList();
+            final isDraft = peController.selectedCurrent?.isDraft ?? false;
 
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
@@ -413,6 +548,38 @@ class _HrPeScreenState extends State<HrPeScreen> {
                           ],
                         ),
                       ),
+                      if (isDraft) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: c.amberBg,
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.edit_note_rounded,
+                                size: 13,
+                                color: c.amber,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                'Draft',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: c.amber,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 12,
@@ -432,44 +599,76 @@ class _HrPeScreenState extends State<HrPeScreen> {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      Icon(Icons.unfold_more_rounded, size: 18, color: c.textMuted),
+                      Icon(
+                        Icons.unfold_more_rounded,
+                        size: 18,
+                        color: c.textMuted,
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 10),
-                Builder(builder: (context) {
-                  final noneAvailable = _compatibleTemplates.isEmpty;
-                  final mismatch = _templateMismatch;
-                  return InkWell(
-                    onTap: noneAvailable ? _createTemplate : _pickTemplate,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: mismatch ? c.riskHighBg : c.surfaceMuted,
-                        borderRadius: BorderRadius.circular(12),
+                Builder(
+                  builder: (context) {
+                    final noneAvailable = _compatibleTemplates.isEmpty;
+                    final mismatch = _templateMismatch;
+                    return InkWell(
+                      onTap: noneAvailable ? _createTemplate : _pickTemplate,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: mismatch ? c.riskHighBg : c.surfaceMuted,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              mismatch
+                                  ? Icons.warning_amber_rounded
+                                  : Icons.fact_check_outlined,
+                              size: 16,
+                              color: mismatch ? c.riskHigh : c.textSecondary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'KPI Template: ${_selectedTemplate?.name ?? '—'}',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: c.textPrimary,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              mismatch
+                                  ? 'Fix'
+                                  : (noneAvailable ? 'Create' : 'Change'),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: mismatch ? c.riskHigh : c.primary,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      child: Row(
-                        children: [
-                          Icon(mismatch ? Icons.warning_amber_rounded : Icons.fact_check_outlined, size: 16, color: mismatch ? c.riskHigh : c.textSecondary),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text('KPI Template: ${_selectedTemplate?.name ?? '—'}', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.textPrimary)),
-                          ),
-                          Text(
-                            mismatch ? 'Fix' : (noneAvailable ? 'Create' : 'Change'),
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: mismatch ? c.riskHigh : c.primary),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
+                    );
+                  },
+                ),
                 if (_templateMismatch) ...[
                   const SizedBox(height: 6),
                   Text(
                     'This evaluation is linked to a ${_selectedTemplate!.department} template, not ${_selectedEmployee!.department}. Tap "Fix" to reassign the correct one.',
-                    style: TextStyle(fontSize: 11, color: c.riskHigh, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: c.riskHigh,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
                 const SizedBox(height: 16),
@@ -478,13 +677,20 @@ class _HrPeScreenState extends State<HrPeScreen> {
                   EmptyState(
                     icon: Icons.fact_check_outlined,
                     title: 'No KPI Template Created Yet',
-                    subtitle: '${_selectedEmployee!.department} has no KPI Template yet. Create one or pick from another department.',
+                    subtitle:
+                        '${_selectedEmployee!.department} has no KPI Template yet. Create one or pick from another department.',
                   ),
                   const SizedBox(height: 12),
                   PrimaryButton(
-                    label: _compatibleTemplates.isEmpty ? 'Create KPI Template' : 'Select KPI Template',
-                    icon: _compatibleTemplates.isEmpty ? Icons.add_rounded : Icons.fact_check_rounded,
-                    onPressed: _compatibleTemplates.isEmpty ? _createTemplate : _pickTemplate,
+                    label: _compatibleTemplates.isEmpty
+                        ? 'Create KPI Template'
+                        : 'Select KPI Template',
+                    icon: _compatibleTemplates.isEmpty
+                        ? Icons.add_rounded
+                        : Icons.fact_check_rounded,
+                    onPressed: _compatibleTemplates.isEmpty
+                        ? _createTemplate
+                        : _pickTemplate,
                   ),
                 ] else ...[
                   // Weighted total preview
@@ -507,7 +713,10 @@ class _HrPeScreenState extends State<HrPeScreen> {
                           children: [
                             const Text(
                               'Weighted Total Score',
-                              style: TextStyle(color: Colors.white70, fontSize: 12.5),
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12.5,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -522,7 +731,10 @@ class _HrPeScreenState extends State<HrPeScreen> {
                             ),
                             const Text(
                               '/ 100',
-                              style: TextStyle(color: Colors.white60, fontSize: 13),
+                              style: TextStyle(
+                                color: Colors.white60,
+                                fontSize: 13,
+                              ),
                             ),
                           ],
                         ),
@@ -534,7 +746,9 @@ class _HrPeScreenState extends State<HrPeScreen> {
                             value: _weightedTotal / 100,
                             strokeWidth: 8,
                             backgroundColor: Colors.white24,
-                            valueColor: const AlwaysStoppedAnimation(Colors.white),
+                            valueColor: const AlwaysStoppedAnimation(
+                              Colors.white,
+                            ),
                             strokeCap: StrokeCap.round,
                           ),
                         ),
@@ -546,154 +760,169 @@ class _HrPeScreenState extends State<HrPeScreen> {
                   const SectionHeader(title: 'KPI Scoring'),
                   if (_kpis.isEmpty)
                     AppCard(
-                      child: Text('This template has no KPI items to score.', style: TextStyle(fontSize: 12.5, color: c.textMuted)),
+                      child: Text(
+                        'This template has no KPI items to score.',
+                        style: TextStyle(fontSize: 12.5, color: c.textMuted),
+                      ),
                     ),
                   ..._kpis.asMap().entries.map((e) {
-                  final i = e.key;
-                  final kpi = e.value;
-                  final score = kpi['score'] as double;
-                  final threshold = _thresholds[kpi['category']] ?? 65;
-                  final hitTarget = score >= threshold;
-                  final color = _scoreColor(score, threshold, c);
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: c.surface,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [c.shadowNeutral],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                    final i = e.key;
+                    final kpi = e.value;
+                    final score = kpi['score'] as double;
+                    final threshold = _thresholds[kpi['category']] ?? 65;
+                    final hitTarget = score >= threshold;
+                    final color = _scoreColor(score, threshold, c);
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: c.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [c.shadowNeutral],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        kpi['name'] as String,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${(kpi['weightage'] as double).toInt()}% weight  ·  ${kpi['category']}',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          color: c.textMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
-                                    Text(
-                                      kpi['name'] as String,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w800,
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: color.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(
+                                          100,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '${score.toInt()} / 100',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w900,
+                                          color: color,
+                                          fontFeatures: const [
+                                            FontFeature.tabularFigures(),
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${(kpi['weightage'] as double).toInt()}% weight  ·  ${kpi['category']}',
-                                      style: TextStyle(
-                                        fontSize: 11.5,
-                                        color: c.textMuted,
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          hitTarget
+                                              ? Icons.check_circle_rounded
+                                              : Icons.cancel_rounded,
+                                          size: 12,
+                                          color: color,
+                                        ),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          hitTarget ? 'KPI Hit' : 'KPI Missed',
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: color,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          SliderTheme(
+                            data: SliderThemeData(
+                              activeTrackColor: color,
+                              thumbColor: color,
+                              inactiveTrackColor: color.withValues(alpha: 0.15),
+                              overlayColor: color.withValues(alpha: 0.1),
+                              trackHeight: 4,
+                            ),
+                            child: Slider(
+                              value: score,
+                              min: 0,
+                              max: 100,
+                              divisions: 100,
+                              onChanged: (v) =>
+                                  setState(() => _kpis[i]['score'] = v),
+                            ),
+                          ),
+                          // Matches PeController._triggerTrainingRecommendations'
+                          // real threshold check — this badge only shows when
+                          // submitting will actually enrol the employee in a
+                          // matching training programme (rule-based, per this
+                          // project's scope), not just a cosmetic hint.
+                          if (score < (_thresholds[kpi['category']] ?? 65))
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: c.amberBg,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      Icons.auto_awesome_rounded,
+                                      size: 13,
+                                      color: c.amber,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        'Training recommendation will be triggered for ${kpi['category']}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: c.amber,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: color.withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(100),
-                                    ),
-                                    child: Text(
-                                      '${score.toInt()} / 100',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w900,
-                                        color: color,
-                                        fontFeatures: const [FontFeature.tabularFigures()],
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        hitTarget ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                                        size: 12,
-                                        color: color,
-                                      ),
-                                      const SizedBox(width: 3),
-                                      Text(
-                                        hitTarget ? 'KPI Hit' : 'KPI Missed',
-                                        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        SliderTheme(
-                          data: SliderThemeData(
-                            activeTrackColor: color,
-                            thumbColor: color,
-                            inactiveTrackColor: color.withValues(alpha: 0.15),
-                            overlayColor: color.withValues(alpha: 0.1),
-                            trackHeight: 4,
-                          ),
-                          child: Slider(
-                            value: score,
-                            min: 0,
-                            max: 100,
-                            divisions: 100,
-                            onChanged: (v) => setState(() => _kpis[i]['score'] = v),
-                          ),
-                        ),
-                        // Matches PeController._triggerTrainingRecommendations'
-                        // real threshold check — this badge only shows when
-                        // submitting will actually enrol the employee in a
-                        // matching training programme (rule-based, per this
-                        // project's scope), not just a cosmetic hint.
-                        if (score < (_thresholds[kpi['category']] ?? 65))
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: c.amberBg,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(
-                                    Icons.auto_awesome_rounded,
-                                    size: 13,
-                                    color: c.amber,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Flexible(
-                                    child: Text(
-                                      'Training recommendation will be triggered for ${kpi['category']}',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: c.amber,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
                             ),
-                          ),
-                      ],
-                    ),
-                  );
-                }),
+                        ],
+                      ),
+                    );
+                  }),
 
                   const SizedBox(height: 8),
                   const SectionHeader(title: 'HR Comments'),
@@ -713,7 +942,10 @@ class _HrPeScreenState extends State<HrPeScreen> {
                 if (history.isEmpty)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Text('No previous evaluations for this employee.', style: TextStyle(fontSize: 12.5, color: c.textMuted)),
+                    child: Text(
+                      'No previous evaluations for this employee.',
+                      style: TextStyle(fontSize: 12.5, color: c.textMuted),
+                    ),
                   )
                 else
                   ...history.map(
@@ -754,7 +986,9 @@ class _HrPeScreenState extends State<HrPeScreen> {
                                 fontSize: 15,
                                 fontWeight: FontWeight.w900,
                                 color: c.primary,
-                                fontFeatures: const [FontFeature.tabularFigures()],
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
                               ),
                             ),
                             const SizedBox(width: 4),
@@ -773,12 +1007,59 @@ class _HrPeScreenState extends State<HrPeScreen> {
 
                 if (_selectedTemplate != null) ...[
                   const SizedBox(height: 16),
-                  PrimaryButton(
-                    label: 'Submit Evaluation',
-                    icon: Icons.assessment_rounded,
-                    onPressed: _submit,
-                    isLoading: _isSubmitting,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isSubmitting || _savingDraft
+                              ? null
+                              : _saveDraft,
+                          icon: _savingDraft
+                              ? SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: c.textSecondary,
+                                  ),
+                                )
+                              : const Icon(Icons.edit_note_rounded, size: 18),
+                          label: const Text('Save as Draft'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: PrimaryButton(
+                          label: 'Submit',
+                          icon: Icons.assessment_rounded,
+                          onPressed: _isSubmitting || _savingDraft
+                              ? null
+                              : _submit,
+                          isLoading: _isSubmitting,
+                        ),
+                      ),
+                    ],
                   ),
+                  if (isDraft) ...[
+                    const SizedBox(height: 10),
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: _discardDraft,
+                        icon: Icon(
+                          Icons.delete_outline_rounded,
+                          size: 16,
+                          color: c.riskHigh,
+                        ),
+                        label: Text(
+                          'Discard Draft',
+                          style: TextStyle(color: c.riskHigh),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ],
             );
@@ -812,7 +1093,9 @@ class _PickerSheet<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
     return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.7,
+      ),
       decoration: BoxDecoration(
         color: c.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -822,7 +1105,10 @@ class _PickerSheet<T> extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+          ),
           const SizedBox(height: 16),
           Flexible(
             child: ListView.separated(
@@ -833,8 +1119,17 @@ class _PickerSheet<T> extends StatelessWidget {
                 final item = items[i];
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text(labelBuilder(item), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                  subtitle: Text(subtitleBuilder(item), style: TextStyle(fontSize: 12, color: c.textMuted)),
+                  title: Text(
+                    labelBuilder(item),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  subtitle: Text(
+                    subtitleBuilder(item),
+                    style: TextStyle(fontSize: 12, color: c.textMuted),
+                  ),
                   trailing: onEdit == null && onDelete == null
                       ? null
                       : Row(
@@ -842,24 +1137,47 @@ class _PickerSheet<T> extends StatelessWidget {
                           children: [
                             if (onEdit != null)
                               IconButton(
-                                icon: Icon(Icons.edit_outlined, size: 20, color: c.textSecondary),
+                                icon: Icon(
+                                  Icons.edit_outlined,
+                                  size: 20,
+                                  color: c.textSecondary,
+                                ),
                                 onPressed: () => onEdit!(item),
                               ),
                             if (onDelete != null)
                               IconButton(
-                                icon: Icon(Icons.delete_outline_rounded, size: 20, color: c.riskHigh),
+                                icon: Icon(
+                                  Icons.delete_outline_rounded,
+                                  size: 20,
+                                  color: c.riskHigh,
+                                ),
                                 onPressed: () async {
                                   final confirmed = await showDialog<bool>(
                                     context: context,
                                     builder: (dialogContext) => AlertDialog(
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                      title: const Text('Delete this template?'),
-                                      content: Text('"${labelBuilder(item)}" will be permanently removed.'),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      title: const Text(
+                                        'Delete this template?',
+                                      ),
+                                      content: Text(
+                                        '"${labelBuilder(item)}" will be permanently removed.',
+                                      ),
                                       actions: [
-                                        TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+                                        TextButton(
+                                          onPressed: () => Navigator.of(
+                                            dialogContext,
+                                          ).pop(false),
+                                          child: const Text('Cancel'),
+                                        ),
                                         ElevatedButton(
-                                          onPressed: () => Navigator.of(dialogContext).pop(true),
-                                          style: ElevatedButton.styleFrom(backgroundColor: c.riskHigh),
+                                          onPressed: () => Navigator.of(
+                                            dialogContext,
+                                          ).pop(true),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: c.riskHigh,
+                                          ),
                                           child: const Text('Delete'),
                                         ),
                                       ],
@@ -907,7 +1225,16 @@ class _KpiItemDraft {
 }
 
 class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
-  static const _departments = ['All Departments', 'Engineering', 'Sales', 'Operations', 'Marketing', 'Design', 'Human Resources', 'Finance'];
+  static const _departments = [
+    'All Departments',
+    'Engineering',
+    'Sales',
+    'Operations',
+    'Marketing',
+    'Design',
+    'Human Resources',
+    'Finance',
+  ];
   static const _categories = ['Technical', 'Behavioural', 'Leadership'];
 
   late final _name = TextEditingController(text: widget.existing?.name);
@@ -929,7 +1256,9 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
       for (final i in existingItems) {
         final draft = _KpiItemDraft()
           ..nameCtrl.text = i.name
-          ..weightCtrl.text = i.weightage % 1 == 0 ? i.weightage.toInt().toString() : i.weightage.toString()
+          ..weightCtrl.text = i.weightage % 1 == 0
+              ? i.weightage.toInt().toString()
+              : i.weightage.toString()
           ..category = i.category;
         _items.add(draft);
       }
@@ -956,7 +1285,10 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
     });
   }
 
-  double get _totalWeightage => _items.fold(0.0, (sum, item) => sum + (double.tryParse(item.weightCtrl.text) ?? 0));
+  double get _totalWeightage => _items.fold(
+    0.0,
+    (sum, item) => sum + (double.tryParse(item.weightCtrl.text) ?? 0),
+  );
 
   Future<void> _save() async {
     final name = _name.text.trim();
@@ -970,7 +1302,10 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
       return;
     }
     if ((total - 100).abs() > 0.01) {
-      setState(() => _errorText = 'Weightages must total 100% (currently ${total.toStringAsFixed(0)}%).');
+      setState(
+        () => _errorText =
+            'Weightages must total 100% (currently ${total.toStringAsFixed(0)}%).',
+      );
       return;
     }
 
@@ -978,19 +1313,45 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
       _errorText = null;
       _saving = true;
     });
-    final items = _items.map((i) => KpiTemplateItem(name: i.nameCtrl.text.trim(), weightage: double.tryParse(i.weightCtrl.text) ?? 0, category: i.category)).toList();
+    final items = _items
+        .map(
+          (i) => KpiTemplateItem(
+            name: i.nameCtrl.text.trim(),
+            weightage: double.tryParse(i.weightCtrl.text) ?? 0,
+            category: i.category,
+          ),
+        )
+        .toList();
     final success = _isEditing
-        ? await peController.updateTemplate(existing: widget.existing!, name: name, departmentName: _department, items: items)
-        : await peController.createTemplate(name: name, departmentName: _department, items: items);
+        ? await peController.updateTemplate(
+            existing: widget.existing!,
+            name: name,
+            departmentName: _department,
+            items: items,
+          )
+        : await peController.createTemplate(
+            name: name,
+            departmentName: _department,
+            items: items,
+          );
     if (!mounted) return;
     setState(() => _saving = false);
     if (!success) {
-      setState(() => _errorText = peController.errorMessage ?? 'Could not save template.');
+      setState(
+        () => _errorText =
+            peController.errorMessage ?? 'Could not save template.',
+      );
       return;
     }
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(_isEditing ? '✓ KPI template updated successfully' : '✓ KPI template created successfully')),
+      SnackBar(
+        content: Text(
+          _isEditing
+              ? '✓ KPI template updated successfully'
+              : '✓ KPI template created successfully',
+        ),
+      ),
     );
   }
 
@@ -1000,27 +1361,58 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
     final total = _totalWeightage;
     final totalOk = (total - 100).abs() < 0.01;
     return Container(
-      decoration: BoxDecoration(color: c.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
-      padding: EdgeInsets.fromLTRB(24, 20, 24, MediaQuery.of(context).viewInsets.bottom + 24),
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+      decoration: BoxDecoration(
+        color: c.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        24,
+        20,
+        24,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.85,
+      ),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             Center(
-              child: Container(width: 40, height: 4, decoration: BoxDecoration(color: c.border, borderRadius: BorderRadius.circular(100))),
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: c.border,
+                  borderRadius: BorderRadius.circular(100),
+                ),
+              ),
             ),
             const SizedBox(height: 20),
-            Text(_isEditing ? 'Edit KPI Template' : 'Create KPI Template', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+            Text(
+              _isEditing ? 'Edit KPI Template' : 'Create KPI Template',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+            ),
             const SizedBox(height: 20),
 
-            const Text('Template Name', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            const Text(
+              'Template Name',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 8),
-            TextField(controller: _name, decoration: const InputDecoration(hintText: 'e.g. Engineering Standard Template')),
+            TextField(
+              controller: _name,
+              decoration: const InputDecoration(
+                hintText: 'e.g. Engineering Standard Template',
+              ),
+            ),
             const SizedBox(height: 14),
 
-            const Text('Department', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            const Text(
+              'Department',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -1032,7 +1424,11 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
                   selected: sel,
                   onSelected: (_) => setState(() => _department = d),
                   selectedColor: c.primaryLight,
-                  labelStyle: TextStyle(color: sel ? c.primaryDark : c.textSecondary, fontWeight: FontWeight.w700, fontSize: 12.5),
+                  labelStyle: TextStyle(
+                    color: sel ? c.primaryDark : c.textSecondary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                  ),
                   side: BorderSide(color: sel ? c.primary : Colors.transparent),
                 );
               }).toList(),
@@ -1042,10 +1438,17 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('KPI Items', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                const Text(
+                  'KPI Items',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                ),
                 Text(
                   '${total.toStringAsFixed(0)}% / 100%',
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: totalOk ? c.primary : c.riskHigh),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: totalOk ? c.primary : c.riskHigh,
+                  ),
                 ),
               ],
             ),
@@ -1055,7 +1458,10 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+                decoration: BoxDecoration(
+                  color: c.surfaceMuted,
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1065,7 +1471,10 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
                           flex: 3,
                           child: TextField(
                             controller: item.nameCtrl,
-                            decoration: const InputDecoration(hintText: 'KPI name', isDense: true),
+                            decoration: const InputDecoration(
+                              hintText: 'KPI name',
+                              isDense: true,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -1073,14 +1482,25 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
                           flex: 1,
                           child: TextField(
                             controller: item.weightCtrl,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: const InputDecoration(hintText: '%', isDense: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: const InputDecoration(
+                              hintText: '%',
+                              isDense: true,
+                            ),
                             onChanged: (_) => setState(() {}),
                           ),
                         ),
                         IconButton(
-                          onPressed: _items.length > 1 ? () => _removeItem(i) : null,
-                          icon: Icon(Icons.remove_circle_outline_rounded, size: 20, color: c.riskHigh),
+                          onPressed: _items.length > 1
+                              ? () => _removeItem(i)
+                              : null,
+                          icon: Icon(
+                            Icons.remove_circle_outline_rounded,
+                            size: 20,
+                            color: c.riskHigh,
+                          ),
                         ),
                       ],
                     ),
@@ -1090,13 +1510,22 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
                       children: _categories.map((cat) {
                         final sel = item.category == cat;
                         return ChoiceChip(
-                          label: Text(cat, style: const TextStyle(fontSize: 11.5)),
+                          label: Text(
+                            cat,
+                            style: const TextStyle(fontSize: 11.5),
+                          ),
                           selected: sel,
                           visualDensity: VisualDensity.compact,
-                          onSelected: (_) => setState(() => item.category = cat),
+                          onSelected: (_) =>
+                              setState(() => item.category = cat),
                           selectedColor: c.primaryLight,
-                          labelStyle: TextStyle(color: sel ? c.primaryDark : c.textSecondary, fontWeight: FontWeight.w700),
-                          side: BorderSide(color: sel ? c.primary : Colors.transparent),
+                          labelStyle: TextStyle(
+                            color: sel ? c.primaryDark : c.textSecondary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          side: BorderSide(
+                            color: sel ? c.primary : Colors.transparent,
+                          ),
                         );
                       }).toList(),
                     ),
@@ -1114,8 +1543,18 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: c.riskHighBg, borderRadius: BorderRadius.circular(10)),
-                child: Text(_errorText!, style: TextStyle(fontSize: 12.5, color: c.riskHigh, fontWeight: FontWeight.w600)),
+                decoration: BoxDecoration(
+                  color: c.riskHighBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  _errorText!,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: c.riskHigh,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ],
             const SizedBox(height: 12),
