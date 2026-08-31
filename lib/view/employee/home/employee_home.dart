@@ -268,7 +268,7 @@ class _ClockInCard extends StatelessWidget {
         ? '$clockInTime  →  $clockOutTime'
         : hasClockedIn
             ? clockInTime!
-            : '— : — — AM';
+            : '— : — — ${DateTime.now().hour < 12 ? 'AM' : 'PM'}';
 
     return Container(
       width: double.infinity,

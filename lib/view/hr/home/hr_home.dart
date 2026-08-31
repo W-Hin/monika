@@ -549,7 +549,7 @@ class _MoreMenuItem extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
-            child: Icon(icon, color: color, size: 22),
+            child: Icon(icon, color: color, size: 26),
           ),
           const SizedBox(height: 8),
           Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: c.textPrimary)),

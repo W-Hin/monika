@@ -86,6 +86,11 @@ class AppTheme {
         filled: true,
         fillColor: c.surfaceMuted,
         contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        // Flutter's default is 1 — any errorText longer than one line gets
+        // silently clipped instead of wrapping (found on Set Password's
+        // "cannot be the same as your current password" message). Applies
+        // app-wide since every TextField shares this one theme.
+        errorMaxLines: 3,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
           borderSide: BorderSide.none,
