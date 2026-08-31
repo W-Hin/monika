@@ -81,6 +81,14 @@ class AuthController extends ChangeNotifier {
       return;
     }
 
+    if (row['is_active'] == false) {
+      await AuthService.signOut();
+      errorMessage = 'This account has been deactivated. Contact HR.';
+      status = AuthStatus.signedOut;
+      notifyListeners();
+      return;
+    }
+
     final user = _mapToAppUser(row);
     role = user.userRole;
     mustChangePassword = row['must_change_password'] as bool? ?? false;
