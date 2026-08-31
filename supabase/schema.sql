@@ -48,9 +48,13 @@ create table public.profiles (
     -- Running risk score: starts at 100, deducted per offence type (weights
     -- configurable via policy_settings). risk_level is a cached band derived
     -- from risk_score so list screens (hr_employees, hr_home) don't need to
-    -- recompute it per row.
+    -- recompute it per row. risk_period_start marks when the current period
+    -- began — used by apply_risk_deduction()/reset_stale_risk_scores() to
+    -- reset the score to 100 automatically every policy_settings
+    -- .risk_reset_period_months, independent of HR's own manual reset.
     risk_score              integer not null default 100,
     risk_level              text not null default 'low' check (risk_level in ('low', 'medium', 'high')),
+    risk_period_start       timestamptz not null default now(),
 
     is_active               boolean not null default true,
     created_at              timestamptz not null default now()
@@ -86,7 +90,7 @@ create table public.anomaly_events (
     id                    bigint generated always as identity primary key,
     user_id               uuid not null references public.profiles(id) on delete cascade,
     attendance_record_id  bigint references public.attendance_records(id) on delete set null, -- set when the anomaly came from a specific clock-in attempt
-    type                  text not null check (type in ('out_of_zone', 'shared_device', 'late')),
+    type                  text not null check (type in ('out_of_zone', 'shared_device', 'late', 'wifi_mismatch', 'early_clockout', 'unexplained_absence')),
     event_date            date not null,
     details               text not null,
     severity              text not null check (severity in ('low', 'medium', 'high')),
@@ -148,6 +152,17 @@ create table public.payroll_deduction_items (
     amount      numeric(10, 2) not null
 );
 
+-- One row per risk-score-zero event, queued for PayrollService to pick up
+-- (and re-pick-up on regeneration) at that month's payroll run — see
+-- apply_risk_deduction() below for what inserts into this.
+create table public.risk_score_penalties (
+    id          bigint generated always as identity primary key,
+    user_id     uuid not null references public.profiles(id) on delete cascade,
+    pay_month   date not null, -- 1st of the month this penalty applies to
+    percent     numeric(4, 2) not null,
+    created_at  timestamptz not null default now()
+);
+
 -- ─────────────────────────────────────────────────────────────────────────
 -- Evaluation & Training
 -- ─────────────────────────────────────────────────────────────────────────
@@ -174,6 +189,10 @@ create table public.performance_evaluations (
     comments        text,
     weighted_total  numeric(5, 2) not null, -- cached sum(score * weightage / 100); recomputed on save
     created_at      timestamptz not null default now(),
+    -- Set while HR is still scoring — excluded from the employee's own PE
+    -- view/history and from triggering training recommendations until
+    -- HR finishes and submits for real (is_draft = false).
+    is_draft        boolean not null default false,
 
     unique (user_id, year)
 );
@@ -224,14 +243,31 @@ create table public.training_enrollments (
 create table public.policy_settings (
     id                     integer primary key default 1,
 
-    -- Risk score weights: points deducted per violation type
-    late_weight            numeric(4, 1) not null default 1,
-    out_of_zone_weight     numeric(4, 1) not null default 2,
-    shared_device_weight   numeric(4, 1) not null default 3,
+    -- Risk score weights: points deducted per violation type. Deliberately
+    -- punitive rather than a slow trickle — a single shared-device attempt
+    -- burns roughly a third of a clean score. Relative severity order:
+    -- early_clockout < late < wifi_mismatch < unexplained_absence <
+    -- out_of_zone < shared_device.
+    late_weight                 numeric(4, 1) not null default 10,
+    out_of_zone_weight          numeric(4, 1) not null default 20,
+    shared_device_weight        numeric(4, 1) not null default 35,
+    wifi_mismatch_weight        numeric(4, 1) not null default 12,
+    early_clockout_weight       numeric(4, 1) not null default 8,
+    unexplained_absence_weight  numeric(4, 1) not null default 15,
+
+    -- How often (months) an employee's risk score resets to 100 on its
+    -- own, independent of HR's manual reset — see apply_risk_deduction()
+    -- and reset_stale_risk_scores() below.
+    risk_reset_period_months    integer not null default 2,
+    -- Percentage of that month's base_salary deducted the moment a risk
+    -- score hits 0 — queued in risk_score_penalties, applied by
+    -- PayrollService at the next payroll run for that employee.
+    risk_penalty_percent        numeric(4, 2) not null default 5.00,
 
     -- Payroll deduction amounts (RM), applied at payroll computation time
     late_deduction         numeric(10, 2) not null default 25.00,
     absent_deduction       numeric(10, 2) not null default 120.00,
+    unpaid_leave_daily_rate numeric(10, 2) not null default 120.00,
 
     -- Training trigger thresholds: PE category score below this recommends training
     leadership_threshold   numeric(5, 2) not null default 60,
@@ -291,6 +327,151 @@ as $$
     );
 $$;
 
+-- Deducts the matching policy_settings weight from the offending employee's
+-- risk_score on every anomaly_events insert, resetting the score (and the
+-- period timer) either when a full risk_reset_period_months has quietly
+-- elapsed since the last reset, or immediately when the deduction would
+-- take the score to 0 — the latter also queues a one-off salary penalty in
+-- risk_score_penalties for PayrollService to apply. SECURITY DEFINER
+-- because the inserting client (employee or HR) has no direct RLS grant to
+-- update another profile's risk_score.
+create or replace function public.apply_risk_deduction()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    policy       record;
+    weight       numeric(4,1);
+    profile_row  record;
+    base_score   integer;
+    new_score    integer;
+    period_reset boolean := false;
+begin
+    select * into policy from public.policy_settings where id = 1;
+
+    weight := case new.type
+        when 'late'                then policy.late_weight
+        when 'out_of_zone'         then policy.out_of_zone_weight
+        when 'shared_device'       then policy.shared_device_weight
+        when 'wifi_mismatch'       then policy.wifi_mismatch_weight
+        when 'early_clockout'      then policy.early_clockout_weight
+        when 'unexplained_absence' then policy.unexplained_absence_weight
+        else 0
+    end;
+
+    select * into profile_row from public.profiles where id = new.user_id for update;
+
+    if profile_row.risk_period_start <= now() - (policy.risk_reset_period_months || ' months')::interval then
+        base_score := 100;
+        period_reset := true;
+    else
+        base_score := profile_row.risk_score;
+    end if;
+
+    new_score := greatest(base_score - weight, 0);
+
+    if new_score <= 0 then
+        insert into public.risk_score_penalties (user_id, pay_month, percent)
+        values (new.user_id, date_trunc('month', now())::date, policy.risk_penalty_percent);
+        new_score := 100;
+        period_reset := true;
+    end if;
+
+    update public.profiles
+        set risk_score = new_score,
+            risk_level = case when new_score >= 80 then 'low' when new_score >= 50 then 'medium' else 'high' end,
+            risk_period_start = case when period_reset then now() else risk_period_start end
+        where id = new.user_id;
+
+    return new;
+end;
+$$;
+
+create trigger trg_apply_risk_deduction
+    after insert on public.anomaly_events
+    for each row execute function public.apply_risk_deduction();
+
+-- Proactive reset for employees who go quiet — the trigger above only
+-- resets lazily when a NEW violation arrives after the period elapses,
+-- which would leave a genuinely reformed employee stuck at a stale low
+-- score forever if they have no further violations to trigger a reset.
+-- Scheduled daily via pg_cron below.
+create or replace function public.reset_stale_risk_scores()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    update public.profiles p
+    set risk_score = 100,
+        risk_level = 'low',
+        risk_period_start = now()
+    from public.policy_settings s
+    where s.id = 1
+      and p.risk_period_start <= now() - (s.risk_reset_period_months || ' months')::interval
+      and p.risk_score < 100;
+end;
+$$;
+
+-- Absence is "the absence of an event", so unlike every other violation
+-- type it can't be raised inline from a clock-in attempt. Scans
+-- "yesterday" once daily, reusing the exact same exclusion rules
+-- PayrollService.generateForMonth() applies (weekday, not a public
+-- holiday, on/after hire date, no attendance record, not covered by
+-- approved leave) so the two absence definitions can never disagree.
+-- Raising it as a normal anomaly_events row means it flows through
+-- apply_risk_deduction() above for free.
+create or replace function public.detect_unexplained_absences()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    check_date date := (now() - interval '1 day')::date;
+begin
+    if extract(isodow from check_date) in (6, 7) then
+        return;
+    end if;
+
+    insert into public.anomaly_events (user_id, type, event_date, details, severity)
+    select p.id, 'unexplained_absence', check_date,
+           'No attendance record and no approved leave for ' || to_char(check_date, 'DD Mon YYYY'),
+           'medium'
+    from public.profiles p
+    where p.is_active
+      and p.hire_date <= check_date
+      and not exists (
+          select 1 from public.company_events ce
+          where ce.event_type = 'public_holiday' and ce.event_date = check_date
+      )
+      and not exists (
+          select 1 from public.attendance_records ar
+          where ar.user_id = p.id and ar.work_date = check_date
+      )
+      and not exists (
+          select 1 from public.leave_applications la
+          where la.user_id = p.id and la.status = 'approved'
+            and check_date between la.start_date and la.end_date
+      )
+      and not exists (
+          select 1 from public.anomaly_events ae
+          where ae.user_id = p.id and ae.type = 'unexplained_absence' and ae.event_date = check_date
+      );
+end;
+$$;
+
+-- Requires the pg_cron extension — a standard Postgres extension,
+-- enableable from the Supabase SQL Editor or Dashboard → Database →
+-- Extensions. Everything above works without it; these two jobs just add
+-- the *proactive* half of the reset/absence-detection behaviour.
+create extension if not exists pg_cron;
+select cron.schedule('reset-stale-risk-scores', '0 2 * * *', $$select public.reset_stale_risk_scores();$$);
+select cron.schedule('detect-unexplained-absences', '30 1 * * *', $$select public.detect_unexplained_absences();$$);
+
 alter table public.departments enable row level security;
 alter table public.profiles enable row level security;
 alter table public.attendance_records enable row level security;
@@ -306,6 +487,7 @@ alter table public.performance_evaluation_scores enable row level security;
 alter table public.training_programs enable row level security;
 alter table public.training_enrollments enable row level security;
 alter table public.policy_settings enable row level security;
+alter table public.risk_score_penalties enable row level security;
 
 -- departments — read-only reference data for every signed-in user, HR-only writes
 create policy "departments_select_authenticated" on public.departments
@@ -325,8 +507,14 @@ create policy "profiles_update_own_or_hr" on public.profiles
 -- attendance_records — employees manage their own (clock in/out); HR reads all
 create policy "attendance_select_own_or_hr" on public.attendance_records
     for select using (user_id = auth.uid() or public.is_hr_admin());
+-- Requires the profile to still be active — a deactivated employee's
+-- Supabase Auth session stays valid, so this is what actually stops
+-- them from clocking in once HR deactivates their account.
 create policy "attendance_insert_own" on public.attendance_records
-    for insert with check (user_id = auth.uid());
+    for insert with check (
+        user_id = auth.uid()
+        and exists (select 1 from public.profiles p where p.id = auth.uid() and p.is_active)
+    );
 create policy "attendance_update_own_or_hr" on public.attendance_records
     for update using (user_id = auth.uid() or public.is_hr_admin())
     with check (user_id = auth.uid() or public.is_hr_admin());
@@ -340,8 +528,12 @@ create policy "anomaly_write_hr" on public.anomaly_events
 -- leave_applications — employees submit/read their own; HR reads/decides all
 create policy "leave_select_own_or_hr" on public.leave_applications
     for select using (user_id = auth.uid() or public.is_hr_admin());
+-- Same active-profile requirement as attendance_insert_own above.
 create policy "leave_insert_own" on public.leave_applications
-    for insert with check (user_id = auth.uid());
+    for insert with check (
+        user_id = auth.uid()
+        and exists (select 1 from public.profiles p where p.id = auth.uid() and p.is_active)
+    );
 create policy "leave_update_hr_only" on public.leave_applications
     for update using (public.is_hr_admin()) with check (public.is_hr_admin());
 
@@ -408,6 +600,13 @@ create policy "enrollments_insert_own" on public.training_enrollments
 create policy "enrollments_update_own_or_hr" on public.training_enrollments
     for update using (user_id = auth.uid() or public.is_hr_admin())
     with check (user_id = auth.uid() or public.is_hr_admin());
+
+-- risk_score_penalties — an employee can see their own queued penalties; HR sees all
+create policy "risk_score_penalties_select_own_or_hr" on public.risk_score_penalties
+    for select using (user_id = auth.uid() or public.is_hr_admin());
+-- Inserts happen only via apply_risk_deduction() (SECURITY DEFINER) — no
+-- client-side insert/update policy needed, same pattern as profiles'
+-- own risk_score column.
 
 -- policy_settings — HR-only, employees never read this directly (current UI
 -- only ever displays these values on HR-facing screens)
