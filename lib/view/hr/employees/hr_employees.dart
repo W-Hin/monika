@@ -5,6 +5,7 @@ import '../../shared/widgets/status_pill.dart';
 import '../../../model/models.dart';
 import '../../../controller/employee_controller.dart';
 import 'add_employee.dart';
+import 'bulk_import_employees.dart';
 import 'employee_detail.dart';
 
 class HrEmployeesScreen extends StatefulWidget {
@@ -35,6 +36,14 @@ class _HrEmployeesScreenState extends State<HrEmployeesScreen> {
         automaticallyImplyLeading: false,
         title: const Text('Employees'),
         actions: [
+          IconButton(
+            tooltip: 'Bulk Import (CSV)',
+            onPressed: () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const BulkImportEmployeesScreen()));
+              employeeController.loadEmployees();
+            },
+            icon: Icon(Icons.upload_file_rounded, color: c.textSecondary, size: 22),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: IconButton(
