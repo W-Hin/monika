@@ -252,6 +252,10 @@ class AnomalyEvent {
   final String details;
   final RiskLevel severity;
   final bool reviewed;
+  // Null for anomaly types with no single clock-in attempt behind them
+  // (the late-pattern anomaly, unexplained_absence) — there's nothing to
+  // revert for those.
+  final int? attendanceRecordId;
 
   const AnomalyEvent({
     required this.id,
@@ -261,6 +265,7 @@ class AnomalyEvent {
     required this.details,
     required this.severity,
     this.reviewed = false,
+    this.attendanceRecordId,
   });
 
   AnomalyEvent copyWith({bool? reviewed}) => AnomalyEvent(
@@ -271,6 +276,7 @@ class AnomalyEvent {
         details: details,
         severity: severity,
         reviewed: reviewed ?? this.reviewed,
+        attendanceRecordId: attendanceRecordId,
       );
 }
 

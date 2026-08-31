@@ -42,6 +42,26 @@ class _AnomalyDetailScreenState extends State<AnomalyDetailScreen> {
     );
   }
 
+  Future<void> _revert(AnomalyEvent event) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Revert This Violation?'),
+        content: Text('${event.employeeName}\'s flagged attendance record will be changed back to On Time. Use this only after a dispute investigation finds the flag invalid.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Revert')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await anomalyController.revertViolation(event);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('✓ Reverted: ${event.employeeName}\'s attendance record is now On Time')),
+    );
+  }
+
   void _viewEmployee(BuildContext context, String employeeName) {
     final match = employeeController.employees.where((e) => e.name == employeeName);
     if (match.isEmpty) {
@@ -131,6 +151,7 @@ class _AnomalyDetailScreenState extends State<AnomalyDetailScreen> {
                               event: events[i],
                               onViewEmployee: () => _viewEmployee(context, events[i].employeeName),
                               onMarkReviewed: () => _markReviewed(events[i]),
+                              onRevert: () => _revert(events[i]),
                             ),
                           ),
                         ),
@@ -148,7 +169,8 @@ class _AnomalyCard extends StatelessWidget {
   final AnomalyEvent event;
   final VoidCallback onViewEmployee;
   final VoidCallback onMarkReviewed;
-  const _AnomalyCard({required this.event, required this.onViewEmployee, required this.onMarkReviewed});
+  final VoidCallback onRevert;
+  const _AnomalyCard({required this.event, required this.onViewEmployee, required this.onMarkReviewed, required this.onRevert});
 
   IconData get _icon {
     switch (event.type) {
@@ -156,6 +178,7 @@ class _AnomalyCard extends StatelessWidget {
       case 'Out-of-zone clock-in': return Icons.location_off_rounded;
       case 'WiFi SSID mismatch': return Icons.wifi_off_rounded;
       case 'Early clock-out': return Icons.logout_rounded;
+      case 'Unexplained absence': return Icons.event_busy_rounded;
       default: return Icons.schedule_rounded;
     }
   }
@@ -242,6 +265,18 @@ class _AnomalyCard extends StatelessWidget {
               ),
             ],
           ),
+          if (event.attendanceRecordId != null) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onRevert,
+                icon: const Icon(Icons.undo_rounded, size: 16),
+                label: const Text('Revert (Dispute Investigation Found Invalid)'),
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 10)),
+              ),
+            ),
+          ],
         ],
       ),
     );
