@@ -236,6 +236,16 @@ create table public.training_programs (
     is_mandatory  boolean not null default false,
     duration      text not null, -- display string, e.g. "4 weeks · Self-paced"
     department_id bigint references public.departments(id) on delete set null, -- NULL = all departments
+    -- Quiz: percent of questions that must be answered correctly to pass.
+    pass_mark     integer not null default 70 check (pass_mark between 1 and 100),
+    -- 'recommended_only' programmes are hidden from the catalogue and only
+    -- reach an employee as a recommendation (see refresh_training_recommendations_for).
+    access        text not null default 'open' check (access in ('open', 'recommended_only')),
+    -- Eligibility lock: months of service before an employee can enrol.
+    min_tenure_months integer not null default 0 check (min_tenure_months >= 0),
+    -- Behaviour rules that auto-recommend a remedial programme.
+    trigger_risk_level text check (trigger_risk_level is null or trigger_risk_level in ('medium', 'high')),
+    trigger_attendance_below numeric(5, 2),
     created_at    timestamptz not null default now()
 );
 
@@ -636,3 +646,445 @@ create policy "risk_score_penalties_select_own_or_hr" on public.risk_score_penal
 -- only ever displays these values on HR-facing screens)
 create policy "policy_settings_all_hr" on public.policy_settings
     for all using (public.is_hr_admin()) with check (public.is_hr_admin());
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Training content, quizzes and access rules (migrations 0038 / 0039)
+-- ─────────────────────────────────────────────────────────────────────────
+
+create table if not exists public.training_lessons (
+    id          bigint generated always as identity primary key,
+    program_id  bigint not null references public.training_programs(id) on delete cascade,
+    sort_order  integer not null default 0,
+    title       text not null,
+    body        text not null default '',
+    media_url   text, -- optional image / video / PDF link
+    created_at  timestamptz not null default now()
+);
+
+create table if not exists public.training_questions (
+    id            bigint generated always as identity primary key,
+    program_id    bigint not null references public.training_programs(id) on delete cascade,
+    sort_order    integer not null default 0,
+    question      text not null,
+    options       text[] not null,
+    correct_index integer not null,
+    explanation   text,
+    created_at    timestamptz not null default now(),
+    constraint training_questions_options_check check (array_length(options, 1) between 2 and 6),
+    constraint training_questions_correct_check check (correct_index >= 0 and correct_index < array_length(options, 1))
+);
+
+create table if not exists public.training_lesson_completions (
+    id            bigint generated always as identity primary key,
+    enrollment_id bigint not null references public.training_enrollments(id) on delete cascade,
+    lesson_id     bigint not null references public.training_lessons(id) on delete cascade,
+    completed_at  timestamptz not null default now(),
+    unique (enrollment_id, lesson_id)
+);
+
+create table if not exists public.training_attempts (
+    id            bigint generated always as identity primary key,
+    enrollment_id bigint not null references public.training_enrollments(id) on delete cascade,
+    user_id       uuid not null references public.profiles(id) on delete cascade,
+    score         numeric(5, 2) not null,
+    passed        boolean not null,
+    created_at    timestamptz not null default now()
+);
+
+alter table public.training_lessons enable row level security;
+alter table public.training_questions enable row level security;
+alter table public.training_lesson_completions enable row level security;
+alter table public.training_attempts enable row level security;
+
+drop policy if exists "training_lessons_select_authenticated" on public.training_lessons;
+create policy "training_lessons_select_authenticated" on public.training_lessons
+    for select using (auth.role() = 'authenticated');
+drop policy if exists "training_lessons_write_hr" on public.training_lessons;
+create policy "training_lessons_write_hr" on public.training_lessons
+    for all using (public.is_hr_admin()) with check (public.is_hr_admin());
+
+-- HR-only: this table holds the answers.
+drop policy if exists "training_questions_all_hr" on public.training_questions;
+create policy "training_questions_all_hr" on public.training_questions
+    for all using (public.is_hr_admin()) with check (public.is_hr_admin());
+
+drop policy if exists "training_completions_select_own_or_hr" on public.training_lesson_completions;
+create policy "training_completions_select_own_or_hr" on public.training_lesson_completions
+    for select using (
+        public.is_hr_admin()
+        or exists (select 1 from public.training_enrollments e where e.id = enrollment_id and e.user_id = auth.uid())
+    );
+
+drop policy if exists "training_attempts_select_own_or_hr" on public.training_attempts;
+create policy "training_attempts_select_own_or_hr" on public.training_attempts
+    for select using (user_id = auth.uid() or public.is_hr_admin());
+-- No insert/update policies on completions or attempts: only the
+-- security-definer functions below write them.
+
+-- Recomputes an enrollment's progress from lessons read + quiz passed.
+-- Internal: called only by the functions below.
+create or replace function public.recompute_training_progress(p_enrollment_id bigint)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_program bigint;
+    v_lessons int;
+    v_done int;
+    v_has_quiz boolean;
+    v_passed boolean;
+    v_steps int;
+    v_finished int;
+begin
+    perform set_config('app.training_rpc', '1', true);
+    select program_id into v_program from public.training_enrollments where id = p_enrollment_id;
+    if v_program is null then return; end if;
+
+    select count(*) into v_lessons from public.training_lessons where program_id = v_program;
+    select count(*) into v_done
+        from public.training_lesson_completions c
+        join public.training_lessons l on l.id = c.lesson_id
+        where c.enrollment_id = p_enrollment_id and l.program_id = v_program;
+    select exists (select 1 from public.training_questions where program_id = v_program) into v_has_quiz;
+    select exists (select 1 from public.training_attempts where enrollment_id = p_enrollment_id and passed) into v_passed;
+
+    v_steps := v_lessons + (case when v_has_quiz then 1 else 0 end);
+    if v_steps = 0 then return; end if;
+    v_finished := v_done + (case when v_has_quiz and v_passed then 1 else 0 end);
+
+    update public.training_enrollments
+    set progress = least(v_finished::numeric / v_steps, 1.0),
+        is_completed = is_completed or v_finished >= v_steps,
+        completed_at = coalesce(completed_at, case when v_finished >= v_steps then now() end)
+    where id = p_enrollment_id;
+end;
+$$;
+revoke all on function public.recompute_training_progress(bigint) from public, anon, authenticated;
+
+create or replace function public.complete_training_lesson(p_lesson_id bigint)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_program bigint;
+    v_enrollment bigint;
+begin
+    perform set_config('app.training_rpc', '1', true);
+    select program_id into v_program from public.training_lessons where id = p_lesson_id;
+    if v_program is null then raise exception 'Lesson not found.'; end if;
+    select id into v_enrollment from public.training_enrollments
+        where program_id = v_program and user_id = auth.uid();
+    if v_enrollment is null then raise exception 'Enrol in this programme before marking lessons as read.'; end if;
+
+    insert into public.training_lesson_completions (enrollment_id, lesson_id)
+    values (v_enrollment, p_lesson_id)
+    on conflict (enrollment_id, lesson_id) do nothing;
+    perform public.recompute_training_progress(v_enrollment);
+end;
+$$;
+
+-- Question count + pass mark, visible to anyone (so the detail screen can say
+-- "includes a 5-question quiz") without exposing the questions themselves.
+create or replace function public.training_quiz_info(p_program_id bigint)
+returns table (question_count int, pass_mark int)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+    select (select count(*)::int from public.training_questions where program_id = p_program_id),
+           (select pass_mark from public.training_programs where id = p_program_id);
+$$;
+
+-- The quiz as the learner sees it: no correct_index, no explanation.
+create or replace function public.get_quiz_questions(p_program_id bigint)
+returns table (id bigint, sort_order int, question text, options text[])
+language plpgsql
+security definer
+set search_path = public
+stable
+as $$
+begin
+    if not public.is_hr_admin() and not exists (
+        select 1 from public.training_enrollments e where e.program_id = p_program_id and e.user_id = auth.uid()
+    ) then
+        raise exception 'Enrol in this programme to take its quiz.';
+    end if;
+    return query
+        select q.id, q.sort_order, q.question, q.options
+        from public.training_questions q
+        where q.program_id = p_program_id
+        order by q.sort_order, q.id;
+end;
+$$;
+
+-- Grades server-side. p_answers[i] is the 0-based option index chosen for the
+-- i-th question in sort order. Returns the score plus a per-question review
+-- (correct answer + explanation) — revealed only after submitting.
+create or replace function public.submit_training_quiz(p_program_id bigint, p_answers int[])
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_uid uuid := auth.uid();
+    v_enrollment bigint;
+    v_pass_mark int;
+    v_total int;
+    v_correct int := 0;
+    v_results jsonb := '[]'::jsonb;
+    v_i int := 0;
+    v_ans int;
+    v_ok boolean;
+    v_score numeric(5, 2);
+    v_passed boolean;
+    q record;
+begin
+    perform set_config('app.training_rpc', '1', true);
+    select id into v_enrollment from public.training_enrollments
+        where program_id = p_program_id and user_id = v_uid;
+    if v_enrollment is null then raise exception 'Enrol in this programme before taking its quiz.'; end if;
+
+    select pass_mark into v_pass_mark from public.training_programs where id = p_program_id;
+    select count(*) into v_total from public.training_questions where program_id = p_program_id;
+    if v_total = 0 then raise exception 'This programme has no quiz.'; end if;
+    if coalesce(array_length(p_answers, 1), 0) <> v_total then
+        raise exception 'Answer every question before submitting.';
+    end if;
+
+    for q in
+        select * from public.training_questions where program_id = p_program_id order by sort_order, id
+    loop
+        v_i := v_i + 1;
+        v_ans := p_answers[v_i];
+        v_ok := coalesce(v_ans = q.correct_index, false);
+        if v_ok then v_correct := v_correct + 1; end if;
+        v_results := v_results || jsonb_build_array(jsonb_build_object(
+            'question_id', q.id,
+            'correct', v_ok,
+            'correct_index', q.correct_index,
+            'explanation', q.explanation
+        ));
+    end loop;
+
+    v_score := round(v_correct * 100.0 / v_total, 2);
+    v_passed := v_score >= v_pass_mark;
+
+    insert into public.training_attempts (enrollment_id, user_id, score, passed)
+    values (v_enrollment, v_uid, v_score, v_passed);
+
+    -- Best attempt counts, so a retake can only improve the recorded score.
+    update public.training_enrollments
+    set performance_score = greatest(coalesce(performance_score, 0), v_score)
+    where id = v_enrollment;
+
+    perform public.recompute_training_progress(v_enrollment);
+
+    return jsonb_build_object(
+        'score', v_score,
+        'passed', v_passed,
+        'correct', v_correct,
+        'total', v_total,
+        'pass_mark', v_pass_mark,
+        'results', v_results
+    );
+end;
+$$;
+
+-- Once a programme has lessons or a quiz, an employee can't set their own
+-- progress/completion/score directly through the API — only the functions
+-- above (which set app.training_rpc) or HR can. Programmes with no content
+-- keep the old self-reported progress.
+create or replace function public.guard_training_enrollment_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if public.is_hr_admin() or coalesce(current_setting('app.training_rpc', true), '') = '1' then
+        return new;
+    end if;
+    if (new.progress is distinct from old.progress
+        or new.is_completed is distinct from old.is_completed
+        or new.performance_score is distinct from old.performance_score
+        or new.completed_at is distinct from old.completed_at)
+       and (exists (select 1 from public.training_lessons where program_id = new.program_id)
+            or exists (select 1 from public.training_questions where program_id = new.program_id)) then
+        raise exception 'Progress on this programme is tracked automatically through its lessons and quiz.';
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_guard_training_enrollment_update on public.training_enrollments;
+create trigger trg_guard_training_enrollment_update
+    before update on public.training_enrollments
+    for each row
+    execute function public.guard_training_enrollment_update();
+
+create or replace function public.tenure_months(p_hire_date date)
+returns int
+language sql
+immutable
+as $$
+    select (extract(year from age(current_date, p_hire_date)) * 12
+          + extract(month from age(current_date, p_hire_date)))::int;
+$$;
+
+-- Evaluates every behaviour-triggered programme for one employee and
+-- enrols them (as a recommendation) in the ones whose rule fires and that
+-- they're tenure-eligible for. Attendance is judged over the last 90 days
+-- using the same expected-day rules as payroll (weekdays, minus public
+-- holidays and approved leave), and needs at least 10 expected days of
+-- history before it can trigger anything — a new hire isn't "absent".
+create or replace function public.refresh_training_recommendations_for(p_user uuid)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_profile record;
+    v_tenure int;
+    v_from date;
+    v_to date := current_date - 1;
+    v_expected int;
+    v_present int;
+    v_rate numeric;
+    v_added int := 0;
+    v_reason text;
+    prog record;
+begin
+    perform set_config('app.training_rpc', '1', true);
+
+    select hire_date, risk_level into v_profile from public.profiles where id = p_user and is_active;
+    if not found then return 0; end if;
+
+    v_tenure := public.tenure_months(v_profile.hire_date);
+    v_from := greatest(v_profile.hire_date, current_date - 90);
+
+    select count(*) filter (where is_workday),
+           count(*) filter (where is_workday and attended)
+    into v_expected, v_present
+    from (
+        select
+            (extract(isodow from d) < 6
+                and not exists (
+                    select 1 from public.company_events ce
+                    where ce.event_type = 'public_holiday'
+                      and (ce.event_date at time zone 'Asia/Kuala_Lumpur')::date = d::date)
+                and not exists (
+                    select 1 from public.leave_applications la
+                    where la.user_id = p_user and la.status = 'approved'
+                      and d::date between la.start_date and la.end_date)
+            ) as is_workday,
+            exists (
+                select 1 from public.attendance_records ar
+                where ar.user_id = p_user and ar.work_date = d::date) as attended
+        from generate_series(v_from, v_to, interval '1 day') as d
+    ) x;
+
+    v_rate := case when v_expected >= 10 then v_present * 100.0 / v_expected end;
+
+    for prog in
+        select * from public.training_programs p
+        where (p.trigger_risk_level is not null or p.trigger_attendance_below is not null)
+          and p.min_tenure_months <= v_tenure
+          and not exists (
+              select 1 from public.training_enrollments e
+              where e.program_id = p.id and e.user_id = p_user)
+    loop
+        v_reason := null;
+        if prog.trigger_risk_level = 'high' and v_profile.risk_level = 'high' then
+            v_reason := 'Recommended because your risk classification is High.';
+        elsif prog.trigger_risk_level = 'medium' and v_profile.risk_level in ('medium', 'high') then
+            v_reason := 'Recommended because your risk classification is ' || initcap(v_profile.risk_level) || '.';
+        elsif prog.trigger_attendance_below is not null and v_rate is not null and v_rate < prog.trigger_attendance_below then
+            v_reason := 'Recommended because your attendance over the last 90 days is ' || round(v_rate)::text
+                     || '%, below the ' || prog.trigger_attendance_below::int::text || '% this programme targets.';
+        end if;
+
+        if v_reason is not null then
+            insert into public.training_enrollments (program_id, user_id, is_recommended, recommendation_reason, progress)
+            values (prog.id, p_user, true, v_reason, 0)
+            on conflict (program_id, user_id) do nothing;
+            v_added := v_added + 1;
+        end if;
+    end loop;
+
+    return v_added;
+end;
+$$;
+revoke all on function public.refresh_training_recommendations_for(uuid) from public, anon, authenticated;
+
+-- What the app calls (for the signed-in employee) when they open Training.
+create or replace function public.refresh_my_training_recommendations()
+returns int
+language sql
+security definer
+set search_path = public
+as $$
+    select public.refresh_training_recommendations_for(auth.uid());
+$$;
+
+-- Daily sweep so recommendations exist even if the employee hasn't opened
+-- the Training tab (and HR's Completion view reflects who's been enrolled).
+create or replace function public.refresh_all_training_recommendations()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    u uuid;
+begin
+    for u in select id from public.profiles where is_active loop
+        perform public.refresh_training_recommendations_for(u);
+    end loop;
+end;
+$$;
+revoke all on function public.refresh_all_training_recommendations() from public, anon, authenticated;
+
+select cron.schedule('refresh-training-recommendations', '0 3 * * *', $$select public.refresh_all_training_recommendations();$$);
+
+-- Self-enrolment guard: employees can only enrol themselves in open
+-- programmes they're tenure-eligible for. Recommendations (written by the
+-- functions above, or by HR when a PE score triggers one) bypass this.
+create or replace function public.guard_training_enrollment_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_access text;
+    v_min int;
+    v_hire date;
+begin
+    if public.is_hr_admin() or coalesce(current_setting('app.training_rpc', true), '') = '1' then
+        return new;
+    end if;
+    select access, min_tenure_months into v_access, v_min
+        from public.training_programs where id = new.program_id;
+    if v_access = 'recommended_only' then
+        raise exception 'This programme is only available when it is recommended to you.';
+    end if;
+    select hire_date into v_hire from public.profiles where id = new.user_id;
+    if v_hire is not null and public.tenure_months(v_hire) < coalesce(v_min, 0) then
+        raise exception 'This programme opens after % months of service.', v_min;
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_guard_training_enrollment_insert on public.training_enrollments;
+create trigger trg_guard_training_enrollment_insert
+    before insert on public.training_enrollments
+    for each row
+    execute function public.guard_training_enrollment_insert();
