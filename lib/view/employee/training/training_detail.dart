@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../../model/models.dart';
 import '../../../controller/training_controller.dart';
+import '../../../controller/training_content_controller.dart';
+import 'training_quiz.dart';
 
 class TrainingDetailScreen extends StatefulWidget {
   final TrainingProgram program;
@@ -22,6 +25,13 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
   void initState() {
     super.initState();
     _program = widget.program;
+    _loadContent();
+  }
+
+  Future<void> _loadContent() async {
+    final id = _program.dbId;
+    if (id == null) return;
+    await trainingContentController.load(programId: id, enrollmentId: _program.enrollmentId);
   }
 
   Color _catColor(BuildContext context) {
@@ -50,6 +60,7 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
     await trainingController.loadMy();
     if (!mounted) return;
     _syncFromController();
+    await _loadContent();
   }
 
   Future<void> _enroll() async {
@@ -64,6 +75,7 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
       return;
     }
     _syncFromController();
+    _loadContent();
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('✓ Enrolled successfully')),
     );
@@ -89,11 +101,86 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
     }
   }
 
+  Future<void> _markRead(TrainingLesson lesson) async {
+    final ok = await trainingContentController.markLessonRead(lesson);
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(trainingContentController.errorMessage ?? 'Could not mark as read'), backgroundColor: context.colors.riskHigh),
+      );
+      return;
+    }
+    await trainingController.loadMy();
+    if (!mounted) return;
+    _syncFromController();
+  }
+
+  Future<void> _takeQuiz() async {
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => TrainingQuizScreen(programId: _program.dbId!, programTitle: _program.title)),
+    );
+    // Refresh however they came back — the "Back to Programme" button pops
+    // true but the app-bar/system back pops null, and the attempt is
+    // already saved server-side either way.
+    if (mounted) await _refresh();
+  }
+
+  List<Widget> _contentSection(BuildContext context) {
+    final c = context.colors;
+    final content = trainingContentController;
+    if (!content.hasContent) return const [];
+    final enrolled = _program.isEnrolled;
+    return [
+      const SizedBox(height: 24),
+      if (content.lessons.isNotEmpty) ...[
+        SectionHeader(title: 'Lessons (${enrolled ? '${content.lessonsDone}/' : ''}${content.lessons.length})'),
+        if (!enrolled)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text('Enrol to unlock the full lessons.', style: TextStyle(fontSize: 12, color: c.textMuted)),
+          ),
+        for (var i = 0; i < content.lessons.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _LessonCard(
+              index: i + 1,
+              lesson: content.lessons[i],
+              unlocked: enrolled,
+              onMarkRead: () => _markRead(content.lessons[i]),
+            ),
+          ),
+      ],
+      if (content.hasQuiz) ...[
+        const SizedBox(height: 14),
+        const SectionHeader(title: 'Quiz'),
+        _QuizCard(
+          questionCount: content.quizQuestionCount,
+          passMark: content.passMark,
+          bestScore: content.bestScore,
+          attempts: content.attemptCount,
+          enrolled: enrolled,
+          lessonsDone: content.allLessonsDone,
+          passed: _program.isCompleted,
+          onTake: _takeQuiz,
+        ),
+      ],
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     final p = _program;
     final catColor = _catColor(context);
+    return ListenableBuilder(
+      listenable: trainingContentController,
+      builder: (context, _) => _buildScaffold(context, c, p, catColor),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context, AppColorsExtension c, TrainingProgram p, Color catColor) {
+    final hasContent = trainingContentController.hasContent;
     return Scaffold(
       appBar: const SimpleAppBar(title: 'Training Details'),
       body: SafeArea(
@@ -169,7 +256,7 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
                   ],
                 ),
               ),
-            ] else if (p.progress > 0) ...[
+            ] else if (p.isEnrolled) ...[
               const SectionHeader(title: 'Your Progress'),
               ClipRRect(
                 borderRadius: BorderRadius.circular(100),
@@ -182,14 +269,195 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
               ),
               const SizedBox(height: 6),
               Text('${(p.progress * 100).toInt()}% complete', style: TextStyle(fontSize: 11.5, color: c.textMuted, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 20),
-              PrimaryButton(label: 'Continue Training', icon: Icons.play_arrow_rounded, onPressed: _continue, isLoading: _busy),
+              // Programmes with lessons/a quiz track progress through them;
+              // only content-less ones keep the old tap-to-advance button.
+              if (!hasContent) ...[
+                const SizedBox(height: 20),
+                PrimaryButton(label: 'Continue Training', icon: Icons.play_arrow_rounded, onPressed: _continue, isLoading: _busy),
+              ],
+            ] else if (p.locked) ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
+                child: Row(
+                  children: [
+                    Icon(Icons.lock_outline_rounded, size: 18, color: c.textMuted),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'This programme opens after ${p.minTenureMonths} months of service.',
+                        style: TextStyle(fontSize: 12.5, color: c.textSecondary, fontWeight: FontWeight.w600, height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ] else ...[
               PrimaryButton(label: 'Enrol Now', icon: Icons.how_to_reg_rounded, onPressed: _enroll, isLoading: _busy),
             ],
+            ..._contentSection(context),
           ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+
+class _LessonCard extends StatelessWidget {
+  final int index;
+  final TrainingLesson lesson;
+  final bool unlocked;
+  final VoidCallback onMarkRead;
+  const _LessonCard({required this.index, required this.lesson, required this.unlocked, required this.onMarkRead});
+
+  static bool _looksLikeImage(String url) {
+    final u = url.toLowerCase().split('?').first;
+    return u.endsWith('.png') || u.endsWith('.jpg') || u.endsWith('.jpeg') || u.endsWith('.gif') || u.endsWith('.webp');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final media = lesson.mediaUrl;
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          enabled: unlocked,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          expandedCrossAxisAlignment: CrossAxisAlignment.start,
+          leading: Container(
+            width: 30,
+            height: 30,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: lesson.completed ? c.riskLowBg : c.surfaceMuted, shape: BoxShape.circle),
+            child: lesson.completed
+                ? Icon(Icons.check_rounded, size: 17, color: c.primary)
+                : Text('$index', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: unlocked ? c.textSecondary : c.textMuted)),
+          ),
+          title: Text(lesson.title, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: unlocked ? c.textPrimary : c.textMuted)),
+          trailing: unlocked ? null : Icon(Icons.lock_outline_rounded, size: 17, color: c.textMuted),
+          children: [
+            if (lesson.body.isNotEmpty) Text(lesson.body, style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.55)),
+            if (media != null && media.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              if (_looksLikeImage(media))
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    media,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Text('Image could not be loaded: $media', style: TextStyle(fontSize: 11.5, color: c.textMuted)),
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+                  decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(10)),
+                  child: Row(
+                    children: [
+                      Icon(Icons.link_rounded, size: 16, color: c.infoBlue),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(media, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, color: c.infoBlue))),
+                      IconButton(
+                        tooltip: 'Copy link',
+                        icon: Icon(Icons.copy_rounded, size: 16, color: c.textMuted),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: media));
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied')));
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+            if (!lesson.completed) ...[
+              const SizedBox(height: 14),
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton.icon(
+                  onPressed: onMarkRead,
+                  icon: const Icon(Icons.check_rounded, size: 16),
+                  label: const Text('Mark as read'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuizCard extends StatelessWidget {
+  final int questionCount;
+  final int passMark;
+  final double? bestScore;
+  final int attempts;
+  final bool enrolled;
+  final bool lessonsDone;
+  final bool passed;
+  final VoidCallback onTake;
+  const _QuizCard({
+    required this.questionCount,
+    required this.passMark,
+    required this.bestScore,
+    required this.attempts,
+    required this.enrolled,
+    required this.lessonsDone,
+    required this.passed,
+    required this.onTake,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final unlocked = enrolled && lessonsDone;
+    final note = !enrolled
+        ? 'Enrol to take the quiz.'
+        : !lessonsDone
+            ? 'Mark every lesson as read to unlock the quiz.'
+            : bestScore == null
+                ? 'Not attempted yet.'
+                : 'Best score ${bestScore!.toStringAsFixed(0)}% · $attempts attempt${attempts == 1 ? '' : 's'}';
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: c.amberBg, borderRadius: BorderRadius.circular(12)),
+                child: Icon(Icons.quiz_rounded, color: c.amber, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('$questionCount questions · pass mark $passMark%', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(note, style: TextStyle(fontSize: 12, color: c.textMuted)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: unlocked ? onTake : null,
+              icon: Icon(passed ? Icons.replay_rounded : Icons.play_arrow_rounded, size: 18),
+              label: Text(attempts == 0 ? 'Take Quiz' : (passed ? 'Retake for a better score' : 'Retake Quiz')),
+            ),
+          ),
+        ],
       ),
     );
   }

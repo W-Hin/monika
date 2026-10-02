@@ -421,6 +421,69 @@ class KpiTemplate {
   const KpiTemplate({this.dbId, required this.name, required this.department, required this.items});
 }
 
+class TrainingLesson {
+  final int id;
+  final int sortOrder;
+  final String title;
+  final String body;
+  final String? mediaUrl;
+  final bool completed; // by the current employee (employee view only)
+
+  const TrainingLesson({
+    required this.id,
+    required this.sortOrder,
+    required this.title,
+    required this.body,
+    this.mediaUrl,
+    this.completed = false,
+  });
+}
+
+/// One multiple-choice question. [correctIndex] and [explanation] are only
+/// ever populated for HR (the employee-facing fetch never receives them —
+/// grading happens server-side, see submit_training_quiz).
+class QuizQuestion {
+  final int id;
+  final int sortOrder;
+  final String question;
+  final List<String> options;
+  final int? correctIndex;
+  final String? explanation;
+
+  const QuizQuestion({
+    required this.id,
+    required this.sortOrder,
+    required this.question,
+    required this.options,
+    this.correctIndex,
+    this.explanation,
+  });
+}
+
+class QuizQuestionResult {
+  final bool correct;
+  final int correctIndex;
+  final String? explanation;
+  const QuizQuestionResult({required this.correct, required this.correctIndex, this.explanation});
+}
+
+class QuizResult {
+  final double score;
+  final bool passed;
+  final int correct;
+  final int total;
+  final int passMark;
+  final List<QuizQuestionResult> review; // same order as the questions
+  const QuizResult({
+    required this.score,
+    required this.passed,
+    required this.correct,
+    required this.total,
+    required this.passMark,
+    required this.review,
+  });
+}
+
 class TrainingCompletionRecord {
   final int? enrollmentId; // training_enrollments.id - null for dummy/local-only rows
   final String employeeName;

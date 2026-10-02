@@ -4,6 +4,7 @@ import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../../model/models.dart';
 import '../../../controller/training_controller.dart';
+import 'training_content_editor.dart';
 
 class HrTrainingScreen extends StatefulWidget {
   const HrTrainingScreen({super.key});
@@ -51,6 +52,15 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _openContent(TrainingProgram program) {
+    final id = program.dbId;
+    if (id == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => TrainingContentEditorScreen(programId: id, programTitle: program.title)),
     );
   }
 
@@ -223,6 +233,7 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
                                             program: t,
                                             onEdit: () => _editProgram(t),
                                             onAssignDept: () => _assignDepartment(t),
+                                            onContent: () => _openContent(t),
                                           ),
                                         ),
                                       )
@@ -266,7 +277,8 @@ class _HrTrainingCard extends StatelessWidget {
   final TrainingProgram program;
   final VoidCallback onEdit;
   final VoidCallback onAssignDept;
-  const _HrTrainingCard({required this.program, required this.onEdit, required this.onAssignDept});
+  final VoidCallback onContent;
+  const _HrTrainingCard({required this.program, required this.onEdit, required this.onAssignDept, required this.onContent});
 
   Color _catColor(AppColorsExtension c) {
     switch (program.category) {
@@ -432,6 +444,16 @@ class _HrTrainingCard extends StatelessWidget {
                     'Assign Dept',
                     style: TextStyle(fontSize: 12.5),
                   ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onContent,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  child: const Text('Content', style: TextStyle(fontSize: 12.5)),
                 ),
               ),
             ],

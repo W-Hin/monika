@@ -99,7 +99,7 @@ class TrainingService {
     await _client.from('training_enrollments').insert({
       'program_id': programId,
       'user_id': uid,
-      'progress': 0.1,
+      'progress': 0,
     });
   }
 
