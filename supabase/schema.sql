@@ -451,7 +451,7 @@ security definer
 set search_path = public
 as $$
 declare
-    check_date date := (now() - interval '1 day')::date;
+    check_date date := ((now() at time zone 'Asia/Kuala_Lumpur') - interval '1 day')::date;
 begin
     if extract(isodow from check_date) in (6, 7) then
         return;
@@ -466,7 +466,8 @@ begin
       and p.hire_date <= check_date
       and not exists (
           select 1 from public.company_events ce
-          where ce.event_type = 'public_holiday' and ce.event_date = check_date
+          where ce.event_type = 'public_holiday'
+            and (ce.event_date at time zone 'Asia/Kuala_Lumpur')::date = check_date
       )
       and not exists (
           select 1 from public.attendance_records ar

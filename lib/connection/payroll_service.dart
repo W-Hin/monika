@@ -86,9 +86,13 @@ class PayrollService {
         .from('company_events')
         .select('event_date')
         .eq('event_type', 'public_holiday')
-        .gte('event_date', monthStartKey)
-        .lt('event_date', monthEndKey);
-    final holidayDates = List<Map<String, dynamic>>.from(holidayRows).map((r) => DateTime.parse(r['event_date'] as String)).toSet();
+        // event_date is a timestamptz written with .toUtc() (CalendarService),
+        // so bound the month in the same terms and read it back .toLocal() —
+        // a holiday at local midnight is the previous day in UTC, which
+        // otherwise shifted it onto the wrong payroll day.
+        .gte('event_date', monthStart.toUtc().toIso8601String())
+        .lt('event_date', monthEndExclusive.toUtc().toIso8601String());
+    final holidayDates = List<Map<String, dynamic>>.from(holidayRows).map((r) => DateTime.parse(r['event_date'] as String).toLocal()).toSet();
 
     var generatedCount = 0;
     for (final emp in List<Map<String, dynamic>>.from(employees)) {
