@@ -230,6 +230,20 @@ class TrainingController extends ChangeNotifier {
     }
   }
 
+  Future<bool> deleteProgram(TrainingProgram program) async {
+    errorMessage = null;
+    if (program.dbId == null) return false;
+    try {
+      await TrainingService.deleteProgram(program.dbId!);
+      await loadForHr();
+      return true;
+    } catch (e) {
+      errorMessage = 'Could not delete training programme: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> assignDepartment(TrainingProgram program, String departmentName) async {
     errorMessage = null;
     if (program.dbId == null) return false;

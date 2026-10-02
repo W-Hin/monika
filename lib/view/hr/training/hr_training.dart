@@ -677,6 +677,47 @@ class _CreateProgramSheetState extends State<_CreateProgramSheet> {
 
   bool get _isEditing => widget.existing != null;
 
+  Future<void> _confirmDelete() async {
+    final program = widget.existing!;
+    final c = context.colors;
+    final enrolled = program.enrolledCount;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (d) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete this programme?'),
+        content: Text(
+          enrolled > 0
+              ? '"${program.title}" will be permanently deleted, along with its lessons and quiz. '
+                  '$enrolled enrolled employee${enrolled == 1 ? '' : 's'} will lose their progress, quiz attempts and scores for it. This cannot be undone.'
+              : '"${program.title}" and its lessons and quiz will be permanently deleted. This cannot be undone.',
+          style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: c.riskHigh),
+            onPressed: () => Navigator.of(d).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    setState(() => _saving = true);
+    final success = await trainingController.deleteProgram(program);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    final messenger = ScaffoldMessenger.of(context);
+    if (!success) {
+      messenger.showSnackBar(SnackBar(content: Text(trainingController.errorMessage ?? 'Could not delete training programme')));
+      return;
+    }
+    Navigator.of(context).pop();
+    messenger.showSnackBar(const SnackBar(content: Text('✓ Training programme deleted')));
+  }
+
   Color _catColor(AppColorsExtension c, String cat) {
     switch (cat) {
       case 'Leadership':
@@ -1064,6 +1105,21 @@ class _CreateProgramSheetState extends State<_CreateProgramSheet> {
               onPressed: _save,
               isLoading: _saving,
             ),
+            if (_isEditing) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _saving ? null : _confirmDelete,
+                  icon: Icon(Icons.delete_outline_rounded, size: 18, color: c.riskHigh),
+                  label: Text('Delete Programme', style: TextStyle(color: c.riskHigh)),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: c.riskHigh),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

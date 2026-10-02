@@ -175,6 +175,12 @@ class TrainingService {
     }).eq('id', id);
   }
 
+  /// Removes the programme. Its lessons, quiz questions, enrolments (and
+  /// with them progress, scores and quiz attempts) cascade-delete.
+  static Future<void> deleteProgram(int id) async {
+    await _client.from('training_programs').delete().eq('id', id);
+  }
+
   static Future<void> assignDepartment({required int programId, required int? departmentId}) async {
     await _client.from('training_programs').update({'department_id': departmentId}).eq('id', programId);
   }
