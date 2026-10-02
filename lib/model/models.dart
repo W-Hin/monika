@@ -213,6 +213,23 @@ class TrainingProgram {
   final double? performanceScore; // out of 100, set once completed
   final String? department; // null = all departments
 
+  // Availability rules (see migration 0039). 'recommended_only' programmes
+  // are hidden from the catalogue and only reach an employee as a
+  // recommendation; minTenureMonths is an eligibility lock; the trigger
+  // fields are the behaviour rules that auto-recommend a remedial programme.
+  final String access;
+  final int minTenureMonths;
+  final String? triggerRiskLevel; // 'medium' | 'high'
+  final double? triggerAttendanceBelow; // percent
+  // Employee view only: not enrolled and not yet tenure-eligible.
+  final bool locked;
+
+  bool get recommendedOnly => access == 'recommended_only';
+
+  /// Enrolled in this programme. The dummy rows have no enrollmentId, so
+  /// progress > 0 still counts for them.
+  bool get isEnrolled => enrollmentId != null || progress > 0;
+
   const TrainingProgram({
     this.dbId,
     this.enrollmentId,
@@ -228,6 +245,11 @@ class TrainingProgram {
     this.isCompleted = false,
     this.performanceScore,
     this.department,
+    this.access = 'open',
+    this.minTenureMonths = 0,
+    this.triggerRiskLevel,
+    this.triggerAttendanceBelow,
+    this.locked = false,
   });
 
   TrainingProgram copyWith({
@@ -251,6 +273,11 @@ class TrainingProgram {
         isCompleted: isCompleted ?? this.isCompleted,
         performanceScore: performanceScore ?? this.performanceScore,
         department: department ?? this.department,
+        access: access,
+        minTenureMonths: minTenureMonths,
+        triggerRiskLevel: triggerRiskLevel,
+        triggerAttendanceBelow: triggerAttendanceBelow,
+        locked: locked,
       );
 }
 

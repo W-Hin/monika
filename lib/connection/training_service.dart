@@ -28,10 +28,30 @@ class TrainingService {
     required String category,
     required String reason,
   }) async {
-    final candidates = await _client.from('training_programs').select('id').eq('category', category).order('id').limit(1);
-    final list = List<Map<String, dynamic>>.from(candidates);
-    if (list.isEmpty) return;
-    final programId = list.first['id'] as int;
+    final candidates = List<Map<String, dynamic>>.from(await _client
+        .from('training_programs')
+        .select('id, access, min_tenure_months, trigger_risk_level, trigger_attendance_below')
+        .eq('category', category)
+        .order('id'));
+    final enrolledIds = List<Map<String, dynamic>>.from(
+      await _client.from('training_enrollments').select('program_id').eq('user_id', userUuid),
+    ).map((r) => r['program_id'] as int).toSet();
+    final profile = await _client.from('profiles').select('hire_date').eq('id', userUuid).maybeSingle();
+    final tenure = _tenureMonths(DateTime.tryParse(profile?['hire_date'] as String? ?? ''));
+
+    // Programmes they haven't started and are tenure-eligible for. Prefer
+    // the recommendation-only ones written for a PE shortfall (no
+    // behaviour trigger of their own — those fire from attendance/risk, not
+    // from a KPI score), then fall back to an open programme in the same
+    // category.
+    final eligible = candidates.where((p) => !enrolledIds.contains(p['id'] as int) && (p['min_tenure_months'] as int) <= tenure).toList();
+    final preferred = eligible
+        .where((p) => p['access'] == 'recommended_only' && p['trigger_risk_level'] == null && p['trigger_attendance_below'] == null)
+        .toList();
+    final fallback = eligible.where((p) => p['access'] == 'open').toList();
+    final pick = preferred.isNotEmpty ? preferred.first : (fallback.isNotEmpty ? fallback.first : null);
+    if (pick == null) return;
+    final programId = pick['id'] as int;
     await _client.from('training_enrollments').upsert(
       {
         'program_id': programId,
@@ -42,6 +62,28 @@ class TrainingService {
       onConflict: 'program_id,user_id',
       ignoreDuplicates: true,
     );
+  }
+
+  static int _tenureMonths(DateTime? hire) {
+    if (hire == null) return 0;
+    final now = DateTime.now();
+    var months = (now.year - hire.year) * 12 + (now.month - hire.month);
+    if (now.day < hire.day) months--;
+    return months < 0 ? 0 : months;
+  }
+
+  /// Months of service for the signed-in employee (0 if unknown).
+  static Future<int> fetchMyTenureMonths() async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return 0;
+    final row = await _client.from('profiles').select('hire_date').eq('id', uid).maybeSingle();
+    return _tenureMonths(DateTime.tryParse(row?['hire_date'] as String? ?? ''));
+  }
+
+  /// Enrols the signed-in employee in any programme whose attendance/risk
+  /// rule currently fires for them. Best-effort and idempotent.
+  static Future<void> refreshMyRecommendations() async {
+    await _client.rpc('refresh_my_training_recommendations');
   }
 
   static Future<List<Map<String, dynamic>>> fetchMyEnrollments() async {
@@ -89,6 +131,10 @@ class TrainingService {
     required bool isMandatory,
     required String duration,
     int? departmentId,
+    String access = 'open',
+    int minTenureMonths = 0,
+    String? triggerRiskLevel,
+    double? triggerAttendanceBelow,
   }) async {
     await _client.from('training_programs').insert({
       'title': title,
@@ -97,6 +143,10 @@ class TrainingService {
       'is_mandatory': isMandatory,
       'duration': duration,
       'department_id': departmentId,
+      'access': access,
+      'min_tenure_months': minTenureMonths,
+      'trigger_risk_level': triggerRiskLevel,
+      'trigger_attendance_below': triggerAttendanceBelow,
     });
   }
 
@@ -107,6 +157,10 @@ class TrainingService {
     required String description,
     required bool isMandatory,
     required String duration,
+    String access = 'open',
+    int minTenureMonths = 0,
+    String? triggerRiskLevel,
+    double? triggerAttendanceBelow,
   }) async {
     await _client.from('training_programs').update({
       'title': title,
@@ -114,6 +168,10 @@ class TrainingService {
       'description': description,
       'is_mandatory': isMandatory,
       'duration': duration,
+      'access': access,
+      'min_tenure_months': minTenureMonths,
+      'trigger_risk_level': triggerRiskLevel,
+      'trigger_attendance_below': triggerAttendanceBelow,
     }).eq('id', id);
   }
 

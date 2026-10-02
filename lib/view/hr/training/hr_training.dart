@@ -239,6 +239,29 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
   }
 }
 
+class _RuleChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _RuleChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(100)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: c.textSecondary),
+          const SizedBox(width: 4),
+          Text(label, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: c.textSecondary)),
+        ],
+      ),
+    );
+  }
+}
+
 class _HrTrainingCard extends StatelessWidget {
   final TrainingProgram program;
   final VoidCallback onEdit;
@@ -361,6 +384,21 @@ class _HrTrainingCard extends StatelessWidget {
               ),
             ],
           ),
+          if (program.recommendedOnly || program.minTenureMonths > 0 || program.triggerRiskLevel != null || program.triggerAttendanceBelow != null) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                if (program.recommendedOnly) _RuleChip(icon: Icons.auto_awesome_rounded, label: 'Recommendation only'),
+                if (program.minTenureMonths > 0) _RuleChip(icon: Icons.lock_clock_rounded, label: 'After ${program.minTenureMonths} mo'),
+                if (program.triggerRiskLevel != null)
+                  _RuleChip(icon: Icons.shield_outlined, label: program.triggerRiskLevel == 'high' ? 'Risk High' : 'Risk Medium+'),
+                if (program.triggerAttendanceBelow != null)
+                  _RuleChip(icon: Icons.event_busy_rounded, label: 'Attendance < ${program.triggerAttendanceBelow!.round()}%'),
+              ],
+            ),
+          ],
           if (program.department != null) ...[
             const SizedBox(height: 8),
             Row(
@@ -609,6 +647,10 @@ class _CreateProgramSheetState extends State<_CreateProgramSheet> {
   String _format = 'Self-paced';
   late String _category = widget.existing?.category ?? 'Technical';
   late bool _mandatory = widget.existing?.isMandatory ?? false;
+  late bool _recommendedOnly = widget.existing?.recommendedOnly ?? false;
+  late double _minTenure = (widget.existing?.minTenureMonths ?? 0).toDouble();
+  late String? _triggerRisk = widget.existing?.triggerRiskLevel;
+  late double? _triggerAttendance = widget.existing?.triggerAttendanceBelow;
   bool _saving = false;
 
   bool get _isEditing => widget.existing != null;
@@ -646,6 +688,10 @@ class _CreateProgramSheetState extends State<_CreateProgramSheet> {
       isMandatory: _mandatory,
       duration: duration,
       departmentName: widget.existing?.department,
+      access: _recommendedOnly ? 'recommended_only' : 'open',
+      minTenureMonths: _minTenure.round(),
+      triggerRiskLevel: _triggerRisk,
+      triggerAttendanceBelow: _triggerAttendance,
     );
     if (!mounted) return;
     setState(() => _saving = false);
@@ -921,6 +967,74 @@ class _CreateProgramSheetState extends State<_CreateProgramSheet> {
               ],
             ),
             const SizedBox(height: 20),
+            const Divider(),
+            const SizedBox(height: 12),
+            const Text('Availability', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 4),
+            Text(
+              'Open programmes can be browsed and joined by anyone eligible. Recommendation-only ones stay hidden and only reach an employee when a rule recommends them.',
+              style: TextStyle(fontSize: 11.5, color: c.textMuted, height: 1.4),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final opt in const [(false, 'Open to everyone'), (true, 'Recommendation only')])
+                  ChoiceChip(
+                    label: Text(opt.$2),
+                    selected: _recommendedOnly == opt.$1,
+                    onSelected: (_) => setState(() => _recommendedOnly = opt.$1),
+                    selectedColor: c.primaryLight,
+                    labelStyle: TextStyle(color: _recommendedOnly == opt.$1 ? c.primaryDark : c.textSecondary, fontWeight: FontWeight.w700, fontSize: 12.5),
+                    side: BorderSide(color: _recommendedOnly == opt.$1 ? c.primary : Colors.transparent),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                const Expanded(child: Text('Minimum tenure', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
+                Text(_minTenure.round() == 0 ? 'None' : '${_minTenure.round()} mo', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: c.primary)),
+              ],
+            ),
+            Slider(value: _minTenure, min: 0, max: 36, divisions: 36, onChanged: (v) => setState(() => _minTenure = v)),
+            const SizedBox(height: 4),
+            const Text('Auto-recommend when', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final opt in const [(null, 'Risk: no rule'), ('medium', 'Risk Medium or worse'), ('high', 'Risk High only')])
+                  ChoiceChip(
+                    label: Text(opt.$2),
+                    selected: _triggerRisk == opt.$1,
+                    onSelected: (_) => setState(() => _triggerRisk = opt.$1),
+                    selectedColor: c.primaryLight,
+                    labelStyle: TextStyle(color: _triggerRisk == opt.$1 ? c.primaryDark : c.textSecondary, fontWeight: FontWeight.w700, fontSize: 12),
+                    side: BorderSide(color: _triggerRisk == opt.$1 ? c.primary : Colors.transparent),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Expanded(child: Text('Attendance (90 days) below', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
+                Text(_triggerAttendance == null ? 'Off' : '${_triggerAttendance!.round()}%', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: c.primary)),
+              ],
+            ),
+            Slider(
+              value: _triggerAttendance ?? 60,
+              min: 60,
+              max: 100,
+              divisions: 8,
+              onChanged: (v) => setState(() => _triggerAttendance = v),
+            ),
+            if (_triggerAttendance != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(onPressed: () => setState(() => _triggerAttendance = null), child: const Text('Turn attendance rule off')),
+              ),
+            const SizedBox(height: 16),
 
             PrimaryButton(
               label: _isEditing ? 'Save Changes' : 'Create Program',

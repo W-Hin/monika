@@ -220,7 +220,23 @@ class _TrainingCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (program.isCompleted)
+              if (program.locked)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(100)),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.lock_outline_rounded, size: 11, color: c.textMuted),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Opens after ${program.minTenureMonths} mo',
+                        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: c.textMuted),
+                      ),
+                    ],
+                  ),
+                )
+              else if (program.isCompleted)
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 9,
@@ -370,7 +386,7 @@ class _TrainingCard extends StatelessWidget {
                 ),
               ),
             ),
-          ] else if (program.progress > 0) ...[
+          ] else if (program.isEnrolled) ...[
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(100),
@@ -398,7 +414,7 @@ class _TrainingCard extends StatelessWidget {
               child: OutlinedButton(
                 onPressed: onTap,
                 child: Text(
-                  program.progress > 0 ? 'Continue' : 'View Details & Enrol',
+                  program.isEnrolled ? 'Continue' : 'View Details & Enrol',
                 ),
               ),
             ),

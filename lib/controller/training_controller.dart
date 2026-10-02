@@ -38,7 +38,8 @@ class TrainingController extends ChangeNotifier {
     'Leadership': 'leadership',
   };
 
-  TrainingProgram _mergeMy(Map<String, dynamic> program, Map<String, dynamic>? enrollment) {
+  TrainingProgram _mergeMy(Map<String, dynamic> program, Map<String, dynamic>? enrollment, int tenureMonths) {
+    final minTenure = (program['min_tenure_months'] as num?)?.toInt() ?? 0;
     final deptName = (program['departments'] as Map<String, dynamic>?)?['name'] as String?;
     return TrainingProgram(
       dbId: program['id'] as int,
@@ -54,6 +55,11 @@ class TrainingController extends ChangeNotifier {
       isCompleted: enrollment?['is_completed'] as bool? ?? false,
       performanceScore: (enrollment?['performance_score'] as num?)?.toDouble(),
       department: deptName,
+      access: program['access'] as String? ?? 'open',
+      minTenureMonths: minTenure,
+      triggerRiskLevel: program['trigger_risk_level'] as String?,
+      triggerAttendanceBelow: (program['trigger_attendance_below'] as num?)?.toDouble(),
+      locked: enrollment == null && tenureMonths < minTenure,
     );
   }
 
@@ -62,10 +68,22 @@ class TrainingController extends ChangeNotifier {
     errorMessage = null;
     notifyListeners();
     try {
+      // Evaluate attendance/risk rules first so a newly-triggered remedial
+      // programme shows up in this very load. Best-effort: a failure here
+      // must not hide the catalogue.
+      try {
+        await TrainingService.refreshMyRecommendations();
+      } catch (_) {}
       final catalogRows = await TrainingService.fetchCatalog();
       final enrollmentRows = await TrainingService.fetchMyEnrollments();
+      final tenure = await TrainingService.fetchMyTenureMonths();
       final enrollByProgram = {for (final e in enrollmentRows) e['program_id'] as int: e};
-      myPrograms = catalogRows.map((p) => _mergeMy(p, enrollByProgram[p['id'] as int])).toList();
+      // Recommendation-only programmes stay out of the catalogue unless the
+      // employee has actually been enrolled in one.
+      myPrograms = catalogRows
+          .where((p) => (p['access'] ?? 'open') != 'recommended_only' || enrollByProgram.containsKey(p['id'] as int))
+          .map((p) => _mergeMy(p, enrollByProgram[p['id'] as int], tenure))
+          .toList();
     } catch (e) {
       errorMessage = 'Could not load training programmes: $e';
     }
@@ -133,6 +151,10 @@ class TrainingController extends ChangeNotifier {
           isMandatory: p['is_mandatory'] as bool,
           duration: p['duration'] as String,
           department: deptName,
+          access: p['access'] as String? ?? 'open',
+          minTenureMonths: (p['min_tenure_months'] as num?)?.toInt() ?? 0,
+          triggerRiskLevel: p['trigger_risk_level'] as String?,
+          triggerAttendanceBelow: (p['trigger_attendance_below'] as num?)?.toDouble(),
         );
       }).toList();
 
@@ -164,6 +186,10 @@ class TrainingController extends ChangeNotifier {
     required bool isMandatory,
     required String duration,
     String? departmentName,
+    String access = 'open',
+    int minTenureMonths = 0,
+    String? triggerRiskLevel,
+    double? triggerAttendanceBelow,
   }) async {
     errorMessage = null;
     try {
@@ -176,6 +202,10 @@ class TrainingController extends ChangeNotifier {
           isMandatory: isMandatory,
           duration: duration,
           departmentId: deptId,
+          access: access,
+          minTenureMonths: minTenureMonths,
+          triggerRiskLevel: triggerRiskLevel,
+          triggerAttendanceBelow: triggerAttendanceBelow,
         );
       } else {
         await TrainingService.updateProgram(
@@ -185,6 +215,10 @@ class TrainingController extends ChangeNotifier {
           description: description,
           isMandatory: isMandatory,
           duration: duration,
+          access: access,
+          minTenureMonths: minTenureMonths,
+          triggerRiskLevel: triggerRiskLevel,
+          triggerAttendanceBelow: triggerAttendanceBelow,
         );
       }
       await loadForHr();
