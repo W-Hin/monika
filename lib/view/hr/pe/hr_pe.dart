@@ -513,6 +513,11 @@ class _HrPeScreenState extends State<HrPeScreen> {
                 .where((h) => h.dbId != peController.selectedCurrent?.dbId)
                 .toList();
             final isDraft = peController.selectedCurrent?.isDraft ?? false;
+            // A submitted (non-draft) evaluation is final — every control
+            // below goes read-only, matching the server-side guard in
+            // migration 0035 (prevent_completed_pe_edit).
+            final isCompleted =
+                peController.selectedCurrent != null && !isDraft;
 
             return ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
@@ -548,6 +553,38 @@ class _HrPeScreenState extends State<HrPeScreen> {
                           ],
                         ),
                       ),
+                      if (isCompleted) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: c.primaryLight,
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.verified_rounded,
+                                size: 13,
+                                color: c.primaryDark,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                'PE Completed',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: c.primaryDark,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
                       if (isDraft) ...[
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -613,7 +650,9 @@ class _HrPeScreenState extends State<HrPeScreen> {
                     final noneAvailable = _compatibleTemplates.isEmpty;
                     final mismatch = _templateMismatch;
                     return InkWell(
-                      onTap: noneAvailable ? _createTemplate : _pickTemplate,
+                      onTap: isCompleted
+                          ? null
+                          : (noneAvailable ? _createTemplate : _pickTemplate),
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -644,16 +683,17 @@ class _HrPeScreenState extends State<HrPeScreen> {
                                 ),
                               ),
                             ),
-                            Text(
-                              mismatch
-                                  ? 'Fix'
-                                  : (noneAvailable ? 'Create' : 'Change'),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: mismatch ? c.riskHigh : c.primary,
+                            if (!isCompleted)
+                              Text(
+                                mismatch
+                                    ? 'Fix'
+                                    : (noneAvailable ? 'Create' : 'Change'),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: mismatch ? c.riskHigh : c.primary,
+                                ),
                               ),
-                            ),
                           ],
                         ),
                       ),
@@ -866,6 +906,11 @@ class _HrPeScreenState extends State<HrPeScreen> {
                             data: SliderThemeData(
                               activeTrackColor: color,
                               thumbColor: color,
+                              disabledActiveTrackColor: color,
+                              disabledThumbColor: color,
+                              disabledInactiveTrackColor: color.withValues(
+                                alpha: 0.15,
+                              ),
                               inactiveTrackColor: color.withValues(alpha: 0.15),
                               overlayColor: color.withValues(alpha: 0.1),
                               trackHeight: 4,
@@ -875,8 +920,10 @@ class _HrPeScreenState extends State<HrPeScreen> {
                               min: 0,
                               max: 100,
                               divisions: 100,
-                              onChanged: (v) =>
-                                  setState(() => _kpis[i]['score'] = v),
+                              onChanged: isCompleted
+                                  ? null
+                                  : (v) =>
+                                        setState(() => _kpis[i]['score'] = v),
                             ),
                           ),
                           // Matches PeController._triggerTrainingRecommendations'
@@ -884,7 +931,8 @@ class _HrPeScreenState extends State<HrPeScreen> {
                           // submitting will actually enrol the employee in a
                           // matching training programme (rule-based, per this
                           // project's scope), not just a cosmetic hint.
-                          if (score < (_thresholds[kpi['category']] ?? 65))
+                          if (!isCompleted &&
+                              score < (_thresholds[kpi['category']] ?? 65))
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                               child: Container(
@@ -928,6 +976,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
                   const SectionHeader(title: 'HR Comments'),
                   TextField(
                     controller: _commentsController,
+                    readOnly: isCompleted,
                     maxLines: 4,
                     decoration: const InputDecoration(
                       hintText:
@@ -1005,7 +1054,38 @@ class _HrPeScreenState extends State<HrPeScreen> {
                     ),
                   ),
 
-                if (_selectedTemplate != null) ...[
+                if (isCompleted) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: c.primaryLight,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.lock_rounded,
+                          size: 16,
+                          color: c.primaryDark,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'This $_year evaluation has been submitted and is final — it can no longer be changed.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: c.primaryDark,
+                              fontWeight: FontWeight.w600,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ] else if (_selectedTemplate != null) ...[
                   const SizedBox(height: 16),
                   Row(
                     children: [

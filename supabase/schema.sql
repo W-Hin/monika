@@ -197,6 +197,26 @@ create table public.performance_evaluations (
     unique (user_id, year)
 );
 
+-- A submitted (non-draft) evaluation is final — once is_draft is false the
+-- row can't be updated, which also stops the app's submit path (it upserts
+-- this row before touching scores). Drafts can still be edited and promoted.
+create or replace function public.prevent_completed_pe_edit()
+returns trigger
+language plpgsql
+as $$
+begin
+    if old.is_draft = false then
+        raise exception 'This performance evaluation has already been submitted and can no longer be changed.';
+    end if;
+    return new;
+end;
+$$;
+
+create trigger trg_prevent_completed_pe_edit
+    before update on public.performance_evaluations
+    for each row
+    execute function public.prevent_completed_pe_edit();
+
 create table public.performance_evaluation_scores (
     id             bigint generated always as identity primary key,
     evaluation_id  bigint not null references public.performance_evaluations(id) on delete cascade,
