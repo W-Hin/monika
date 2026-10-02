@@ -23,11 +23,10 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
   bool _isSaving = false;
   late String _department;
   late String _jobTitle;
-  late bool _isIntern;
   late TextEditingController _salaryController;
 
   final _departments = ['Engineering', 'Sales', 'Operations', 'Marketing', 'Design', 'Human Resources', 'Finance'];
-  final _jobTitles = ['Employee', 'Senior Engineer', 'Team Lead', 'Manager', 'Designer', 'Analyst', 'Consultant', 'Mobile Developer', 'Backend Engineer', 'UI/UX Designer', 'Sales Executive', 'Operations Executive', 'Marketing Executive'];
+  final _jobTitles = ['Employee', 'Senior Engineer', 'Team Lead', 'Manager', 'Designer', 'Analyst', 'Consultant', 'Mobile Developer', 'Backend Engineer', 'UI/UX Designer', 'Sales Executive', 'Operations Executive', 'Marketing Executive', 'Intern'];
 
   @override
   void initState() {
@@ -35,7 +34,6 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     _emp = widget.employee;
     _department = _emp.department;
     _jobTitle = _emp.jobTitle;
-    _isIntern = _emp.isIntern;
     _salaryController = TextEditingController(text: _emp.baseSalary?.toStringAsFixed(2) ?? '');
     _salaryController.addListener(() => setState(() {}));
     if (!_departments.contains(_department)) _departments.add(_department);
@@ -52,7 +50,6 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
       _isEditing &&
       (_department != _emp.department ||
           _jobTitle != _emp.jobTitle ||
-          _isIntern != _emp.isIntern ||
           _salaryController.text != (_emp.baseSalary?.toStringAsFixed(2) ?? ''));
 
   /// The 1st of next calendar month — used as the "official" effective
@@ -81,8 +78,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     final oldSalary = _emp.baseSalary;
     final newSalary = double.tryParse(_salaryController.text.trim());
 
-    final oldIsIntern = _emp.isIntern;
-    final changed = oldJobTitle != _jobTitle || oldDepartment != _department || oldSalary != newSalary || oldIsIntern != _isIntern;
+    final changed = oldJobTitle != _jobTitle || oldDepartment != _department || oldSalary != newSalary;
     if (!changed) {
       setState(() => _isEditing = false);
       return;
@@ -95,11 +91,10 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
         jobTitle: _jobTitle,
         departmentName: _department,
         baseSalary: newSalary,
-        isIntern: _isIntern,
       );
       if (!mounted) return;
       setState(() {
-        _emp = _emp.copyWith(department: _department, jobTitle: _jobTitle, baseSalary: newSalary, isIntern: _isIntern);
+        _emp = _emp.copyWith(department: _department, jobTitle: _jobTitle, baseSalary: newSalary, isIntern: _jobTitle == 'Intern');
         _isEditing = false;
         _isSaving = false;
       });
@@ -262,8 +257,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
         );
         _department = _emp.department;
         _jobTitle = _emp.jobTitle;
-        _isIntern = _emp.isIntern;
-        _salaryController.text = _emp.baseSalary?.toStringAsFixed(2) ?? '';
+            _salaryController.text = _emp.baseSalary?.toStringAsFixed(2) ?? '';
       });
       widget.onUpdate(_emp);
     } catch (_) {
@@ -394,18 +388,6 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                     const SizedBox(height: 14),
                     _DropdownField(label: 'Department', value: _department, items: _departments, onChanged: (v) => setState(() => _department = v!)),
                     const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                      decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
-                      child: Row(
-                        children: [
-                          Icon(Icons.school_outlined, size: 18, color: c.textMuted),
-                          const SizedBox(width: 10),
-                          Expanded(child: Text('Intern', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary))),
-                          Switch(value: _isIntern, onChanged: (v) => setState(() => _isIntern = v)),
-                        ],
-                      ),
-                    ),
                     const SizedBox(height: 14),
                     Text('Basic Monthly Salary (RM)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
                     const SizedBox(height: 8),
@@ -435,8 +417,6 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                     _InfoRow(icon: Icons.work_outline_rounded, label: 'Job Title', value: _emp.jobTitle),
                     const Divider(height: 1, indent: 56),
                     _InfoRow(icon: Icons.apartment_rounded, label: 'Department', value: _emp.department),
-                    const Divider(height: 1, indent: 56),
-                    _InfoRow(icon: Icons.school_outlined, label: 'Intern', value: _emp.isIntern ? 'Yes' : 'No'),
                     const Divider(height: 1, indent: 56),
                     _InfoRow(icon: Icons.payments_outlined, label: 'Basic Monthly Salary', value: _emp.baseSalary != null ? 'RM ${_emp.baseSalary!.toStringAsFixed(2)}' : 'Not set'),
                   ],

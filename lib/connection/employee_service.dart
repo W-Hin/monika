@@ -35,14 +35,15 @@ class EmployeeService {
     required String jobTitle,
     required String departmentName,
     double? baseSalary,
-    bool? isIntern,
   }) async {
     final dept = await _client.from('departments').select('id').eq('name', departmentName).single();
     await _client.from('profiles').update({
       'job_title': jobTitle,
       'department_id': dept['id'],
       'base_salary': baseSalary,
-      if (isIntern != null) 'is_intern': isIntern,
+      // Being an intern IS having the "Intern" job title — derived here so
+      // the flag HR's event targeting reads can never disagree with it.
+      'is_intern': jobTitle == 'Intern',
     }).eq('id', uuid);
   }
 

@@ -39,7 +39,6 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
   String _department = 'Engineering';
   String _jobTitle = _jobTitlesByDepartment['Engineering']!.first;
   String _accountType = 'employee';
-  bool _isIntern = false;
   bool _isSubmitting = false;
   bool _created = false;
 
@@ -53,8 +52,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
           _salary.text != '3500.00' ||
           _department != 'Engineering' ||
           _jobTitle != _jobTitlesByDepartment['Engineering']!.first ||
-          _accountType != 'employee' ||
-          _isIntern);
+          _accountType != 'employee');
 
   @override
   void initState() {
@@ -74,14 +72,21 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
     super.dispose();
   }
 
+  /// Picking this job title is what makes someone an intern (the Edge
+  /// Function sets profiles.is_intern from it) — one source of truth,
+  /// instead of a separate toggle that could be switched on for a Team
+  /// Lead. Kept last in every list so each department's default
+  /// (`.first`) is unchanged, and hidden for HR Admin accounts.
+  static const _internTitle = 'Intern';
+
   static const _jobTitlesByDepartment = <String, List<String>>{
-    'Engineering': ['Software Engineer', 'Senior Engineer', 'Team Lead', 'Backend Engineer', 'Mobile Developer'],
-    'Sales': ['Sales Executive', 'Sales Manager', 'Account Executive'],
-    'Operations': ['Operations Executive', 'Operations Manager'],
-    'Marketing': ['Marketing Executive', 'Marketing Manager'],
-    'Design': ['UI/UX Designer', 'Graphic Designer', 'Design Lead'],
-    'Human Resources': ['HR Executive', 'HR Manager', 'HR Administrator'],
-    'Finance': ['Financial Analyst', 'Accountant', 'Finance Manager'],
+    'Engineering': ['Software Engineer', 'Senior Engineer', 'Team Lead', 'Backend Engineer', 'Mobile Developer', _internTitle],
+    'Sales': ['Sales Executive', 'Sales Manager', 'Account Executive', _internTitle],
+    'Operations': ['Operations Executive', 'Operations Manager', _internTitle],
+    'Marketing': ['Marketing Executive', 'Marketing Manager', _internTitle],
+    'Design': ['UI/UX Designer', 'Graphic Designer', 'Design Lead', _internTitle],
+    'Human Resources': ['HR Executive', 'HR Manager', 'HR Administrator', _internTitle],
+    'Finance': ['Financial Analyst', 'Accountant', 'Finance Manager', _internTitle],
   };
 
   String _generateTempPassword() {
@@ -130,7 +135,6 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
           'avatarInitials': _initialsFrom(_name.text),
           'hireDate': DateFormat('yyyy-MM-dd').format(DateTime.now()),
           'baseSalary': double.tryParse(_salary.text.trim()),
-          'isIntern': _isIntern,
         },
       );
 
@@ -349,33 +353,12 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
               _DropdownField(
                 label: 'Job Title',
                 value: _jobTitle,
-                items: _jobTitlesByDepartment[_department]!,
+                items: _accountType == 'hr_admin'
+                    ? _jobTitlesByDepartment[_department]!.where((t) => t != _internTitle).toList()
+                    : _jobTitlesByDepartment[_department]!,
                 icon: Icons.work_history_outlined,
                 onChanged: (v) => setState(() => _jobTitle = v!),
               ),
-              if (_accountType == 'employee') ...[
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                  decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(12)),
-                  child: Row(
-                    children: [
-                      Icon(Icons.school_outlined, size: 18, color: c.textMuted),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Intern', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: c.textPrimary)),
-                            Text('Lets HR target company events (e.g. an ice-breaking event) at every intern', style: TextStyle(fontSize: 11, color: c.textMuted)),
-                          ],
-                        ),
-                      ),
-                      Switch(value: _isIntern, onChanged: (v) => setState(() => _isIntern = v)),
-                    ],
-                  ),
-                ),
-              ],
               const SizedBox(height: 24),
 
               // Payroll
