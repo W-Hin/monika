@@ -34,6 +34,7 @@ class PeController extends ChangeNotifier {
                 name: i['name'] as String,
                 weightage: (i['weightage'] as num).toDouble(),
                 category: i['category'] as String? ?? 'Technical',
+                metricSource: i['metric_source'] as String? ?? KpiMetricSource.manual,
               ))
           .toList(),
     );
@@ -53,6 +54,7 @@ class PeController extends ChangeNotifier {
                 weightage: (s['weightage'] as num).toDouble(),
                 score: (s['score'] as num).toDouble(),
                 category: s['category'] as String? ?? 'Technical',
+                metricSource: s['metric_source'] as String? ?? KpiMetricSource.manual,
               ))
           .toList(),
       isDraft: row['is_draft'] as bool? ?? false,
@@ -81,7 +83,7 @@ class PeController extends ChangeNotifier {
       await PeService.createTemplate(
         name: name,
         departmentName: departmentName,
-        items: items.map((i) => {'name': i.name, 'weightage': i.weightage, 'category': i.category}).toList(),
+        items: items.map((i) => {'name': i.name, 'weightage': i.weightage, 'category': i.category, 'metric_source': i.metricSource}).toList(),
       );
       await loadTemplates();
       return true;
@@ -107,7 +109,7 @@ class PeController extends ChangeNotifier {
         id: existing.dbId!,
         name: name,
         departmentName: departmentName,
-        items: items.map((i) => {'name': i.name, 'weightage': i.weightage, 'category': i.category}).toList(),
+        items: items.map((i) => {'name': i.name, 'weightage': i.weightage, 'category': i.category, 'metric_source': i.metricSource}).toList(),
       );
       await loadTemplates();
       return true;
@@ -198,7 +200,7 @@ class PeController extends ChangeNotifier {
         year: DateTime.now().year,
         comments: comments,
         weightedTotal: weightedTotal,
-        scores: kpis.map((k) => {'kpi_name': k.name, 'weightage': k.weightage, 'score': k.score, 'category': k.category}).toList(),
+        scores: kpis.map((k) => {'kpi_name': k.name, 'weightage': k.weightage, 'score': k.score, 'category': k.category, 'metric_source': k.metricSource}).toList(),
         isDraft: false,
       );
       await loadForEmployee(userUuid);
@@ -234,7 +236,7 @@ class PeController extends ChangeNotifier {
         year: DateTime.now().year,
         comments: comments,
         weightedTotal: weightedTotal,
-        scores: kpis.map((k) => {'kpi_name': k.name, 'weightage': k.weightage, 'score': k.score, 'category': k.category}).toList(),
+        scores: kpis.map((k) => {'kpi_name': k.name, 'weightage': k.weightage, 'score': k.score, 'category': k.category, 'metric_source': k.metricSource}).toList(),
         isDraft: true,
       );
       await loadForEmployee(userUuid);

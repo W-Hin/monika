@@ -212,6 +212,19 @@ class _KpiBar extends StatelessWidget {
               Text('${kpi.weightage.toStringAsFixed(0)}% weight', style: TextStyle(fontSize: 11, color: c.textMuted, fontWeight: FontWeight.w600)),
             ],
           ),
+          if (KpiMetricSource.isAuto(kpi.metricSource)) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(Icons.sensors_rounded, size: 12, color: c.infoBlue),
+                const SizedBox(width: 4),
+                Text(
+                  'Measured automatically from your ${KpiMetricSource.label(kpi.metricSource).toLowerCase()} records',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: c.infoBlue),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 10),
           ClipRRect(
             borderRadius: BorderRadius.circular(100),

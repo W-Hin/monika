@@ -5,6 +5,7 @@ import '../../shared/widgets/common_widgets.dart';
 import '../../../model/models.dart';
 import '../../../controller/employee_controller.dart';
 import '../../../controller/pe_controller.dart';
+import '../../../connection/pe_metrics_service.dart';
 import '../../../connection/policy_service.dart';
 
 class HrPeScreen extends StatefulWidget {
@@ -23,6 +24,11 @@ class _HrPeScreenState extends State<HrPeScreen> {
   bool _initialized = false;
 
   List<Map<String, dynamic>> _kpis = [];
+
+  // System-measured results for the selected employee (year-to-date), keyed
+  // by KpiMetricSource. Fetched in _selectEmployee; empty if the fetch failed
+  // or hasn't run, in which case auto KPIs fall back to manual scoring.
+  Map<String, PeMetric> _metrics = {};
 
   // Matches policy_settings' defaults until the real values load — kept in
   // sync with the actual thresholds Policy Config lets HR tune, so this
@@ -65,9 +71,29 @@ class _HrPeScreenState extends State<HrPeScreen> {
                   'weightage': i.weightage,
                   'score': 70.0,
                   'category': i.category,
+                  'source': i.metricSource,
                 },
               )
               .toList();
+    _applyMetrics();
+  }
+
+  /// Overwrites each auto-measured KPI's score with what the system
+  /// observed. KPIs with no data yet (a brand-new hire) are left alone so HR
+  /// can score them by hand instead of submitting a made-up number.
+  void _applyMetrics() {
+    for (final k in _kpis) {
+      final source = k['source'] as String? ?? KpiMetricSource.manual;
+      if (!KpiMetricSource.isAuto(source)) continue;
+      final measured = _metrics[source]?.score;
+      if (measured != null) k['score'] = measured.roundToDouble();
+    }
+  }
+
+  /// True when this KPI's score comes from the system and can't be edited.
+  bool _isLockedAuto(Map<String, dynamic> kpi) {
+    final source = kpi['source'] as String? ?? KpiMetricSource.manual;
+    return KpiMetricSource.isAuto(source) && _metrics[source]?.score != null;
   }
 
   @override
@@ -113,6 +139,11 @@ class _HrPeScreenState extends State<HrPeScreen> {
   Future<void> _selectEmployee(TeamMemberSummary emp) async {
     setState(() => _selectedEmployee = emp);
     await peController.loadForEmployee(emp.uuid);
+    try {
+      _metrics = await PeMetricsService.measure(emp.uuid);
+    } catch (_) {
+      _metrics = {};
+    }
     if (!mounted) return;
 
     final existing = peController.selectedCurrent;
@@ -137,9 +168,13 @@ class _HrPeScreenState extends State<HrPeScreen> {
                 'weightage': k.weightage,
                 'score': k.score,
                 'category': k.category,
+                'source': k.metricSource,
               },
             )
             .toList();
+        // A finished evaluation keeps the scores it was submitted with;
+        // a draft's auto KPIs refresh to the latest measurements.
+        if (existing.isDraft) _applyMetrics();
         _commentsController.text = existing.comments;
       });
     } else {
@@ -258,6 +293,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
             weightage: k['weightage'] as double,
             score: k['score'] as double,
             category: k['category'] as String,
+            metricSource: k['source'] as String? ?? KpiMetricSource.manual,
           ),
         )
         .toList();
@@ -342,6 +378,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
             weightage: k['weightage'] as double,
             score: k['score'] as double,
             category: k['category'] as String,
+            metricSource: k['source'] as String? ?? KpiMetricSource.manual,
           ),
         )
         .toList();
@@ -846,6 +883,39 @@ class _HrPeScreenState extends State<HrPeScreen> {
                                           color: c.textMuted,
                                         ),
                                       ),
+                                      if (KpiMetricSource.isAuto(
+                                        kpi['source'] as String? ??
+                                            KpiMetricSource.manual,
+                                      )) ...[
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.sensors_rounded,
+                                              size: 12,
+                                              color: c.infoBlue,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Flexible(
+                                              child: Text(
+                                                isCompleted
+                                                    ? 'Auto-measured · ${KpiMetricSource.label(kpi['source'] as String)}'
+                                                    : _metrics[kpi['source']]
+                                                              ?.score ==
+                                                          null
+                                                    ? 'Auto-measured · ${_metrics[kpi['source']]?.detail ?? 'No data yet'} — score manually'
+                                                    : 'Auto-measured · ${_metrics[kpi['source']]!.detail}',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: c.infoBlue,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -920,7 +990,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
                               min: 0,
                               max: 100,
                               divisions: 100,
-                              onChanged: isCompleted
+                              onChanged: isCompleted || _isLockedAuto(kpi)
                                   ? null
                                   : (v) =>
                                         setState(() => _kpis[i]['score'] = v),
@@ -1297,6 +1367,7 @@ class _KpiItemDraft {
   final nameCtrl = TextEditingController();
   final weightCtrl = TextEditingController();
   String category = 'Technical';
+  String metricSource = KpiMetricSource.manual;
 
   void dispose() {
     nameCtrl.dispose();
@@ -1339,7 +1410,8 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
           ..weightCtrl.text = i.weightage % 1 == 0
               ? i.weightage.toInt().toString()
               : i.weightage.toString()
-          ..category = i.category;
+          ..category = i.category
+          ..metricSource = i.metricSource;
         _items.add(draft);
       }
     }
@@ -1381,6 +1453,17 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
       setState(() => _errorText = 'Every KPI needs a name.');
       return;
     }
+    final autoSources = _items
+        .map((i) => i.metricSource)
+        .where(KpiMetricSource.isAuto)
+        .toList();
+    if (autoSources.length != autoSources.toSet().length) {
+      setState(
+        () => _errorText =
+            'Each auto-measured source can only be used once per template.',
+      );
+      return;
+    }
     if ((total - 100).abs() > 0.01) {
       setState(
         () => _errorText =
@@ -1399,6 +1482,7 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
             name: i.nameCtrl.text.trim(),
             weightage: double.tryParse(i.weightCtrl.text) ?? 0,
             category: i.category,
+            metricSource: i.metricSource,
           ),
         )
         .toList();
@@ -1605,6 +1689,61 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
                           ),
                           side: BorderSide(
                             color: sel ? c.primary : Colors.transparent,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Measured by',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: c.textMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 6,
+                      children: KpiMetricSource.all.map((src) {
+                        final sel = item.metricSource == src;
+                        return ChoiceChip(
+                          avatar: KpiMetricSource.isAuto(src)
+                              ? Icon(
+                                  Icons.sensors_rounded,
+                                  size: 13,
+                                  color: sel ? c.infoBlue : c.textMuted,
+                                )
+                              : null,
+                          label: Text(
+                            src == KpiMetricSource.manual
+                                ? 'HR scores it'
+                                : KpiMetricSource.label(src),
+                            style: const TextStyle(fontSize: 11.5),
+                          ),
+                          selected: sel,
+                          visualDensity: VisualDensity.compact,
+                          onSelected: (_) => setState(() {
+                            item.metricSource = src;
+                            if (KpiMetricSource.isAuto(src)) {
+                              // Conduct/attendance/punctuality are behaviour;
+                              // a low score here should recommend behavioural
+                              // training, which is the category's threshold.
+                              if (src != KpiMetricSource.training) {
+                                item.category = 'Behavioural';
+                              }
+                              if (item.nameCtrl.text.trim().isEmpty) {
+                                item.nameCtrl.text = KpiMetricSource.label(src);
+                              }
+                            }
+                          }),
+                          selectedColor: c.infoBlueBg,
+                          labelStyle: TextStyle(
+                            color: sel ? c.infoBlue : c.textSecondary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          side: BorderSide(
+                            color: sel ? c.infoBlue : Colors.transparent,
                           ),
                         );
                       }).toList(),

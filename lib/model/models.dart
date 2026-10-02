@@ -125,12 +125,48 @@ class LeaveApplication {
   });
 }
 
+/// Where a KPI's score comes from. Everything except [manual] is computed
+/// from data this system actually observes (see PeMetricsService); the rest
+/// of a template (technical output, leadership, delivery) can only be
+/// judged by HR from other systems, so stays manual.
+class KpiMetricSource {
+  KpiMetricSource._();
+  static const manual = 'manual';
+  static const attendance = 'attendance';
+  static const punctuality = 'punctuality';
+  static const conduct = 'conduct';
+  static const training = 'training';
+
+  static const all = [manual, attendance, punctuality, conduct, training];
+
+  static bool isAuto(String source) => source != manual;
+
+  static String label(String source) {
+    switch (source) {
+      case attendance:
+        return 'Attendance';
+      case punctuality:
+        return 'Punctuality';
+      case conduct:
+        return 'Conduct';
+      case training:
+        return 'Training';
+      default:
+        return 'Manual';
+    }
+  }
+}
+
 class KpiItem {
   final String name;
   final double weightage;
   final double score; // out of 100
   final String category; // 'Technical' | 'Behavioural' | 'Leadership'
-  const KpiItem({required this.name, required this.weightage, required this.score, this.category = 'Technical'});
+  // 'manual' (HR scores it) or one of the system-measured sources — see
+  // KpiMetricSource. Snapshotted with the score so a finished evaluation
+  // still shows which KPIs were measured vs judged.
+  final String metricSource;
+  const KpiItem({required this.name, required this.weightage, required this.score, this.category = 'Technical', this.metricSource = KpiMetricSource.manual});
 }
 
 class PerformanceEvaluation {
@@ -346,7 +382,8 @@ class KpiTemplateItem {
   final String name;
   final double weightage;
   final String category; // 'Technical' | 'Behavioural' | 'Leadership'
-  const KpiTemplateItem({required this.name, required this.weightage, this.category = 'Technical'});
+  final String metricSource; // KpiMetricSource.*
+  const KpiTemplateItem({required this.name, required this.weightage, this.category = 'Technical', this.metricSource = KpiMetricSource.manual});
 }
 
 class KpiTemplate {

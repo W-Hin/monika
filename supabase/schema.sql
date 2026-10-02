@@ -178,7 +178,9 @@ create table public.kpi_template_items (
     id           bigint generated always as identity primary key,
     template_id  bigint not null references public.kpi_templates(id) on delete cascade,
     name         text not null,
-    weightage    numeric(5, 2) not null -- percent; all items for one template must sum to 100, enforced in application logic
+    weightage    numeric(5, 2) not null, -- percent; all items for one template must sum to 100, enforced in application logic
+    -- 'manual' = HR scores it; the rest are computed from this system's own data (PeMetricsService)
+    metric_source text not null default 'manual' check (metric_source in ('manual', 'attendance', 'punctuality', 'conduct', 'training'))
 );
 
 create table public.performance_evaluations (
@@ -222,7 +224,8 @@ create table public.performance_evaluation_scores (
     evaluation_id  bigint not null references public.performance_evaluations(id) on delete cascade,
     kpi_name       text not null,
     weightage      numeric(5, 2) not null, -- snapshot of the weightage used at scoring time, independent of later template edits
-    score          numeric(5, 2) not null  -- 0-100
+    score          numeric(5, 2) not null, -- 0-100
+    metric_source  text not null default 'manual' -- snapshot of how this score was produced
 );
 
 create table public.training_programs (
