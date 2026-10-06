@@ -63,6 +63,17 @@ class PeMetricsService {
           .gte('event_date', yearStart.toUtc().toIso8601String()),
     );
 
+    // Absences HR excused after an appeal count like a day of leave.
+    final excusedRows = List<Map<String, dynamic>>.from(
+      await _client
+          .from('anomaly_events')
+          .select('event_date')
+          .eq('user_id', userUuid)
+          .eq('type', 'unexplained_absence')
+          .not('reverted_at', 'is', null)
+          .gte('event_date', yearStartKey),
+    );
+
     final enrollmentRows = List<Map<String, dynamic>>.from(
       await _client
           .from('training_enrollments')
@@ -84,7 +95,11 @@ class PeMetricsService {
             _dateOnly(DateTime.parse(r['end_date'] as String)),
           ),
         )
-        .toList();
+        .toList()
+      ..addAll(excusedRows.map((r) {
+        final d = _dateOnly(DateTime.parse(r['event_date'] as String));
+        return (d, d);
+      }));
     final attendedDates = attendanceRows
         .map((r) => _dateOnly(DateTime.parse(r['work_date'] as String)))
         .toSet();

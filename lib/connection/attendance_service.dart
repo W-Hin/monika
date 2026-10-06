@@ -125,6 +125,18 @@ class AttendanceService {
         .single();
   }
 
+  /// The signed-in employee's recent unexplained absences with their
+  /// appeal status (my_absence_flags, migration 0044).
+  static Future<List<Map<String, dynamic>>> fetchMyAbsenceFlags() async {
+    final rows = await _client.rpc('my_absence_flags');
+    return List<Map<String, dynamic>>.from(rows as List);
+  }
+
+  /// Appeal an unexplained absence within 7 days, giving a reason HR will see.
+  static Future<void> appealAbsence({required int anomalyId, required String reason}) async {
+    await _client.rpc('appeal_absence', params: {'p_anomaly_id': anomalyId, 'p_reason': reason});
+  }
+
   static Future<Map<String, dynamic>?> fetchPolicySettings() {
     return _client.from('policy_settings').select().eq('id', 1).maybeSingle();
   }

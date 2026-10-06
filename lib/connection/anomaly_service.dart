@@ -48,6 +48,12 @@ class AnomalyService {
     return (restored as num?)?.toInt() ?? 0;
   }
 
+  /// HR turns down an employee's appeal against an unexplained absence,
+  /// optionally with a note the employee will see.
+  static Future<void> rejectAppeal(int anomalyId, String response) async {
+    await _client.rpc('reject_absence_appeal', params: {'p_anomaly_id': anomalyId, 'p_response': response});
+  }
+
   static Future<void> markReviewed(int id) async {
     final uid = _client.auth.currentUser!.id;
     await _client.from('anomaly_events').update({

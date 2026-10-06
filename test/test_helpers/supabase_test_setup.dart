@@ -195,6 +195,22 @@ final _fixtures = <String, List<Map<String, dynamic>>>{
       'reverted_at': '2026-08-21T03:00:00Z',
       'profiles': {'name': 'Test Employee'},
     },
+    // An unexplained absence the employee appealed within 7 days, still open.
+    {
+      'id': 3,
+      'user_id': 'test-user-id',
+      'attendance_record_id': null,
+      'type': 'unexplained_absence',
+      'event_date': '2026-09-25',
+      'details': 'No attendance record and no approved leave for 25 Sep 2026',
+      'severity': 'medium',
+      'reviewed': false,
+      'reverted_at': null,
+      'appeal_reason': 'Working at the client site all day',
+      'appealed_at': '2026-09-27T02:00:00Z',
+      'appeal_status': 'pending',
+      'profiles': {'name': 'Test Employee'},
+    },
   ],
   // One mandatory programme for everyone, so HR sees its Exemptions action.
   'training_programs': [

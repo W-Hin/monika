@@ -322,6 +322,11 @@ class AnomalyEvent {
   final int? attendanceRecordId;
   // HR found it invalid after a dispute and gave the risk points back.
   final bool reverted;
+  final bool isAbsence; // an unexplained_absence, which the employee can appeal
+  final DateTime? eventDate;
+  final String? appealReason;
+  final String? appealStatus; // pending | accepted | rejected
+  final DateTime? appealedAt;
 
   const AnomalyEvent({
     required this.id,
@@ -333,9 +338,34 @@ class AnomalyEvent {
     this.reviewed = false,
     this.attendanceRecordId,
     this.reverted = false,
+    this.isAbsence = false,
+    this.eventDate,
+    this.appealReason,
+    this.appealStatus,
+    this.appealedAt,
   });
 
-  AnomalyEvent copyWith({bool? reviewed, bool? reverted}) => AnomalyEvent(
+  static const absenceWindowDays = 7;
+
+  /// An absence can be excused within 7 days of it, or later if the
+  /// employee appealed inside those 7 days and the appeal is still open.
+  /// Mirrors absence_revert_allowed() in the database, which has the final say.
+  bool absenceExcusableOn(DateTime today) {
+    final day = eventDate;
+    if (day == null) return false;
+    final d = DateTime(day.year, day.month, day.day);
+    final t = DateTime(today.year, today.month, today.day);
+    if (!d.isBefore(t.subtract(const Duration(days: absenceWindowDays)))) return true;
+    final appealed = appealedAt;
+    if (appealStatus != 'pending' || appealed == null) return false;
+    final a = DateTime(appealed.year, appealed.month, appealed.day);
+    return !a.isAfter(d.add(const Duration(days: absenceWindowDays)));
+  }
+
+  bool canRevertOn(DateTime today) =>
+      !reverted && (isAbsence ? absenceExcusableOn(today) : attendanceRecordId != null);
+
+  AnomalyEvent copyWith({bool? reviewed, bool? reverted, String? appealStatus}) => AnomalyEvent(
         id: id,
         employeeName: employeeName,
         type: type,
@@ -345,6 +375,46 @@ class AnomalyEvent {
         reviewed: reviewed ?? this.reviewed,
         attendanceRecordId: attendanceRecordId,
         reverted: reverted ?? this.reverted,
+        isAbsence: isAbsence,
+        eventDate: eventDate,
+        appealReason: appealReason,
+        appealStatus: appealStatus ?? this.appealStatus,
+        appealedAt: appealedAt,
+      );
+}
+
+/// One of the signed-in employee's own unexplained absences, as returned
+/// by my_absence_flags() (employees can't read anomaly_events directly).
+class AbsenceFlag {
+  final int id;
+  final DateTime date;
+  final String? appealReason;
+  final String? appealStatus; // pending | accepted | rejected
+  final String? appealResponse; // HR's note when rejecting
+  final bool excused;
+  final DateTime appealDeadline;
+  final bool canAppeal;
+
+  const AbsenceFlag({
+    required this.id,
+    required this.date,
+    this.appealReason,
+    this.appealStatus,
+    this.appealResponse,
+    required this.excused,
+    required this.appealDeadline,
+    required this.canAppeal,
+  });
+
+  factory AbsenceFlag.fromJson(Map<String, dynamic> j) => AbsenceFlag(
+        id: (j['id'] as num).toInt(),
+        date: DateTime.parse(j['event_date'] as String),
+        appealReason: j['appeal_reason'] as String?,
+        appealStatus: j['appeal_status'] as String?,
+        appealResponse: j['appeal_response'] as String?,
+        excused: j['excused'] as bool? ?? false,
+        appealDeadline: DateTime.parse(j['appeal_deadline'] as String),
+        canAppeal: j['can_appeal'] as bool? ?? false,
       );
 }
 

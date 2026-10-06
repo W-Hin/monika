@@ -42,6 +42,11 @@ class AnomalyController extends ChangeNotifier {
       reviewed: row['reviewed'] as bool? ?? false,
       attendanceRecordId: row['attendance_record_id'] as int?,
       reverted: row['reverted_at'] != null,
+      isAbsence: row['type'] == 'unexplained_absence',
+      eventDate: eventDate,
+      appealReason: row['appeal_reason'] as String?,
+      appealStatus: row['appeal_status'] as String?,
+      appealedAt: DateTime.tryParse(row['appealed_at'] as String? ?? '')?.toLocal(),
     );
   }
 
@@ -79,9 +84,23 @@ class AnomalyController extends ChangeNotifier {
   Future<int> revertViolation(AnomalyEvent event) async {
     final restored = await AnomalyService.revert(event.id);
     final i = feed.indexWhere((e) => e.id == event.id);
-    if (i != -1) feed[i] = feed[i].copyWith(reviewed: true, reverted: true);
+    if (i != -1) {
+      feed[i] = feed[i].copyWith(
+        reviewed: true,
+        reverted: true,
+        appealStatus: feed[i].appealStatus == 'pending' ? 'accepted' : null,
+      );
+    }
     notifyListeners();
     return restored;
+  }
+
+  /// Throws if the server refuses (e.g. no open appeal, or HR's own).
+  Future<void> rejectAppeal(AnomalyEvent event, String response) async {
+    await AnomalyService.rejectAppeal(event.id, response);
+    final i = feed.indexWhere((e) => e.id == event.id);
+    if (i != -1) feed[i] = feed[i].copyWith(reviewed: true, appealStatus: 'rejected');
+    notifyListeners();
   }
 }
 

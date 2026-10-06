@@ -126,6 +126,20 @@ class PayrollService {
               ))
           .toList();
       bool onApprovedLeave(DateTime d) => leaveRanges.any((r) => !d.isBefore(r.$1) && !d.isAfter(r.$2));
+
+      // Absences HR excused after an appeal (migration 0044) aren't deducted.
+      final excusedRows = await _client
+          .from('anomaly_events')
+          .select('event_date')
+          .eq('user_id', uid)
+          .eq('type', 'unexplained_absence')
+          .not('reverted_at', 'is', null)
+          .gte('event_date', monthStartKey)
+          .lt('event_date', monthEndKey);
+      final excusedDates = List<Map<String, dynamic>>.from(excusedRows)
+          .map((r) => DateTime.parse(r['event_date'] as String))
+          .toSet();
+      bool excused(DateTime d) => excusedDates.any((e) => e.year == d.year && e.month == d.month && e.day == d.day);
       bool onUnpaidLeave(DateTime d) =>
           leaveRanges.any((r) => r.$3 == 'unpaid' && !d.isBefore(r.$1) && !d.isAfter(r.$2));
 
@@ -140,7 +154,7 @@ class PayrollService {
           unpaidLeaveCount++;
           continue;
         }
-        if (onApprovedLeave(d)) continue;
+        if (onApprovedLeave(d) || excused(d)) continue;
         absentCount++;
       }
 

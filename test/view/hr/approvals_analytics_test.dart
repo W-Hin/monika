@@ -47,4 +47,13 @@ void main() {
     // Two flagged clock-ins in the feed, only the unreverted one offers Revert.
     expect(find.text('Revert (Dispute Investigation Found Invalid)', skipOffstage: false), findsOneWidget);
   });
+
+  testWidgets('an appealed absence shows the reason with Excuse and Reject options', (tester) async {
+    await tester.pumpWidget(MaterialApp(theme: AppTheme.light, home: const AnomalyDetailScreen()));
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(find.text('Reject Appeal'), find.byType(ListView), const Offset(0, -200));
+    expect(find.text('"Working at the client site all day"'), findsOneWidget);
+    expect(find.text('Excuse Absence (Valid Reason Given)'), findsOneWidget);
+  });
 }
