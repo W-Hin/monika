@@ -290,12 +290,12 @@ class _ClockInCard extends StatelessWidget {
             children: [
               Text(
                 DateFormat('EEE, d MMMM yyyy').format(DateTime.now()),
-                style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12.5, fontWeight: FontWeight.w600),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12.5, fontWeight: FontWeight.w600),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.18),
+                  color: Colors.white.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(100),
                 ),
                 child: Row(
@@ -321,7 +321,7 @@ class _ClockInCard extends StatelessWidget {
                 : hasClockedIn
                     ? 'Tap below to verify location before you leave'
                     : 'Tap below to verify location, network & device',
-            style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12),
           ),
           const SizedBox(height: 18),
           if (!hasClockedOut)

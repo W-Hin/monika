@@ -141,7 +141,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               itemCount: notifs.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (_, i) {
                 final n = notifs[i];
                 final (color, bg) = resolveHue(c, _hueFor(n.type));

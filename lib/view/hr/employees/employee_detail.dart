@@ -198,12 +198,12 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                   if (!mounted) return;
                   setState(() => _emp = _emp.copyWith(isActive: activating));
                   widget.onUpdate(_emp);
-                  Navigator.of(dialogContext).pop();
+                  if (dialogContext.mounted) Navigator.of(dialogContext).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(activating ? '✓ Account reactivated' : '✓ Account deactivated')),
                   );
                 } catch (e) {
-                  Navigator.of(dialogContext).pop();
+                  if (dialogContext.mounted) Navigator.of(dialogContext).pop();
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Could not update account: $e')),
@@ -240,12 +240,12 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                   if (!mounted) return;
                   setState(() => _emp = _emp.copyWith(risk: RiskLevel.low));
                   widget.onUpdate(_emp);
-                  Navigator.of(dialogContext).pop();
+                  if (dialogContext.mounted) Navigator.of(dialogContext).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('✓ Risk score reset to 100 (Low Risk)')),
                   );
                 } catch (e) {
-                  Navigator.of(dialogContext).pop();
+                  if (dialogContext.mounted) Navigator.of(dialogContext).pop();
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Could not reset risk score: $e')),
@@ -315,12 +315,12 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                   if (!mounted) return;
                   setState(() => _emp = _emp.copyWith(registeredDevice: 'Not yet registered'));
                   widget.onUpdate(_emp);
-                  Navigator.of(dialogContext).pop();
+                  if (dialogContext.mounted) Navigator.of(dialogContext).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('✓ Device binding reset')),
                   );
                 } catch (e) {
-                  Navigator.of(dialogContext).pop();
+                  if (dialogContext.mounted) Navigator.of(dialogContext).pop();
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Could not reset device binding: $e')),

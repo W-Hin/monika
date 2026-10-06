@@ -42,15 +42,60 @@ class _AnomalyDetailScreenState extends State<AnomalyDetailScreen> {
     );
   }
 
+  String _friendly(Object e, String fallback) =>
+      RegExp(r'message: ([^,)]+)').firstMatch(e.toString())?.group(1) ?? fallback;
+
+  Future<void> _rejectAppeal(AnomalyEvent event) async {
+    final note = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Reject This Appeal?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${event.employeeName}\'s absence will stay unexplained and still be deducted.'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: note,
+              maxLines: 3,
+              decoration: const InputDecoration(hintText: 'Note to the employee (optional)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Reject Appeal')),
+        ],
+      ),
+    );
+    final text = note.text.trim();
+    note.dispose();
+    if (confirmed != true) return;
+    try {
+      await anomalyController.rejectAppeal(event, text);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Appeal rejected; ${event.employeeName} has been notified')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_friendly(e, 'Could not reject the appeal')), backgroundColor: context.colors.riskHigh),
+      );
+    }
+  }
+
   Future<void> _revert(AnomalyEvent event) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Revert This Violation?'),
-        content: Text('${event.employeeName}\'s attendance record will be changed back to On Time and the risk points this violation cost will be given back. Use this only after a dispute investigation finds the flag invalid.'),
+        title: Text(event.isAbsence ? 'Excuse This Absence?' : 'Revert This Violation?'),
+        content: Text(event.isAbsence
+            ? '${event.employeeName}\'s absence on ${event.date} will be excused: it won\'t be deducted from their pay, it won\'t count against their attendance, and the risk points it cost will be given back.'
+            : '${event.employeeName}\'s attendance record will be changed back to On Time and the risk points this violation cost will be given back. Use this only after a dispute investigation finds the flag invalid.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Revert')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: Text(event.isAbsence ? 'Excuse' : 'Revert')),
         ],
       ),
     );
@@ -60,16 +105,17 @@ class _AnomalyDetailScreenState extends State<AnomalyDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(restored > 0
-              ? '✓ Reverted: record is On Time and $restored risk points were given back to ${event.employeeName}'
-              : '✓ Reverted: record is On Time (${event.employeeName}\'s score had already reset, so no points were due)'),
+          content: Text(event.isAbsence
+              ? '✓ Absence excused${restored > 0 ? ' and $restored risk points given back' : ''}; ${event.employeeName} has been notified'
+              : restored > 0
+                  ? '✓ Reverted: record is On Time and $restored risk points were given back to ${event.employeeName}'
+                  : '✓ Reverted: record is On Time (${event.employeeName}\'s score had already reset, so no points were due)'),
         ),
       );
     } catch (e) {
       if (!mounted) return;
-      final m = RegExp(r'message: ([^,)]+)').firstMatch(e.toString());
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(m?.group(1) ?? 'Could not revert this violation'), backgroundColor: context.colors.riskHigh),
+        SnackBar(content: Text(_friendly(e, 'Could not revert this violation')), backgroundColor: context.colors.riskHigh),
       );
     }
   }
@@ -158,12 +204,13 @@ class _AnomalyDetailScreenState extends State<AnomalyDetailScreen> {
                             physics: const AlwaysScrollableScrollPhysics(),
                             padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                             itemCount: events.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 10),
+                            separatorBuilder: (_, _) => const SizedBox(height: 10),
                             itemBuilder: (_, i) => _AnomalyCard(
                               event: events[i],
                               onViewEmployee: () => _viewEmployee(context, events[i].employeeName),
                               onMarkReviewed: () => _markReviewed(events[i]),
                               onRevert: () => _revert(events[i]),
+                              onRejectAppeal: () => _rejectAppeal(events[i]),
                             ),
                           ),
                         ),
@@ -182,7 +229,14 @@ class _AnomalyCard extends StatelessWidget {
   final VoidCallback onViewEmployee;
   final VoidCallback onMarkReviewed;
   final VoidCallback onRevert;
-  const _AnomalyCard({required this.event, required this.onViewEmployee, required this.onMarkReviewed, required this.onRevert});
+  final VoidCallback onRejectAppeal;
+  const _AnomalyCard({
+    required this.event,
+    required this.onViewEmployee,
+    required this.onMarkReviewed,
+    required this.onRevert,
+    required this.onRejectAppeal,
+  });
 
   IconData get _icon {
     switch (event.type) {
@@ -277,15 +331,55 @@ class _AnomalyCard extends StatelessWidget {
               ),
             ],
           ),
-          if (event.attendanceRecordId != null && !event.reverted) ...[
+          if (event.appealReason != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: c.infoBlueBg, borderRadius: BorderRadius.circular(10)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    switch (event.appealStatus) {
+                      'accepted' => 'Appeal accepted',
+                      'rejected' => 'Appeal rejected',
+                      _ => 'Employee appealed this absence',
+                    },
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: c.infoBlue),
+                  ),
+                  const SizedBox(height: 4),
+                  Text('"${event.appealReason}"', style: TextStyle(fontSize: 12, color: c.textSecondary, height: 1.4)),
+                ],
+              ),
+            ),
+          ],
+          if (event.canRevertOn(DateTime.now())) ...[
             const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: onRevert,
-                icon: const Icon(Icons.undo_rounded, size: 16),
-                label: const Text('Revert (Dispute Investigation Found Invalid)'),
+                icon: Icon(event.isAbsence ? Icons.event_available_rounded : Icons.undo_rounded, size: 16),
+                label: Text(event.isAbsence ? 'Excuse Absence (Valid Reason Given)' : 'Revert (Dispute Investigation Found Invalid)'),
                 style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 10)),
+              ),
+            ),
+          ] else if (event.isAbsence && !event.reverted) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Can no longer be excused: more than ${AnomalyEvent.absenceWindowDays} days have passed and no appeal was made in time.',
+              style: TextStyle(fontSize: 11.5, color: c.textMuted),
+            ),
+          ],
+          if (event.appealStatus == 'pending' && !event.reverted) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton.icon(
+                onPressed: onRejectAppeal,
+                icon: Icon(Icons.block_rounded, size: 16, color: c.riskHigh),
+                label: Text('Reject Appeal', style: TextStyle(color: c.riskHigh)),
               ),
             ),
           ],

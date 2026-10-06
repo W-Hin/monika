@@ -1058,7 +1058,7 @@ class _AssigneePickerSheetState extends State<_AssigneePickerSheet> {
                       )
                     : ListView.separated(
                         itemCount: employees.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        separatorBuilder: (_, _) => const Divider(height: 1),
                         itemBuilder: (_, i) {
                           final e = employees[i];
                           final checked = _selected.containsKey(e.uuid);

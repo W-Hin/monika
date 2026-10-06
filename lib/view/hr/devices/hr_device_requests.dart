@@ -67,14 +67,14 @@ class _HrDeviceRequestsScreenState extends State<HrDeviceRequestsScreen> {
                     emp.copyWith(registeredDevice: 'Not yet registered'),
                   );
                   if (!mounted) return;
-                  Navigator.of(dialogContext).pop();
+                  if (dialogContext.mounted) Navigator.of(dialogContext).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('✓ Device unpaired for ${emp.name}'),
                     ),
                   );
                 } catch (e) {
-                  Navigator.of(dialogContext).pop();
+                  if (dialogContext.mounted) Navigator.of(dialogContext).pop();
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Could not unpair device: $e')),
