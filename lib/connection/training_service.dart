@@ -58,6 +58,7 @@ class TrainingService {
         'user_id': userUuid,
         'is_recommended': true,
         'recommendation_reason': reason,
+        'recommended_by': 'pe',
       },
       onConflict: 'program_id,user_id',
       ignoreDuplicates: true,

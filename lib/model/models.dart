@@ -484,6 +484,88 @@ class QuizResult {
   });
 }
 
+/// One signal that pushed the ML model towards its predicted area.
+/// [z] is how far the employee's value sits from the training average in
+/// standard deviations (negative = below average).
+class InsightFactor {
+  final String feature;
+  final double? value;
+  final double z;
+  final double contribution;
+  const InsightFactor({required this.feature, required this.value, required this.z, required this.contribution});
+
+  factory InsightFactor.fromJson(Map<String, dynamic> j) => InsightFactor(
+        feature: j['feature'] as String,
+        value: (j['value'] as num?)?.toDouble(),
+        z: (j['z'] as num).toDouble(),
+        contribution: (j['contribution'] as num).toDouble(),
+      );
+
+  /// Plain-language reason for the HR screen, e.g. "Attendance is low (82% over 90 days)".
+  String get description {
+    final low = z < 0;
+    final v = value == null ? '—' : (value! % 1 == 0 ? value!.toInt().toString() : value!.toStringAsFixed(1));
+    switch (feature) {
+      case 'tenure_months':
+        return low ? 'Relatively new to the company ($v months)' : 'Long time with the company ($v months)';
+      case 'attendance_rate':
+        return low ? 'Attendance is low ($v% over 90 days)' : 'Attendance is strong ($v% over 90 days)';
+      case 'punctuality_rate':
+        return low ? 'Often late ($v% of clock-ins on time)' : 'Usually on time ($v% of clock-ins)';
+      case 'risk_score':
+        return low ? 'Risk score has dropped ($v/100)' : 'Clean risk record ($v/100)';
+      case 'pe_technical':
+      case 'pe_behavioural':
+      case 'pe_leadership':
+        final area = feature.substring(3);
+        final name = '${area[0].toUpperCase()}${area.substring(1)}';
+        return low ? 'Low $name score in the last review ($v)' : 'Strong $name score in the last review ($v)';
+      case 'trainings_completed':
+        return low ? 'Few trainings completed so far ($v)' : 'Many trainings completed ($v)';
+      case 'avg_training_score':
+        return low ? 'Training quiz scores are low (average $v)' : 'Training quiz scores are high (average $v)';
+      default:
+        return feature;
+    }
+  }
+}
+
+/// What the offline-trained model (ml/train.py) predicts for one employee,
+/// scored inside the database by ml_predict_training_category().
+class TrainingInsight {
+  final String category; // technical | behavioural | leadership
+  final double confidence; // 0-1
+  final Map<String, double> probabilities;
+  final List<InsightFactor> factors;
+  final String modelVersion;
+  final double? modelAccuracy; // held-out test accuracy recorded at training time
+  final double minConfidence; // below this the prediction isn't acted on automatically
+
+  const TrainingInsight({
+    required this.category,
+    required this.confidence,
+    required this.probabilities,
+    required this.factors,
+    required this.modelVersion,
+    required this.modelAccuracy,
+    required this.minConfidence,
+  });
+
+  factory TrainingInsight.fromJson(Map<String, dynamic> j) => TrainingInsight(
+        category: j['category'] as String,
+        confidence: (j['confidence'] as num).toDouble(),
+        probabilities: (j['probabilities'] as Map<String, dynamic>).map((k, v) => MapEntry(k, (v as num).toDouble())),
+        factors: (j['top_factors'] as List<dynamic>? ?? [])
+            .map((f) => InsightFactor.fromJson(f as Map<String, dynamic>))
+            .toList(),
+        modelVersion: j['model_version'] as String,
+        modelAccuracy: (j['model_accuracy'] as num?)?.toDouble(),
+        minConfidence: (j['min_confidence'] as num).toDouble(),
+      );
+
+  bool get isConfident => confidence >= minConfidence;
+}
+
 class TrainingCompletionRecord {
   final int? enrollmentId; // training_enrollments.id - null for dummy/local-only rows
   final String employeeName;

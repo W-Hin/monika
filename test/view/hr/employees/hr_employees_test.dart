@@ -27,6 +27,22 @@ void main() {
     expect(find.text('Account Information'), findsOneWidget);
   });
 
+  testWidgets('EmployeeDetailScreen shows the ML training insight and why', (tester) async {
+    final employee = DummyData.teamOverview.first;
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.light,
+      home: EmployeeDetailScreen(employee: employee, onUpdate: (_) {}),
+    ));
+    await tester.pumpAndSettle();
+    await tester.dragUntilVisible(find.text('Suggested focus: Behavioural'), find.byType(ListView), const Offset(0, -200));
+
+    expect(find.text('82% confidence'), findsOneWidget);
+    expect(find.text('• Attendance is low (81.5% over 90 days)'), findsOneWidget);
+    expect(find.text('• Low Behavioural score in the last review (55)'), findsOneWidget);
+    expect(find.textContaining('recommend a behavioural programme automatically'), findsOneWidget);
+    expect(find.textContaining('78% accurate on test data'), findsOneWidget);
+  });
+
   group('BulkImportEmployeesScreen', () {
     testWidgets('builds and shows the paste field', (tester) async {
       await tester.pumpWidget(MaterialApp(theme: AppTheme.light, home: const BulkImportEmployeesScreen()));

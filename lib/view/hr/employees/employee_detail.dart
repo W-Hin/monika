@@ -6,6 +6,7 @@ import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../model/models.dart';
 import '../../../connection/employee_service.dart';
+import '../../../connection/training_insight_service.dart';
 
 class EmployeeDetailScreen extends StatefulWidget {
   final TeamMemberSummary employee;
@@ -25,6 +26,12 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
   late String _jobTitle;
   late TextEditingController _salaryController;
 
+  // ML training insight: loading until the first fetch finishes; null
+  // insight with no error means no model has been uploaded yet.
+  bool _insightLoading = true;
+  bool _insightFailed = false;
+  TrainingInsight? _insight;
+
   final _departments = ['Engineering', 'Sales', 'Operations', 'Marketing', 'Design', 'Human Resources', 'Finance'];
   final _jobTitles = ['Employee', 'Senior Engineer', 'Team Lead', 'Manager', 'Designer', 'Analyst', 'Consultant', 'Mobile Developer', 'Backend Engineer', 'UI/UX Designer', 'Sales Executive', 'Operations Executive', 'Marketing Executive', 'Intern'];
 
@@ -38,6 +45,25 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     _salaryController.addListener(() => setState(() {}));
     if (!_departments.contains(_department)) _departments.add(_department);
     if (!_jobTitles.contains(_jobTitle)) _jobTitles.add(_jobTitle);
+    _loadInsight();
+  }
+
+  Future<void> _loadInsight() async {
+    try {
+      final insight = await TrainingInsightService.fetch(_emp.uuid);
+      if (!mounted) return;
+      setState(() {
+        _insight = insight;
+        _insightFailed = false;
+        _insightLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _insightFailed = true;
+        _insightLoading = false;
+      });
+    }
   }
 
   @override
@@ -240,6 +266,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
   /// isn't silently overwritten mid-pull.
   Future<void> _refresh() async {
     if (_isEditing) return;
+    unawaited(_loadInsight());
     try {
       final row = await EmployeeService.fetchOne(_emp.uuid);
       if (row == null || !mounted) return;
@@ -456,6 +483,10 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
             ),
             const SizedBox(height: 24),
 
+            const SectionHeader(title: 'Training Insight'),
+            _TrainingInsightCard(loading: _insightLoading, failed: _insightFailed, insight: _insight),
+            const SizedBox(height: 24),
+
             const SectionHeader(title: 'Device Binding'),
             AppCard(
               child: Row(
@@ -495,6 +526,137 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
           ),
         ),
       ),
+      ),
+    );
+  }
+}
+
+/// What the offline-trained ML model suggests this employee's next
+/// training area should be, and the signals behind it.
+class _TrainingInsightCard extends StatelessWidget {
+  final bool loading;
+  final bool failed;
+  final TrainingInsight? insight;
+  const _TrainingInsightCard({required this.loading, required this.failed, required this.insight});
+
+  static const _areas = ['technical', 'behavioural', 'leadership'];
+
+  static String _label(String area) => '${area[0].toUpperCase()}${area.substring(1)}';
+
+  static Color _areaColor(AppColorsExtension c, String area) {
+    switch (area) {
+      case 'leadership':
+        return c.purple;
+      case 'behavioural':
+        return c.amber;
+      default:
+        return c.infoBlue;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    if (loading) {
+      return const AppCard(child: Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator(strokeWidth: 2))));
+    }
+    if (failed || insight == null) {
+      return AppCard(
+        child: Row(
+          children: [
+            Icon(Icons.auto_awesome_outlined, size: 20, color: c.textMuted),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                failed ? 'Training insight is unavailable right now.' : 'No training model has been uploaded yet.',
+                style: TextStyle(fontSize: 12.5, color: c.textSecondary),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final i = insight!;
+    final color = _areaColor(c, i.category);
+    final pct = (i.confidence * 100).round().clamp(0, 99);
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
+                child: Icon(Icons.auto_awesome_rounded, color: color, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Suggested focus: ${_label(i.category)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text('$pct% confidence', style: TextStyle(fontSize: 11.5, color: c.textMuted)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          for (final area in _areas) ...[
+            Row(
+              children: [
+                SizedBox(width: 86, child: Text(_label(area), style: TextStyle(fontSize: 11.5, color: c.textSecondary))),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: i.probabilities[area] ?? 0,
+                      minHeight: 6,
+                      backgroundColor: c.surfaceMuted,
+                      color: _areaColor(c, area),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 40,
+                  child: Text('${((i.probabilities[area] ?? 0) * 100).round()}%',
+                      textAlign: TextAlign.right, style: TextStyle(fontSize: 11.5, color: c.textSecondary)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
+          if (i.factors.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('Why', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: c.textPrimary)),
+            const SizedBox(height: 4),
+            for (final f in i.factors)
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Text('• ${f.description}', style: TextStyle(fontSize: 12, color: c.textSecondary, height: 1.35)),
+              ),
+          ],
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: c.infoBlueBg, borderRadius: BorderRadius.circular(10)),
+            child: Text(
+              i.isConfident
+                  ? 'Confident enough to recommend a ${_label(i.category).toLowerCase()} programme automatically in the daily sweep.'
+                  : 'Below the ${(i.minConfidence * 100).round()}% confidence needed, so no programme is recommended automatically.',
+              style: TextStyle(fontSize: 11.5, color: c.infoBlue, height: 1.4),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Model ${i.modelVersion}${i.modelAccuracy != null ? ' · ${(i.modelAccuracy! * 100).round()}% accurate on test data' : ''}',
+            style: TextStyle(fontSize: 10.5, color: c.textMuted),
+          ),
+        ],
       ),
     );
   }

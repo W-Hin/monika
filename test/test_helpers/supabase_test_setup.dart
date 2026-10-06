@@ -28,6 +28,10 @@ Future<void> initializeTestSupabase() async {
   final mockClient = MockClient((request) async {
     final table = _tableFromPath(request.url.path);
     final wantsSingleObject = (request.headers['accept'] ?? '').contains('vnd.pgrst.object');
+    if (_rpcFixtures.containsKey(table)) {
+      return http.Response(jsonEncode(_rpcFixtures[table]), 200,
+          headers: {'content-type': 'application/json'}, request: request);
+    }
     final rows = _fixtures[table] ?? const [];
 
     // postgrest-dart null-checks `response.request` while parsing — a bare
@@ -62,14 +66,35 @@ Future<void> initializeTestSupabase() async {
   );
 }
 
-/// PostgREST table paths look like `/rest/v1/<table>` (RPC calls are
-/// `/rest/v1/rpc/<fn>`, deliberately not fixtured — best-effort try/catch
-/// covers those callers same as any other unhandled endpoint).
+/// PostgREST table paths look like `/rest/v1/<table>`; RPC calls are
+/// `/rest/v1/rpc/<fn>` and come back as `rpc/<fn>`. Only the RPCs listed in
+/// [_rpcFixtures] answer with data — every other one gets an empty array,
+/// which its caller's best-effort try/catch handles like any other
+/// unhandled endpoint.
 String _tableFromPath(String path) {
   final parts = path.split('/').where((p) => p.isNotEmpty).toList();
   final i = parts.indexOf('v1');
-  return i >= 0 && i + 1 < parts.length ? parts[i + 1] : '';
+  if (i < 0 || i + 1 >= parts.length) return '';
+  if (parts[i + 1] == 'rpc' && i + 2 < parts.length) return 'rpc/${parts[i + 2]}';
+  return parts[i + 1];
 }
+
+/// Raw JSON bodies for RPCs that return a single jsonb value.
+final _rpcFixtures = <String, Object>{
+  // Shape returned by ml_predict_training_category() (migration 0040).
+  'rpc/ml_predict_training_category': {
+    'category': 'behavioural',
+    'confidence': 0.82,
+    'probabilities': {'technical': 0.10, 'behavioural': 0.82, 'leadership': 0.08},
+    'top_factors': [
+      {'feature': 'attendance_rate', 'value': 81.5, 'z': -3.4, 'contribution': 1.9},
+      {'feature': 'pe_behavioural', 'value': 55, 'z': -1.7, 'contribution': 1.2},
+    ],
+    'model_version': 'lr-20261006-test',
+    'model_accuracy': 0.78,
+    'min_confidence': 0.65,
+  },
+};
 
 final _fixtures = <String, List<Map<String, dynamic>>>{
   'departments': [
@@ -137,6 +162,21 @@ final _fixtures = <String, List<Map<String, dynamic>>>{
         'name': 'Test Employee',
         'departments': {'name': 'Engineering'},
       },
+    },
+  ],
+  // One flagged clock-in (it has an attendance_record_id), so the anomaly
+  // feed renders a card with the Revert action.
+  'anomaly_events': [
+    {
+      'id': 1,
+      'user_id': 'test-user-id',
+      'attendance_record_id': 1,
+      'type': 'out_of_zone',
+      'event_date': '2026-09-01',
+      'details': 'Clocked in 450 m outside the office geofence',
+      'severity': 'medium',
+      'reviewed': false,
+      'profiles': {'name': 'Test Employee'},
     },
   ],
   'payroll_summaries': [
