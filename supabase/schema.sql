@@ -174,11 +174,16 @@ create table public.kpi_templates (
     created_at     timestamptz not null default now()
 );
 
+-- One KPI template per department; "All Departments" (null) counts as one.
+create unique index kpi_templates_department_unique
+    on public.kpi_templates (coalesce(department_id, -1));
+
 create table public.kpi_template_items (
     id           bigint generated always as identity primary key,
     template_id  bigint not null references public.kpi_templates(id) on delete cascade,
     name         text not null,
     weightage    numeric(5, 2) not null, -- percent; all items for one template must sum to 100, enforced in application logic
+    category     text not null default 'Technical' check (category in ('Technical', 'Behavioural', 'Leadership')),
     -- 'manual' = HR scores it; the rest are computed from this system's own data (PeMetricsService)
     metric_source text not null default 'manual' check (metric_source in ('manual', 'attendance', 'punctuality', 'conduct', 'training'))
 );
@@ -225,6 +230,7 @@ create table public.performance_evaluation_scores (
     kpi_name       text not null,
     weightage      numeric(5, 2) not null, -- snapshot of the weightage used at scoring time, independent of later template edits
     score          numeric(5, 2) not null, -- 0-100
+    category       text not null default 'Technical' check (category in ('Technical', 'Behavioural', 'Leadership')), -- snapshot, like weightage
     metric_source  text not null default 'manual' -- snapshot of how this score was produced
 );
 
@@ -255,6 +261,7 @@ create table public.training_enrollments (
     user_id                uuid not null references public.profiles(id) on delete cascade,
     is_recommended         boolean not null default false, -- set by the ML/rule recommendation engine, Phase 5
     recommendation_reason  text,
+    recommended_by         text check (recommended_by is null or recommended_by in ('rule', 'pe', 'ml')), -- null = self-enrolled
     progress               numeric(3, 2) not null default 0, -- 0.00-1.00
     is_completed           boolean not null default false,
     performance_score      numeric(5, 2), -- 0-100, set once completed
@@ -937,37 +944,58 @@ as $$
           + extract(month from age(current_date, p_hire_date)))::int;
 $$;
 
--- Evaluates every behaviour-triggered programme for one employee and
--- enrols them (as a recommendation) in the ones whose rule fires and that
--- they're tenure-eligible for. Attendance is judged over the last 90 days
--- using the same expected-day rules as payroll (weekdays, minus public
--- holidays and approved leave), and needs at least 10 expected days of
--- history before it can trigger anything — a new hire isn't "absent".
-create or replace function public.refresh_training_recommendations_for(p_user uuid)
-returns int
+-- ML training recommender (FR9.2). The model is trained offline (ml/train.py)
+-- and uploaded into training_ml_models by ml/output/model_upload.sql; it is
+-- scored here with plain arithmetic, so there is no model server.
+-- ── Model storage ──────────────────────────────────────────────────────
+create table public.training_ml_models (
+    id              bigint generated always as identity primary key,
+    version         text not null unique,
+    trained_at      timestamptz not null,
+    algorithm       text not null,
+    features        text[] not null,      -- input order the coefficients use
+    means           float8[] not null,    -- standardisation: z = (x - mean) / scale, missing -> 0
+    scales          float8[] not null,
+    classes         text[] not null,      -- output order: technical, behavioural, leadership
+    coef            float8[] not null,    -- [class][feature]
+    intercept       float8[] not null,    -- [class]
+    metrics         jsonb not null default '{}'::jsonb,
+    min_confidence  numeric(4, 2) not null default 0.65, -- below this the prediction is shown but not acted on
+    is_active       boolean not null default false,
+    uploaded_at     timestamptz not null default now()
+);
+
+create unique index training_ml_models_one_active
+    on public.training_ml_models (is_active) where is_active;
+
+alter table public.training_ml_models enable row level security;
+
+create policy "HR can view training models"
+    on public.training_ml_models for select
+    to authenticated
+    using (public.is_hr_admin());
+
+-- ── Shared: 90-day attendance rate ─────────────────────────────────────
+-- Same expected-day rules as payroll (weekdays, minus public holidays and
+-- approved leave). Null until there are at least 10 expected days, so a
+-- new hire isn't treated as absent.
+create or replace function public.attendance_rate_90d(p_user uuid)
+returns numeric
 language plpgsql
+stable
 security definer
 set search_path = public
 as $$
 declare
-    v_profile record;
-    v_tenure int;
+    v_hire date;
     v_from date;
     v_to date := current_date - 1;
     v_expected int;
     v_present int;
-    v_rate numeric;
-    v_added int := 0;
-    v_reason text;
-    prog record;
 begin
-    perform set_config('app.training_rpc', '1', true);
-
-    select hire_date, risk_level into v_profile from public.profiles where id = p_user and is_active;
-    if not found then return 0; end if;
-
-    v_tenure := public.tenure_months(v_profile.hire_date);
-    v_from := greatest(v_profile.hire_date, current_date - 90);
+    select hire_date into v_hire from public.profiles where id = p_user;
+    if not found then return null; end if;
+    v_from := greatest(v_hire, current_date - 90);
 
     select count(*) filter (where is_workday),
            count(*) filter (where is_workday and attended)
@@ -990,7 +1018,224 @@ begin
         from generate_series(v_from, v_to, interval '1 day') as d
     ) x;
 
-    v_rate := case when v_expected >= 10 then v_present * 100.0 / v_expected end;
+    return case when v_expected >= 10 then round(v_present * 100.0 / v_expected, 1) end;
+end;
+$$;
+revoke all on function public.attendance_rate_90d(uuid) from public, anon, authenticated;
+
+-- ── Model inputs (names must match ml/features.py) ─────────────────────
+create or replace function public.ml_employee_features(p_user uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+    v_profile record;
+    v_on_time int;
+    v_late int;
+    v_eval_id bigint;
+    v_pe jsonb := '{}'::jsonb;
+    v_completed int;
+    v_avg_score numeric;
+begin
+    select hire_date, risk_score into v_profile from public.profiles where id = p_user;
+    if not found then return null; end if;
+
+    select count(*) filter (where status = 'on_time'),
+           count(*) filter (where status = 'late')
+    into v_on_time, v_late
+    from public.attendance_records
+    where user_id = p_user and work_date >= current_date - 90;
+
+    select id into v_eval_id
+    from public.performance_evaluations
+    where user_id = p_user and not is_draft
+    order by year desc
+    limit 1;
+
+    if v_eval_id is not null then
+        select coalesce(jsonb_object_agg('pe_' || cat, avg_score), '{}'::jsonb) into v_pe
+        from (
+            select lower(category) as cat,
+                   round(sum(score * weightage) / nullif(sum(weightage), 0), 1) as avg_score
+            from public.performance_evaluation_scores
+            where evaluation_id = v_eval_id
+            group by lower(category)
+        ) s;
+    end if;
+
+    select count(*) filter (where is_completed),
+           round(avg(performance_score) filter (where is_completed and performance_score is not null), 1)
+    into v_completed, v_avg_score
+    from public.training_enrollments
+    where user_id = p_user;
+
+    return jsonb_build_object(
+        'tenure_months', public.tenure_months(v_profile.hire_date),
+        'attendance_rate', public.attendance_rate_90d(p_user),
+        'punctuality_rate', case when v_on_time + v_late >= 5
+                                 then round(v_on_time * 100.0 / (v_on_time + v_late), 1) end,
+        'risk_score', v_profile.risk_score,
+        'pe_technical', v_pe -> 'pe_technical',
+        'pe_behavioural', v_pe -> 'pe_behavioural',
+        'pe_leadership', v_pe -> 'pe_leadership',
+        'trainings_completed', v_completed,
+        'avg_training_score', v_avg_score
+    );
+end;
+$$;
+revoke all on function public.ml_employee_features(uuid) from public, anon, authenticated;
+
+-- ── Scorer: softmax(intercept + coef · z) ──────────────────────────────
+-- Also returns the top factors behind the winning area: each feature's
+-- pull towards that area relative to the average pull across all areas,
+-- keeping only the ones that pushed it up.
+create or replace function public.ml_score_features(p_model_id bigint, p_features jsonb)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+    m public.training_ml_models;
+    n int;
+    k int;
+    v float8;
+    z float8[] := '{}';
+    logits float8[] := '{}';
+    probs float8[] := '{}';
+    l float8;
+    max_l float8;
+    total float8 := 0;
+    best int := 1;
+    avg_pull float8;
+    factors jsonb := '[]'::jsonb;
+    probabilities jsonb := '{}'::jsonb;
+begin
+    select * into m from public.training_ml_models where id = p_model_id;
+    if not found then return null; end if;
+    n := array_length(m.features, 1);
+    k := array_length(m.classes, 1);
+
+    for j in 1..n loop
+        v := (p_features ->> m.features[j])::float8;
+        z[j] := case when v is null then 0 else (v - m.means[j]) / m.scales[j] end;
+    end loop;
+
+    for c in 1..k loop
+        l := m.intercept[c];
+        for j in 1..n loop
+            l := l + m.coef[c][j] * z[j];
+        end loop;
+        logits[c] := l;
+        if c = 1 or l > max_l then max_l := l; end if;
+    end loop;
+
+    for c in 1..k loop
+        probs[c] := exp(logits[c] - max_l);
+        total := total + probs[c];
+    end loop;
+    for c in 1..k loop
+        probs[c] := probs[c] / total;
+        probabilities := probabilities || jsonb_build_object(m.classes[c], probs[c]);
+        if probs[c] > probs[best] then best := c; end if;
+    end loop;
+
+    select coalesce(jsonb_agg(f order by (f ->> 'contribution')::float8 desc), '[]'::jsonb) into factors
+    from (
+        select f
+        from (
+            select jsonb_build_object(
+                       'feature', m.features[j],
+                       'value', p_features -> m.features[j],
+                       'z', z[j],
+                       'contribution', m.coef[best][j] * z[j]
+                           - (select avg(m.coef[c][j] * z[j]) from generate_series(1, k) as c)
+                   ) as f
+            from generate_series(1, n) as j
+        ) x
+        where (f ->> 'contribution')::float8 > 0.05
+        order by (f ->> 'contribution')::float8 desc
+        limit 3
+    ) y;
+
+    return jsonb_build_object(
+        'category', m.classes[best],
+        'confidence', probs[best],
+        'probabilities', probabilities,
+        'top_factors', factors,
+        'model_version', m.version,
+        'model_accuracy', m.metrics -> 'test_accuracy',
+        'min_confidence', m.min_confidence
+    );
+end;
+$$;
+revoke all on function public.ml_score_features(bigint, jsonb) from public, anon, authenticated;
+
+-- ── What the HR screen calls ───────────────────────────────────────────
+-- HR can ask about anyone; an employee only about themselves. Returns
+-- null when no model has been uploaded yet.
+create or replace function public.ml_predict_training_category(p_user uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+    v_model_id bigint;
+    v_features jsonb;
+begin
+    if p_user is distinct from auth.uid() and not public.is_hr_admin() then
+        raise exception 'You can only view your own training insight.';
+    end if;
+
+    select id into v_model_id from public.training_ml_models where is_active;
+    if v_model_id is null then return null; end if;
+
+    v_features := public.ml_employee_features(p_user);
+    if v_features is null then return null; end if;
+
+    return public.ml_score_features(v_model_id, v_features)
+        || jsonb_build_object('features', v_features);
+end;
+$$;
+grant execute on function public.ml_predict_training_category(uuid) to authenticated;
+
+-- ── Daily sweep, now with the ML step ──────────────────────────────────
+-- 1. Behaviour rules (unchanged from 0039).
+-- 2. If a model is active, its confidence clears the model's threshold and
+--    the employee has no unfinished ML recommendation already, enrol them
+--    in one programme from the predicted area: a recommendation-only
+--    programme without a behaviour trigger first, else an open one.
+create or replace function public.refresh_training_recommendations_for(p_user uuid)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_profile record;
+    v_tenure int;
+    v_rate numeric;
+    v_added int := 0;
+    v_reason text;
+    v_model_id bigint;
+    v_pred jsonb;
+    v_category text;
+    v_confidence float8;
+    prog record;
+begin
+    perform set_config('app.training_rpc', '1', true);
+
+    select hire_date, risk_level into v_profile from public.profiles where id = p_user and is_active;
+    if not found then return 0; end if;
+
+    v_tenure := public.tenure_months(v_profile.hire_date);
+    v_rate := public.attendance_rate_90d(p_user);
 
     for prog in
         select * from public.training_programs p
@@ -1011,12 +1256,47 @@ begin
         end if;
 
         if v_reason is not null then
-            insert into public.training_enrollments (program_id, user_id, is_recommended, recommendation_reason, progress)
-            values (prog.id, p_user, true, v_reason, 0)
+            insert into public.training_enrollments (program_id, user_id, is_recommended, recommendation_reason, progress, recommended_by)
+            values (prog.id, p_user, true, v_reason, 0, 'rule')
             on conflict (program_id, user_id) do nothing;
             v_added := v_added + 1;
         end if;
     end loop;
+
+    select id into v_model_id from public.training_ml_models where is_active;
+    if v_model_id is not null and not exists (
+        select 1 from public.training_enrollments e
+        where e.user_id = p_user and e.recommended_by = 'ml' and not e.is_completed
+    ) then
+        v_pred := public.ml_score_features(v_model_id, public.ml_employee_features(p_user));
+        v_category := v_pred ->> 'category';
+        v_confidence := (v_pred ->> 'confidence')::float8;
+
+        if v_confidence >= (v_pred ->> 'min_confidence')::float8 then
+            select * into prog
+            from public.training_programs p
+            where p.category = v_category
+              and p.trigger_risk_level is null
+              and p.trigger_attendance_below is null
+              and p.min_tenure_months <= v_tenure
+              and not exists (
+                  select 1 from public.training_enrollments e
+                  where e.program_id = p.id and e.user_id = p_user)
+            order by (p.access = 'recommended_only') desc, p.id
+            limit 1;
+
+            if found then
+                insert into public.training_enrollments (program_id, user_id, is_recommended, recommendation_reason, progress, recommended_by)
+                values (prog.id, p_user, true,
+                        'Suggested by MONIKA''s training model: your recent records point to '
+                            || v_category || ' skills as your best area to grow ('
+                            || least(round((v_confidence * 100)::numeric), 99)::text || '% confidence).',
+                        0, 'ml')
+                on conflict (program_id, user_id) do nothing;
+                v_added := v_added + 1;
+            end if;
+        end if;
+    end if;
 
     return v_added;
 end;
