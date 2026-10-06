@@ -7,11 +7,10 @@ docs/superpowers/
 graphify-out/
 CLAUDE.local.md
 
-# Working design-rationale notes used while writing the FYP report —
-# not meant to stay in the repo long-term.
-docs/diagrams/
-
 # Miscellaneous
+
+# ML training data — regenerate with ml/generate_synthetic.py (seeded)
+ml/data/
 
 # Backend secrets — commit backend/config.example.php, never backend/config.php
 backend/config.php
