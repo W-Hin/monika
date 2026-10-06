@@ -484,6 +484,60 @@ class QuizResult {
   });
 }
 
+/// One past try at a programme's quiz (training_attempts).
+class QuizAttempt {
+  final double score;
+  final bool passed;
+  final DateTime takenAt;
+  const QuizAttempt({required this.score, required this.passed, required this.takenAt});
+
+  factory QuizAttempt.fromJson(Map<String, dynamic> j) => QuizAttempt(
+        score: (j['score'] as num).toDouble(),
+        passed: j['passed'] as bool,
+        takenAt: DateTime.parse(j['created_at'] as String).toLocal(),
+      );
+}
+
+/// Issued by the database when an enrolment is completed (migration 0041).
+/// Name and title are snapshots, so it stays valid if the programme changes.
+class TrainingCertificate {
+  final int id;
+  final String certificateNo;
+  final int? enrollmentId;
+  final int? programId;
+  final String employeeName;
+  final String programTitle;
+  final String category; // technical | behavioural | leadership
+  final double? score;
+  final DateTime issuedAt;
+
+  const TrainingCertificate({
+    required this.id,
+    required this.certificateNo,
+    required this.enrollmentId,
+    required this.programId,
+    required this.employeeName,
+    required this.programTitle,
+    required this.category,
+    required this.score,
+    required this.issuedAt,
+  });
+
+  factory TrainingCertificate.fromJson(Map<String, dynamic> j) => TrainingCertificate(
+        id: j['id'] as int,
+        certificateNo: j['certificate_no'] as String,
+        enrollmentId: j['enrollment_id'] as int?,
+        programId: j['program_id'] as int?,
+        employeeName: j['employee_name'] as String,
+        programTitle: j['program_title'] as String,
+        category: j['category'] as String,
+        score: (j['score'] as num?)?.toDouble(),
+        issuedAt: DateTime.parse(j['issued_at'] as String).toLocal(),
+      );
+
+  String get categoryLabel => category.isEmpty ? category : '${category[0].toUpperCase()}${category.substring(1)}';
+}
+
 /// One signal that pushed the ML model towards its predicted area.
 /// [z] is how far the employee's value sits from the training average in
 /// standard deviations (negative = below average).

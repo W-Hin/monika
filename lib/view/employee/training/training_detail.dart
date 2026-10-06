@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../../model/models.dart';
 import '../../../controller/training_controller.dart';
 import '../../../controller/training_content_controller.dart';
+import '../../../controller/certificate_controller.dart';
+import 'certificates.dart';
 import 'training_quiz.dart';
 
 class TrainingDetailScreen extends StatefulWidget {
@@ -20,6 +23,7 @@ class TrainingDetailScreen extends StatefulWidget {
 class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
   late TrainingProgram _program;
   bool _busy = false;
+  TrainingCertificate? _certificate;
 
   @override
   void initState() {
@@ -32,6 +36,30 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
     final id = _program.dbId;
     if (id == null) return;
     await trainingContentController.load(programId: id, enrollmentId: _program.enrollmentId);
+    await _loadCertificate();
+  }
+
+  Future<void> _loadCertificate() async {
+    final enrollmentId = _program.enrollmentId;
+    if (!_program.isCompleted || enrollmentId == null) return;
+    final cert = await certificateController.forEnrollment(enrollmentId);
+    if (mounted) setState(() => _certificate = cert);
+  }
+
+  void _openCertificate(TrainingCertificate cert) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => CertificateScreen(certificate: cert)));
+  }
+
+  /// Shown once, right after the action that completed the programme.
+  void _announceCertificate() {
+    final cert = _certificate;
+    if (cert == null || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('🎓 Certificate ${cert.certificateNo} earned!'),
+        action: SnackBarAction(label: 'View', onPressed: () => _openCertificate(cert)),
+      ),
+    );
   }
 
   Color _catColor(BuildContext context) {
@@ -95,9 +123,14 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
     }
     _syncFromController();
     if (!wasCompleted && _program.isCompleted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('🎉 Training completed! HR will review and score it soon.')),
-      );
+      await _loadCertificate();
+      if (_certificate != null) {
+        _announceCertificate();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('🎉 Training completed! HR will review and score it soon.')),
+        );
+      }
     }
   }
 
@@ -116,6 +149,7 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
   }
 
   Future<void> _takeQuiz() async {
+    final wasCompleted = _program.isCompleted;
     await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (_) => TrainingQuizScreen(programId: _program.dbId!, programTitle: _program.title)),
@@ -123,7 +157,9 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
     // Refresh however they came back — the "Back to Programme" button pops
     // true but the app-bar/system back pops null, and the attempt is
     // already saved server-side either way.
-    if (mounted) await _refresh();
+    if (!mounted) return;
+    await _refresh();
+    if (!wasCompleted && _program.isCompleted) _announceCertificate();
   }
 
   List<Widget> _contentSection(BuildContext context) {
@@ -164,6 +200,11 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
           passed: _program.isCompleted,
           onTake: _takeQuiz,
         ),
+        if (content.attempts.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          SectionHeader(title: 'Attempt History (${content.attempts.length})'),
+          _AttemptHistory(attempts: content.attempts, passMark: content.passMark),
+        ],
       ],
     ];
   }
@@ -256,6 +297,17 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
                   ],
                 ),
               ),
+              if (_certificate != null) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _openCertificate(_certificate!),
+                    icon: const Icon(Icons.workspace_premium_outlined, size: 18),
+                    label: Text('View Certificate · ${_certificate!.certificateNo}'),
+                  ),
+                ),
+              ],
             ] else if (p.isEnrolled) ...[
               const SectionHeader(title: 'Your Progress'),
               ClipRRect(
@@ -388,6 +440,64 @@ class _LessonCard extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Every quiz attempt, newest first, numbered in the order they were taken.
+class _AttemptHistory extends StatelessWidget {
+  final List<QuizAttempt> attempts;
+  final int passMark;
+  const _AttemptHistory({required this.attempts, required this.passMark});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final best = attempts.map((a) => a.score).reduce((a, b) => a > b ? a : b);
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (var i = 0; i < attempts.length; i++) ...[
+            if (i > 0) const Divider(height: 1, indent: 16, endIndent: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 74,
+                    child: Text('Attempt ${attempts.length - i}', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+                  ),
+                  Expanded(
+                    child: Text(
+                      DateFormat('d MMM yyyy, h:mm a').format(attempts[i].takenAt),
+                      style: TextStyle(fontSize: 11.5, color: c.textMuted),
+                    ),
+                  ),
+                  if (attempts[i].score == best && attempts.length > 1)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Icon(Icons.star_rounded, size: 15, color: c.amber),
+                    ),
+                  Text('${attempts[i].score.toStringAsFixed(0)}%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: attempts[i].passed ? c.riskLowBg : c.riskHighBg,
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                    child: Text(
+                      attempts[i].passed ? 'Passed' : 'Below $passMark%',
+                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: attempts[i].passed ? c.primary : c.riskHigh),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

@@ -689,7 +689,7 @@ class _CreateProgramSheetState extends State<_CreateProgramSheet> {
         content: Text(
           enrolled > 0
               ? '"${program.title}" will be permanently deleted, along with its lessons and quiz. '
-                  '$enrolled enrolled employee${enrolled == 1 ? '' : 's'} will lose their progress, quiz attempts and scores for it. This cannot be undone.'
+                  '$enrolled enrolled employee${enrolled == 1 ? '' : 's'} will lose their progress, quiz attempts and scores for it (certificates already earned are kept). This cannot be undone.'
               : '"${program.title}" and its lessons and quiz will be permanently deleted. This cannot be undone.',
           style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4),
         ),

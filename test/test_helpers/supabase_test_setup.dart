@@ -94,6 +94,9 @@ final _rpcFixtures = <String, Object>{
     'model_accuracy': 0.78,
     'min_confidence': 0.65,
   },
+  'rpc/training_quiz_info': [
+    {'question_count': 5, 'pass_mark': 70},
+  ],
 };
 
 final _fixtures = <String, List<Map<String, dynamic>>>{
@@ -177,6 +180,25 @@ final _fixtures = <String, List<Map<String, dynamic>>>{
       'severity': 'medium',
       'reviewed': false,
       'profiles': {'name': 'Test Employee'},
+    },
+  ],
+  // A failed first try then a pass, newest first (as the app orders them).
+  'training_attempts': [
+    {'id': 2, 'enrollment_id': 3, 'user_id': 'test-user-id', 'score': 80.0, 'passed': true, 'created_at': '2026-09-12T06:30:00Z'},
+    {'id': 1, 'enrollment_id': 3, 'user_id': 'test-user-id', 'score': 40.0, 'passed': false, 'created_at': '2026-09-10T02:15:00Z'},
+  ],
+  'training_certificates': [
+    {
+      'id': 2,
+      'certificate_no': 'MON-2026-00002',
+      'enrollment_id': 3,
+      'user_id': 'test-user-id',
+      'program_id': 7,
+      'employee_name': 'Test Employee',
+      'program_title': 'Workplace Ethics',
+      'category': 'behavioural',
+      'score': 80.0,
+      'issued_at': '2026-09-12T06:30:05Z',
     },
   ],
   'payroll_summaries': [

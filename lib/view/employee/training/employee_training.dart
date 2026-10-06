@@ -4,6 +4,7 @@ import '../../shared/widgets/common_widgets.dart';
 import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
 import '../../../controller/training_controller.dart';
+import 'certificates.dart';
 import 'training_detail.dart';
 
 class EmployeeTrainingScreen extends StatefulWidget {
@@ -32,6 +33,16 @@ class _EmployeeTrainingScreenState extends State<EmployeeTrainingScreen> {
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: const Text('Training & Development'),
+        actions: [
+          IconButton(
+            tooltip: 'My Certificates',
+            icon: const Icon(Icons.workspace_premium_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MyCertificatesScreen()),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         top: false,
