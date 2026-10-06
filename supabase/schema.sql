@@ -104,6 +104,12 @@ create table public.anomaly_events (
     reviewed_by           uuid references public.profiles(id) on delete set null,
     reviewed_at           timestamptz,
     reverted_at           timestamptz, -- HR found it invalid after a dispute; its risk points were given back
+    -- An employee's appeal against an unexplained absence (within 7 days of it)
+    appeal_reason         text,
+    appealed_at           timestamptz,
+    appeal_status         text check (appeal_status is null or appeal_status in ('pending', 'accepted', 'rejected')),
+    appeal_response       text, -- HR's note when rejecting
+    appeal_decided_at     timestamptz,
     created_at            timestamptz not null default now()
 );
 
@@ -522,8 +528,9 @@ $$;
 -- Extensions. Everything above works without it; these two jobs just add
 -- the *proactive* half of the reset/absence-detection behaviour.
 create extension if not exists pg_cron;
-select cron.schedule('reset-stale-risk-scores', '0 2 * * *', $$select public.reset_stale_risk_scores();$$);
-select cron.schedule('detect-unexplained-absences', '30 1 * * *', $$select public.detect_unexplained_absences();$$);
+-- pg_cron runs in UTC; these are 00:30 and 01:00 Malaysia time.
+select cron.schedule('detect-unexplained-absences', '30 16 * * *', $$select public.detect_unexplained_absences();$$);
+select cron.schedule('reset-stale-risk-scores', '0 17 * * *', $$select public.reset_stale_risk_scores();$$);
 
 alter table public.departments enable row level security;
 alter table public.profiles enable row level security;
@@ -860,9 +867,13 @@ begin
   insert into public.notifications (user_id, title, body, type)
   values (
     new.user_id,
-    'Attendance Flag',
-    format('An attendance anomaly was flagged on your account: %s', new.details) ||
-    E'\n\nNext steps:\n1. Go to Attendance\n2. Review the flagged record — contact HR if this wasn\'t you',
+    case when new.type = 'unexplained_absence' then 'Unexplained Absence' else 'Attendance Flag' end,
+    case when new.type = 'unexplained_absence'
+      then format('You were marked absent on %s: no clock-in and no approved leave.', to_char(new.event_date, 'DD Mon YYYY')) ||
+           format(E'\n\nIf you were working or had a valid reason, appeal by %s:\n1. Go to Attendance\n2. Tap Appeal on this absence and explain why', to_char(new.event_date + 7, 'DD Mon YYYY'))
+      else format('An attendance anomaly was flagged on your account: %s', new.details) ||
+           E'\n\nNext steps:\n1. Go to Attendance\n2. Review the flagged record — contact HR if this wasn\'t you'
+    end,
     'anomaly'
   );
   return new;
@@ -1493,6 +1504,138 @@ end;
 $$;
 grant execute on function public.withdraw_from_training(bigint) to authenticated;
 
+-- Unexplained-absence appeals (migration 0044).
+create or replace function public.malaysia_today()
+returns date
+language sql
+stable
+as $$
+    select (now() at time zone 'Asia/Kuala_Lumpur')::date;
+$$;
+
+-- Can HR still excuse this absence? Within 7 days of it, or later if the
+-- employee appealed inside those 7 days and the appeal is still open.
+create or replace function public.absence_revert_allowed(p_event_date date, p_appeal_status text, p_appealed_at timestamptz)
+returns boolean
+language sql
+stable
+as $$
+    select p_event_date >= public.malaysia_today() - 7
+        or coalesce(p_appeal_status = 'pending'
+                    and (p_appealed_at at time zone 'Asia/Kuala_Lumpur')::date <= p_event_date + 7, false);
+$$;
+
+-- The signed-in employee's recent absence flags (employees can't read
+-- anomaly_events directly).
+create or replace function public.my_absence_flags()
+returns table (
+    id bigint,
+    event_date date,
+    details text,
+    appeal_reason text,
+    appeal_status text,
+    appeal_response text,
+    excused boolean,
+    appeal_deadline date,
+    can_appeal boolean
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select a.id, a.event_date, a.details, a.appeal_reason, a.appeal_status, a.appeal_response,
+           a.reverted_at is not null,
+           a.event_date + 7,
+           a.reverted_at is null and a.appeal_status is null and a.event_date >= public.malaysia_today() - 7
+    from public.anomaly_events a
+    where a.user_id = auth.uid()
+      and a.type = 'unexplained_absence'
+      and a.event_date >= public.malaysia_today() - 60
+    order by a.event_date desc;
+$$;
+grant execute on function public.my_absence_flags() to authenticated;
+
+create or replace function public.appeal_absence(p_anomaly_id bigint, p_reason text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    a record;
+    v_name text;
+begin
+    select * into a from public.anomaly_events where id = p_anomaly_id for update;
+    if not found or a.user_id is distinct from auth.uid() or a.type <> 'unexplained_absence' then
+        raise exception 'Absence not found.';
+    end if;
+    if a.reverted_at is not null then
+        raise exception 'This absence has already been excused.';
+    end if;
+    if a.appeal_status is not null then
+        raise exception 'You have already appealed this absence.';
+    end if;
+    if a.event_date < public.malaysia_today() - 7 then
+        raise exception 'Appeals must be made within 7 days of the absence.';
+    end if;
+    if length(trim(coalesce(p_reason, ''))) < 10 then
+        raise exception 'Please explain the reason in at least 10 characters.';
+    end if;
+
+    update public.anomaly_events
+    set appeal_reason = trim(p_reason), appealed_at = now(), appeal_status = 'pending'
+    where id = a.id;
+
+    select name into v_name from public.profiles where id = a.user_id;
+    insert into public.notifications (user_id, title, body, type)
+    select p.id, 'Absence Appeal',
+           format('%s appealed the unexplained absence on %s: "%s"', v_name, to_char(a.event_date, 'DD Mon YYYY'), trim(p_reason))
+           || E'\n\nNext steps:\n1. Go to Analytics → Anomaly & Violation Feed\n2. Excuse the absence or reject the appeal',
+           'anomaly'
+    from public.profiles p
+    where p.user_role = 'hr_admin' and p.is_active and p.id <> a.user_id;
+end;
+$$;
+grant execute on function public.appeal_absence(bigint, text) to authenticated;
+
+create or replace function public.reject_absence_appeal(p_anomaly_id bigint, p_response text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    a record;
+begin
+    if not public.is_hr_admin() then
+        raise exception 'Only HR admins can decide on an appeal.';
+    end if;
+    select * into a from public.anomaly_events where id = p_anomaly_id for update;
+    if not found then
+        raise exception 'Violation not found.';
+    end if;
+    if a.user_id = auth.uid() then
+        raise exception 'You cannot decide on your own appeal. Ask another HR admin to review it.';
+    end if;
+    if a.appeal_status is distinct from 'pending' then
+        raise exception 'There is no open appeal on this absence.';
+    end if;
+
+    update public.anomaly_events
+    set appeal_status = 'rejected', appeal_response = nullif(trim(coalesce(p_response, '')), ''),
+        appeal_decided_at = now(), reviewed = true, reviewed_by = auth.uid(), reviewed_at = now()
+    where id = a.id;
+
+    insert into public.notifications (user_id, title, body, type)
+    values (a.user_id, 'Absence Appeal Not Accepted',
+            format('HR did not accept your appeal for the absence on %s.', to_char(a.event_date, 'DD Mon YYYY'))
+            || coalesce(E'\n\nHR\'s note: ' || nullif(trim(coalesce(p_response, '')), ''), ''),
+            'anomaly');
+end;
+$$;
+grant execute on function public.reject_absence_appeal(bigint, text) to authenticated;
+
 -- Returns how many risk points were given back. Points are only restored
 -- if the violation still counts towards the current risk period — once
 -- the score has reset, there is nothing left to give back.
@@ -1509,6 +1652,7 @@ declare
     v_weight numeric;
     v_restored integer := 0;
     v_score integer;
+    v_absence boolean;
 begin
     if not public.is_hr_admin() then
         raise exception 'Only HR admins can revert a violation.';
@@ -1522,6 +1666,10 @@ begin
     end if;
     if a.reverted_at is not null then
         raise exception 'This violation has already been reverted.';
+    end if;
+    v_absence := a.type = 'unexplained_absence';
+    if v_absence and not public.absence_revert_allowed(a.event_date, a.appeal_status, a.appealed_at) then
+        raise exception 'Absences can only be excused within 7 days, unless the employee appealed within that time.';
     end if;
 
     if a.attendance_record_id is not null then
@@ -1552,12 +1700,18 @@ begin
     end if;
 
     update public.anomaly_events
-    set reviewed = true, reviewed_by = auth.uid(), reviewed_at = now(), reverted_at = now()
+    set reviewed = true, reviewed_by = auth.uid(), reviewed_at = now(), reverted_at = now(),
+        appeal_status = case when appeal_status = 'pending' then 'accepted' else appeal_status end,
+        appeal_decided_at = case when appeal_status = 'pending' then now() else appeal_decided_at end
     where id = a.id;
 
     insert into public.notifications (user_id, title, body, type)
-    values (a.user_id, 'Attendance Flag Reverted',
-            format('HR reviewed the flag on your attendance for %s and found it invalid. ', to_char(a.event_date, 'DD Mon YYYY'))
+    values (a.user_id,
+            case when v_absence then 'Absence Excused' else 'Attendance Flag Reverted' end,
+            case when v_absence
+                 then format('HR excused your absence on %s. It will not be deducted from your pay. ', to_char(a.event_date, 'DD Mon YYYY'))
+                 else format('HR reviewed the flag on your attendance for %s and found it invalid. ', to_char(a.event_date, 'DD Mon YYYY'))
+            end
             || case when v_restored > 0 then format('%s risk points have been given back.', v_restored)
                     else 'Your risk score had already reset since then, so no points needed to be given back.' end,
             'anomaly');
@@ -1688,6 +1842,7 @@ language plpgsql
 stable
 security definer
 set search_path = public
+set timezone = 'Asia/Kuala_Lumpur'
 as $$
 declare
     v_hire date;
@@ -1714,6 +1869,10 @@ begin
                     select 1 from public.leave_applications la
                     where la.user_id = p_user and la.status = 'approved'
                       and d::date between la.start_date and la.end_date)
+                and not exists ( -- an absence HR excused after an appeal
+                    select 1 from public.anomaly_events ae
+                    where ae.user_id = p_user and ae.type = 'unexplained_absence'
+                      and ae.reverted_at is not null and ae.event_date = d::date)
             ) as is_workday,
             exists (
                 select 1 from public.attendance_records ar
@@ -2042,7 +2201,17 @@ end;
 $$;
 revoke all on function public.refresh_all_training_recommendations() from public, anon, authenticated;
 
-select cron.schedule('refresh-training-recommendations', '0 3 * * *', $$select public.refresh_all_training_recommendations();$$);
+-- 01:30 Malaysia time, after the absence and risk jobs above.
+select cron.schedule('refresh-training-recommendations', '30 17 * * *', $$select public.refresh_all_training_recommendations();$$);
+
+-- Measure "today", "yesterday" and "the last 90 days" in Malaysia time
+-- whenever these run.
+alter function public.tenure_months(date) set timezone = 'Asia/Kuala_Lumpur';
+alter function public.ml_employee_features(uuid) set timezone = 'Asia/Kuala_Lumpur';
+alter function public.ml_predict_training_category(uuid) set timezone = 'Asia/Kuala_Lumpur';
+alter function public.refresh_training_recommendations_for(uuid) set timezone = 'Asia/Kuala_Lumpur';
+alter function public.refresh_my_training_recommendations() set timezone = 'Asia/Kuala_Lumpur';
+alter function public.refresh_all_training_recommendations() set timezone = 'Asia/Kuala_Lumpur';
 
 -- Self-enrolment guard: employees can only enrol themselves in open
 -- programmes they're tenure-eligible for. Recommendations (written by the
