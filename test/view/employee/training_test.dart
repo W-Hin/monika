@@ -63,6 +63,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('View Certificate · MON-2026-00002'), findsOneWidget);
+    expect(find.text('Withdraw From Programme', skipOffstage: false), findsNothing);
 
     await tester.dragUntilVisible(find.text('Attempt History (2)'), find.byType(ListView), const Offset(0, -200));
     await tester.dragUntilVisible(find.text('Attempt 1'), find.byType(ListView), const Offset(0, -200));

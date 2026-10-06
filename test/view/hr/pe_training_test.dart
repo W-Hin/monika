@@ -36,4 +36,18 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('All Programs'), findsOneWidget);
   });
+
+  testWidgets('a mandatory programme lets HR manage exemptions', (tester) async {
+    await tester.pumpWidget(MaterialApp(theme: AppTheme.light, home: const HrTrainingScreen()));
+    await tester.pumpAndSettle();
+
+    final exemptions = find.text('Exemptions');
+    await tester.dragUntilVisible(exemptions, find.byType(ListView).first, const Offset(0, -200));
+    await tester.tap(exemptions);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nobody is exempted yet.'), findsOneWidget);
+    expect(find.text('Employee'), findsOneWidget);
+    expect(find.text('Department'), findsOneWidget);
+  });
 }

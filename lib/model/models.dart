@@ -2,7 +2,7 @@ enum UserRole { employee, hrAdmin }
 
 enum RiskLevel { low, medium, high }
 
-enum LeaveStatus { pending, approved, rejected }
+enum LeaveStatus { pending, approved, rejected, cancelled }
 
 enum AttendanceStatus { onTime, late, flagged }
 
@@ -318,9 +318,10 @@ class AnomalyEvent {
   final RiskLevel severity;
   final bool reviewed;
   // Null for anomaly types with no single clock-in attempt behind them
-  // (the late-pattern anomaly, unexplained_absence) — there's nothing to
-  // revert for those.
+  // (unexplained_absence) — there's no record to revert for those.
   final int? attendanceRecordId;
+  // HR found it invalid after a dispute and gave the risk points back.
+  final bool reverted;
 
   const AnomalyEvent({
     required this.id,
@@ -331,9 +332,10 @@ class AnomalyEvent {
     required this.severity,
     this.reviewed = false,
     this.attendanceRecordId,
+    this.reverted = false,
   });
 
-  AnomalyEvent copyWith({bool? reviewed}) => AnomalyEvent(
+  AnomalyEvent copyWith({bool? reviewed, bool? reverted}) => AnomalyEvent(
         id: id,
         employeeName: employeeName,
         type: type,
@@ -342,6 +344,7 @@ class AnomalyEvent {
         severity: severity,
         reviewed: reviewed ?? this.reviewed,
         attendanceRecordId: attendanceRecordId,
+        reverted: reverted ?? this.reverted,
       );
 }
 
@@ -482,6 +485,25 @@ class QuizResult {
     required this.passMark,
     required this.review,
   });
+}
+
+/// An employee or a whole department excused from a mandatory programme
+/// (training_exemptions). Exactly one of [userUuid] / [departmentName] is set.
+class TrainingExemption {
+  final int id;
+  final String? userUuid;
+  final String? employeeName;
+  final String? departmentName;
+  const TrainingExemption({required this.id, this.userUuid, this.employeeName, this.departmentName});
+
+  factory TrainingExemption.fromJson(Map<String, dynamic> j) => TrainingExemption(
+        id: j['id'] as int,
+        userUuid: j['user_id'] as String?,
+        employeeName: (j['profiles'] as Map<String, dynamic>?)?['name'] as String?,
+        departmentName: (j['departments'] as Map<String, dynamic>?)?['name'] as String?,
+      );
+
+  String get label => userUuid != null ? (employeeName ?? 'Employee') : 'All of ${departmentName ?? 'department'}';
 }
 
 /// One past try at a programme's quiz (training_attempts).

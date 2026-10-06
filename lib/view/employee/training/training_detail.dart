@@ -134,6 +134,42 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
     }
   }
 
+  Future<void> _withdraw() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Withdraw From This Programme?'),
+        content: Text(_program.isRecommended
+            ? 'You\'ll be removed from "${_program.title}" and it won\'t be recommended to you again.'
+            : 'You\'ll be removed from "${_program.title}". You can enrol again later.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Stay Enrolled')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Withdraw')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    final ok = await trainingController.withdraw(_program);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(trainingController.errorMessage ?? 'Could not withdraw'), backgroundColor: context.colors.riskHigh),
+      );
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✓ Withdrawn from the programme')));
+    // A recommendation-only programme leaves the catalogue entirely.
+    final stillListed = trainingController.myPrograms.any((p) => p.dbId == _program.dbId);
+    if (!stillListed) {
+      Navigator.of(context).pop();
+      return;
+    }
+    _syncFromController();
+    await _loadContent();
+  }
+
   Future<void> _markRead(TrainingLesson lesson) async {
     final ok = await trainingContentController.markLessonRead(lesson);
     if (!mounted) return;
@@ -348,6 +384,19 @@ class _TrainingDetailScreenState extends State<TrainingDetailScreen> {
               PrimaryButton(label: 'Enrol Now', icon: Icons.how_to_reg_rounded, onPressed: _enroll, isLoading: _busy),
             ],
             ..._contentSection(context),
+            if (TrainingController.canWithdraw(p,
+                lessonsRead: trainingContentController.lessonsDone,
+                attempts: trainingContentController.attemptCount)) ...[
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  onPressed: _busy ? null : _withdraw,
+                  icon: Icon(Icons.logout_rounded, size: 18, color: c.riskHigh),
+                  label: Text('Withdraw From Programme', style: TextStyle(color: c.riskHigh)),
+                ),
+              ),
+            ],
           ],
           ),
         ),

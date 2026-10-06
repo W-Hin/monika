@@ -38,7 +38,29 @@ class TrainingController extends ChangeNotifier {
     'Leadership': 'leadership',
   };
 
-  TrainingProgram _mergeMy(Map<String, dynamic> program, Map<String, dynamic>? enrollment, int tenureMonths) {
+  /// Mandatory for this employee: a mandatory programme meant for their
+  /// department (or everyone) that HR hasn't exempted them from (FR9.6).
+  static bool isMandatoryFor({
+    required bool programMandatory,
+    required int? programDepartmentId,
+    required int? myDepartmentId,
+    required bool exempt,
+  }) =>
+      programMandatory && !exempt && (programDepartmentId == null || programDepartmentId == myDepartmentId);
+
+  /// FR9.5 — only an optional programme the employee hasn't started yet
+  /// (no progress, no lesson read, no quiz attempt). The server checks the
+  /// same rules again.
+  static bool canWithdraw(TrainingProgram p, {required int lessonsRead, required int attempts}) =>
+      p.dbId != null &&
+      p.enrollmentId != null &&
+      !p.isCompleted &&
+      !p.isMandatory &&
+      p.progress == 0 &&
+      lessonsRead == 0 &&
+      attempts == 0;
+
+  TrainingProgram _mergeMy(Map<String, dynamic> program, Map<String, dynamic>? enrollment, int tenureMonths, bool mandatoryForMe) {
     final minTenure = (program['min_tenure_months'] as num?)?.toInt() ?? 0;
     final deptName = (program['departments'] as Map<String, dynamic>?)?['name'] as String?;
     return TrainingProgram(
@@ -47,7 +69,7 @@ class TrainingController extends ChangeNotifier {
       title: program['title'] as String,
       category: _categoryToDisplay[program['category']] ?? program['category'] as String,
       description: program['description'] as String,
-      isMandatory: program['is_mandatory'] as bool,
+      isMandatory: mandatoryForMe,
       isRecommended: enrollment?['is_recommended'] as bool? ?? false,
       recommendationReason: enrollment?['recommendation_reason'] as String?,
       progress: enrollment != null ? (enrollment['progress'] as num).toDouble() : 0,
@@ -76,13 +98,24 @@ class TrainingController extends ChangeNotifier {
       } catch (_) {}
       final catalogRows = await TrainingService.fetchCatalog();
       final enrollmentRows = await TrainingService.fetchMyEnrollments();
-      final tenure = await TrainingService.fetchMyTenureMonths();
+      final me = await TrainingService.fetchMyContext();
+      final exempt = await TrainingService.fetchMyExemptProgramIds(me.departmentId);
       final enrollByProgram = {for (final e in enrollmentRows) e['program_id'] as int: e};
       // Recommendation-only programmes stay out of the catalogue unless the
       // employee has actually been enrolled in one.
       myPrograms = catalogRows
           .where((p) => (p['access'] ?? 'open') != 'recommended_only' || enrollByProgram.containsKey(p['id'] as int))
-          .map((p) => _mergeMy(p, enrollByProgram[p['id'] as int], tenure))
+          .map((p) => _mergeMy(
+                p,
+                enrollByProgram[p['id'] as int],
+                me.tenureMonths,
+                isMandatoryFor(
+                  programMandatory: p['is_mandatory'] as bool,
+                  programDepartmentId: p['department_id'] as int?,
+                  myDepartmentId: me.departmentId,
+                  exempt: exempt.contains(p['id'] as int),
+                ),
+              ))
           .toList();
     } catch (e) {
       errorMessage = 'Could not load training programmes: $e';
@@ -101,6 +134,56 @@ class TrainingController extends ChangeNotifier {
     } catch (e) {
       errorMessage = 'Could not enrol: $e';
       notifyListeners();
+      return false;
+    }
+  }
+
+  /// Returns true on success. On failure, sets errorMessage to the
+  /// server's reason (e.g. the programme was already started).
+  Future<bool> withdraw(TrainingProgram program) async {
+    errorMessage = null;
+    if (program.dbId == null) return false;
+    try {
+      await TrainingService.withdraw(program.dbId!);
+      await loadMy();
+      return true;
+    } catch (e) {
+      final m = RegExp(r'message: ([^,)]+)').firstMatch(e.toString());
+      errorMessage = m?.group(1) ?? 'Could not withdraw: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ── HR: exemptions from mandatory programmes (FR9.6) ──────────────────
+  Future<List<TrainingExemption>> loadExemptions(TrainingProgram program) async {
+    if (program.dbId == null) return [];
+    final rows = await TrainingService.fetchExemptions(program.dbId!);
+    return rows.map(TrainingExemption.fromJson).toList();
+  }
+
+  /// Exactly one of [userUuid] / [departmentName]. Returns true on success.
+  Future<bool> addExemption(TrainingProgram program, {String? userUuid, String? departmentName}) async {
+    errorMessage = null;
+    try {
+      final deptId = departmentName == null ? null : await TrainingService.departmentIdForName(departmentName);
+      await TrainingService.addExemption(programId: program.dbId!, userUuid: userUuid, departmentId: deptId);
+      return true;
+    } catch (e) {
+      errorMessage = e.toString().contains('duplicate')
+          ? 'Already exempted.'
+          : 'Could not add the exemption: $e';
+      return false;
+    }
+  }
+
+  Future<bool> removeExemption(TrainingExemption exemption) async {
+    errorMessage = null;
+    try {
+      await TrainingService.removeExemption(exemption.id);
+      return true;
+    } catch (e) {
+      errorMessage = 'Could not remove the exemption: $e';
       return false;
     }
   }

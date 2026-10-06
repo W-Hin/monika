@@ -30,21 +30,33 @@ class TrainingService {
   }) async {
     final candidates = List<Map<String, dynamic>>.from(await _client
         .from('training_programs')
-        .select('id, access, min_tenure_months, trigger_risk_level, trigger_attendance_below')
+        .select('id, access, min_tenure_months, trigger_risk_level, trigger_attendance_below, department_id')
         .eq('category', category)
         .order('id'));
     final enrolledIds = List<Map<String, dynamic>>.from(
       await _client.from('training_enrollments').select('program_id').eq('user_id', userUuid),
     ).map((r) => r['program_id'] as int).toSet();
-    final profile = await _client.from('profiles').select('hire_date').eq('id', userUuid).maybeSingle();
+    // Recommendations the employee withdrew from (FR9.5) aren't repeated.
+    enrolledIds.addAll(List<Map<String, dynamic>>.from(
+      await _client.from('training_dismissals').select('program_id').eq('user_id', userUuid),
+    ).map((r) => r['program_id'] as int));
+    final profile = await _client.from('profiles').select('hire_date, department_id').eq('id', userUuid).maybeSingle();
     final tenure = _tenureMonths(DateTime.tryParse(profile?['hire_date'] as String? ?? ''));
 
-    // Programmes they haven't started and are tenure-eligible for. Prefer
+    final departmentId = profile?['department_id'] as int?;
+
+    // Programmes they haven't started, are tenure-eligible for, and are
+    // meant for their department (or everyone). Prefer
     // the recommendation-only ones written for a PE shortfall (no
     // behaviour trigger of their own — those fire from attendance/risk, not
     // from a KPI score), then fall back to an open programme in the same
     // category.
-    final eligible = candidates.where((p) => !enrolledIds.contains(p['id'] as int) && (p['min_tenure_months'] as int) <= tenure).toList();
+    final eligible = candidates
+        .where((p) =>
+            !enrolledIds.contains(p['id'] as int) &&
+            (p['min_tenure_months'] as int) <= tenure &&
+            (p['department_id'] == null || p['department_id'] == departmentId))
+        .toList();
     final preferred = eligible
         .where((p) => p['access'] == 'recommended_only' && p['trigger_risk_level'] == null && p['trigger_attendance_below'] == null)
         .toList();
@@ -73,12 +85,61 @@ class TrainingService {
     return months < 0 ? 0 : months;
   }
 
-  /// Months of service for the signed-in employee (0 if unknown).
-  static Future<int> fetchMyTenureMonths() async {
+  /// Months of service and department of the signed-in employee.
+  static Future<({int tenureMonths, int? departmentId})> fetchMyContext() async {
     final uid = _client.auth.currentUser?.id;
-    if (uid == null) return 0;
-    final row = await _client.from('profiles').select('hire_date').eq('id', uid).maybeSingle();
-    return _tenureMonths(DateTime.tryParse(row?['hire_date'] as String? ?? ''));
+    if (uid == null) return (tenureMonths: 0, departmentId: null);
+    final row = await _client.from('profiles').select('hire_date, department_id').eq('id', uid).maybeSingle();
+    return (
+      tenureMonths: _tenureMonths(DateTime.tryParse(row?['hire_date'] as String? ?? '')),
+      departmentId: row?['department_id'] as int?,
+    );
+  }
+
+  /// Programmes the signed-in employee is exempt from — personally or
+  /// through their department. Filtered here as well as by RLS, because an
+  /// HR admin's RLS view includes everyone's exemptions.
+  static Future<Set<int>> fetchMyExemptProgramIds(int? departmentId) async {
+    final uid = _client.auth.currentUser?.id;
+    if (uid == null) return {};
+    final rows = List<Map<String, dynamic>>.from(
+      await _client.from('training_exemptions').select('program_id, user_id, department_id'),
+    );
+    return rows
+        .where((r) => r['user_id'] == uid || (departmentId != null && r['department_id'] == departmentId))
+        .map((r) => r['program_id'] as int)
+        .toSet();
+  }
+
+  /// FR9.5 — leave an optional programme before starting it. The server
+  /// refuses mandatory or already-started programmes, and remembers a
+  /// withdrawn recommendation so it isn't recommended again.
+  static Future<void> withdraw(int programId) async {
+    await _client.rpc('withdraw_from_training', params: {'p_program_id': programId});
+  }
+
+  /// HR — who is excused from a mandatory programme (FR9.6). The user_id
+  /// relationship is named because created_by also points at profiles.
+  static Future<List<Map<String, dynamic>>> fetchExemptions(int programId) async {
+    final rows = await _client
+        .from('training_exemptions')
+        .select('id, user_id, department_id, profiles!training_exemptions_user_id_fkey(name), departments(name)')
+        .eq('program_id', programId)
+        .order('created_at');
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  static Future<void> addExemption({required int programId, String? userUuid, int? departmentId}) async {
+    await _client.from('training_exemptions').insert({
+      'program_id': programId,
+      'user_id': userUuid,
+      'department_id': departmentId,
+      'created_by': _client.auth.currentUser?.id,
+    });
+  }
+
+  static Future<void> removeExemption(int id) async {
+    await _client.from('training_exemptions').delete().eq('id', id);
   }
 
   /// Enrols the signed-in employee in any programme whose attendance/risk

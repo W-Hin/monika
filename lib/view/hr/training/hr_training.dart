@@ -4,6 +4,7 @@ import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../../model/models.dart';
 import '../../../controller/training_controller.dart';
+import '../../../controller/employee_controller.dart';
 import 'training_content_editor.dart';
 
 class HrTrainingScreen extends StatefulWidget {
@@ -52,6 +53,14 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _openExemptions(TrainingProgram program) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _ExemptionsSheet(program: program, departments: _departments),
     );
   }
 
@@ -234,6 +243,7 @@ class _HrTrainingScreenState extends State<HrTrainingScreen> {
                                             onEdit: () => _editProgram(t),
                                             onAssignDept: () => _assignDepartment(t),
                                             onContent: () => _openContent(t),
+                                            onExemptions: () => _openExemptions(t),
                                           ),
                                         ),
                                       )
@@ -278,7 +288,14 @@ class _HrTrainingCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onAssignDept;
   final VoidCallback onContent;
-  const _HrTrainingCard({required this.program, required this.onEdit, required this.onAssignDept, required this.onContent});
+  final VoidCallback onExemptions;
+  const _HrTrainingCard({
+    required this.program,
+    required this.onEdit,
+    required this.onAssignDept,
+    required this.onContent,
+    required this.onExemptions,
+  });
 
   Color _catColor(AppColorsExtension c) {
     switch (program.category) {
@@ -458,7 +475,201 @@ class _HrTrainingCard extends StatelessWidget {
               ),
             ],
           ),
+          if (program.isMandatory) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onExemptions,
+                icon: const Icon(Icons.person_remove_outlined, size: 16),
+                label: const Text('Exemptions', style: TextStyle(fontSize: 12.5)),
+                style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 10)),
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+/// FR9.6 — HR excuses an employee or a whole department from a mandatory
+/// programme. Exempted employees no longer see it as mandatory and may
+/// withdraw from it if they haven't started.
+class _ExemptionsSheet extends StatefulWidget {
+  final TrainingProgram program;
+  final List<String> departments;
+  const _ExemptionsSheet({required this.program, required this.departments});
+
+  @override
+  State<_ExemptionsSheet> createState() => _ExemptionsSheetState();
+}
+
+class _ExemptionsSheetState extends State<_ExemptionsSheet> {
+  List<TrainingExemption> _exemptions = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    if (employeeController.employees.isEmpty) employeeController.loadEmployees();
+  }
+
+  Future<void> _load() async {
+    try {
+      final list = await trainingController.loadExemptions(widget.program);
+      if (!mounted) return;
+      setState(() {
+        _exemptions = list;
+        _loading = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Could not load exemptions: $e';
+      });
+    }
+  }
+
+  Future<void> _add({String? userUuid, String? departmentName}) async {
+    final ok = await trainingController.addExemption(widget.program, userUuid: userUuid, departmentName: departmentName);
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trainingController.errorMessage ?? 'Could not add the exemption')));
+      return;
+    }
+    await _load();
+  }
+
+  Future<void> _remove(TrainingExemption x) async {
+    final ok = await trainingController.removeExemption(x);
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trainingController.errorMessage ?? 'Could not remove the exemption')));
+      return;
+    }
+    await _load();
+  }
+
+  Future<void> _pickEmployee() async {
+    final dept = widget.program.department;
+    final taken = _exemptions.map((x) => x.userUuid).whereType<String>().toSet();
+    final candidates = employeeController.employees
+        .where((e) => e.isActive && e.uuid.isNotEmpty && !taken.contains(e.uuid) && (dept == null || e.department == dept))
+        .toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+    final picked = await showModalBottomSheet<TeamMemberSummary>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(sheetContext).size.height * 0.7),
+          child: candidates.isEmpty
+              ? const Padding(padding: EdgeInsets.all(24), child: Text('No other employees this programme applies to.'))
+              : ListView(
+                  shrinkWrap: true,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text('Exempt an Employee', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                    ),
+                    ...candidates.map((e) => ListTile(
+                          title: Text(e.name),
+                          subtitle: Text('${e.jobTitle} · ${e.department}'),
+                          onTap: () => Navigator.of(sheetContext).pop(e),
+                        )),
+                  ],
+                ),
+        ),
+      ),
+    );
+    if (picked != null) await _add(userUuid: picked.uuid);
+  }
+
+  Future<void> _pickDepartment() async {
+    final taken = _exemptions.map((x) => x.departmentName).whereType<String>().toSet();
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Exempt a Department', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+            ),
+            ...widget.departments.where((d) => !taken.contains(d)).map((d) => ListTile(
+                  title: Text(d),
+                  onTap: () => Navigator.of(sheetContext).pop(d),
+                )),
+          ],
+        ),
+      ),
+    );
+    if (picked != null) await _add(departmentName: picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Exemptions', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: c.textPrimary)),
+            const SizedBox(height: 4),
+            Text(
+              '"${widget.program.title}" stays mandatory for everyone else. Exempted employees can still take it voluntarily.',
+              style: TextStyle(fontSize: 12.5, color: c.textSecondary, height: 1.4),
+            ),
+            const SizedBox(height: 14),
+            if (_loading)
+              const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 2)))
+            else if (_error != null)
+              Text(_error!, style: TextStyle(fontSize: 12.5, color: c.riskHigh))
+            else if (_exemptions.isEmpty)
+              Text('Nobody is exempted yet.', style: TextStyle(fontSize: 12.5, color: c.textMuted))
+            else
+              ..._exemptions.map((x) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    leading: Icon(x.userUuid != null ? Icons.person_outline_rounded : Icons.apartment_rounded, size: 20, color: c.textSecondary),
+                    title: Text(x.label, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
+                    trailing: IconButton(
+                      tooltip: 'Remove exemption',
+                      icon: Icon(Icons.close_rounded, size: 18, color: c.riskHigh),
+                      onPressed: () => _remove(x),
+                    ),
+                  )),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _loading ? null : _pickEmployee,
+                    icon: const Icon(Icons.person_add_alt_outlined, size: 16),
+                    label: const Text('Employee', style: TextStyle(fontSize: 12.5)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _loading ? null : _pickDepartment,
+                    icon: const Icon(Icons.apartment_rounded, size: 16),
+                    label: const Text('Department', style: TextStyle(fontSize: 12.5)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/common_widgets.dart';
-import '../../../core/data/dummy_data.dart';
 import '../../../model/models.dart';
 import '../../../controller/training_controller.dart';
 import 'certificates.dart';
@@ -27,7 +26,6 @@ class _EmployeeTrainingScreenState extends State<EmployeeTrainingScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final myDepartment = DummyData.employeeUser.department;
 
     return Scaffold(
       appBar: AppBar(
@@ -51,13 +49,10 @@ class _EmployeeTrainingScreenState extends State<EmployeeTrainingScreen> {
           builder: (context, _) {
             final all = trainingController.myPrograms;
             final recommended = all.where((t) => t.isRecommended).toList();
-            final mandatory = all
-                .where(
-                  (t) =>
-                      t.isMandatory &&
-                      (t.department == null || t.department == myDepartment),
-                )
-                .toList();
+            // isMandatory is already resolved per employee: their own
+            // department's (or everyone's) mandatory programmes, minus
+            // any HR has exempted them from.
+            final mandatory = all.where((t) => t.isMandatory).toList();
             final completed = all.where((t) => t.isCompleted).toList();
 
             List<TrainingProgram> list;
