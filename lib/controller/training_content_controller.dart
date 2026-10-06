@@ -9,8 +9,7 @@ class TrainingContentController extends ChangeNotifier {
   List<TrainingLesson> lessons = [];
   int quizQuestionCount = 0;
   int passMark = 70;
-  double? bestScore;
-  int attemptCount = 0;
+  List<QuizAttempt> attempts = []; // newest first
   bool loading = false;
   String? errorMessage;
 
@@ -21,6 +20,8 @@ class TrainingContentController extends ChangeNotifier {
   bool get hasQuiz => quizQuestionCount > 0;
   int get lessonsDone => lessons.where((l) => l.completed).length;
   bool get allLessonsDone => lessons.isEmpty || lessonsDone == lessons.length;
+  int get attemptCount => attempts.length;
+  double? get bestScore => attempts.isEmpty ? null : attempts.map((a) => a.score).reduce((a, b) => a > b ? a : b);
 
   List<TrainingLesson> _mapLessons(
     List<Map<String, dynamic>> rows,
@@ -59,20 +60,9 @@ class TrainingContentController extends ChangeNotifier {
       quizQuestionCount = count;
       passMark = mark;
 
-      if (enrollmentId != null) {
-        final attempts = await TrainingContentService.fetchAttempts(
-          enrollmentId,
-        );
-        attemptCount = attempts.length;
-        bestScore = attempts.isEmpty
-            ? null
-            : attempts
-                  .map((a) => (a['score'] as num).toDouble())
-                  .reduce((a, b) => a > b ? a : b);
-      } else {
-        attemptCount = 0;
-        bestScore = null;
-      }
+      attempts = enrollmentId == null
+          ? []
+          : (await TrainingContentService.fetchAttempts(enrollmentId)).map(QuizAttempt.fromJson).toList();
     } catch (e) {
       errorMessage = 'Could not load this programme\'s content: $e';
     }
