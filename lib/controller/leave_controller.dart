@@ -126,6 +126,22 @@ class LeaveController extends ChangeNotifier {
     }
   }
 
+  /// Returns true on success. On failure, sets myErrorMessage.
+  Future<bool> cancel(LeaveApplication app) async {
+    myErrorMessage = null;
+    if (app.dbId == null) return false;
+    try {
+      await LeaveService.cancelApplication(app.dbId!);
+      await loadMy();
+      unawaited(analyticsController.refreshPendingLeaveCount());
+      return true;
+    } catch (e) {
+      myErrorMessage = 'Could not cancel the application: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> loadAllForHr() async {
     loadingApprovals = true;
     approvalsErrorMessage = null;

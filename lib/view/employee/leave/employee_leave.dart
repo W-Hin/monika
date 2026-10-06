@@ -21,6 +21,26 @@ class _EmployeeLeaveScreenState extends State<EmployeeLeaveScreen> {
     leaveController.loadMy();
   }
 
+  Future<void> _confirmCancel(LeaveApplication app) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancel This Application?'),
+        content: Text('Your ${app.leaveType.toLowerCase()} request for ${app.startDate} – ${app.endDate} will be withdrawn. You can apply again later.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Keep It')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Cancel Application')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final ok = await leaveController.cancel(app);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ok ? '✓ Application cancelled' : leaveController.myErrorMessage ?? 'Could not cancel the application')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -92,7 +112,7 @@ class _EmployeeLeaveScreenState extends State<EmployeeLeaveScreen> {
                 else
                   ...apps.map((a) => Padding(
                         padding: const EdgeInsets.only(bottom: 10),
-                        child: _LeaveTile(app: a),
+                        child: LeaveApplicationTile(app: a, onCancel: () => _confirmCancel(a)),
                       )),
               ],
               ),
@@ -134,9 +154,11 @@ class _BalanceCard extends StatelessWidget {
   }
 }
 
-class _LeaveTile extends StatelessWidget {
+/// One of the employee's own applications. A Pending one can be cancelled.
+class LeaveApplicationTile extends StatelessWidget {
   final LeaveApplication app;
-  const _LeaveTile({required this.app});
+  final VoidCallback onCancel;
+  const LeaveApplicationTile({super.key, required this.app, required this.onCancel});
 
   @override
   Widget build(BuildContext context) {
@@ -163,6 +185,15 @@ class _LeaveTile extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(app.reason, style: TextStyle(fontSize: 12.5, color: c.textMuted, fontStyle: FontStyle.italic)),
+          if (app.status == LeaveStatus.pending)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onCancel,
+                icon: Icon(Icons.close_rounded, size: 16, color: c.riskHigh),
+                label: Text('Cancel Application', style: TextStyle(fontSize: 12.5, color: c.riskHigh)),
+              ),
+            ),
         ],
       ),
     );

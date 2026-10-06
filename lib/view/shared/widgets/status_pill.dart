@@ -100,6 +100,8 @@ T _leavePill<T>(LeaveStatus status, T Function(String, Color, Color, IconData?) 
       return make('Pending', colors.statusPending, colors.riskMediumBg, Icons.schedule);
     case LeaveStatus.rejected:
       return make('Rejected', colors.statusRejected, colors.riskHighBg, Icons.cancel_outlined);
+    case LeaveStatus.cancelled:
+      return make('Cancelled', colors.textMuted, colors.surfaceMuted, Icons.block_rounded);
   }
 }
 

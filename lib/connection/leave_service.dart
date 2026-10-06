@@ -59,6 +59,16 @@ class LeaveService {
     });
   }
 
+  /// The applicant withdraws their own application while it's still
+  /// Pending (FR4.6). RLS only allows Pending -> Cancelled on your own row.
+  static Future<void> cancelApplication(int applicationId) async {
+    await _client
+        .from('leave_applications')
+        .update({'status': 'cancelled'})
+        .eq('id', applicationId)
+        .eq('status', 'pending');
+  }
+
   /// HR — every application, joined with the applicant's name. Explicitly
   /// disambiguated to the user_id FK — leave_applications also has a
   /// decided_by FK to profiles, so a plain 'profiles(name)' embed is
