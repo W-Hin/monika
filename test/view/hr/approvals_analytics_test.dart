@@ -23,4 +23,19 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Anomaly & Violation Feed'), findsOneWidget);
   });
+
+  testWidgets('a flagged clock-in can be reverted, with a confirmation step first', (tester) async {
+    await tester.pumpWidget(MaterialApp(theme: AppTheme.light, home: const AnomalyDetailScreen()));
+    await tester.pumpAndSettle();
+
+    final revert = find.text('Revert (Dispute Investigation Found Invalid)');
+    await tester.dragUntilVisible(revert, find.byType(ListView), const Offset(0, -200));
+    await tester.tap(revert);
+    await tester.pumpAndSettle();
+    expect(find.text('Revert This Violation?'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Revert This Violation?'), findsNothing);
+  });
 }
