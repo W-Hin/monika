@@ -944,6 +944,86 @@ as $$
           + extract(month from age(current_date, p_hire_date)))::int;
 $$;
 
+-- Training certificates (migration 0041): issued by the database when an
+-- enrolment is completed; name/title are snapshots so a certificate
+-- outlives later renames or deletion of the programme.
+create table public.training_certificates (
+    id              bigint generated always as identity primary key,
+    certificate_no  text not null unique,           -- e.g. MON-2026-00042
+    enrollment_id   bigint unique references public.training_enrollments(id) on delete set null,
+    user_id         uuid not null references public.profiles(id) on delete cascade,
+    program_id      bigint references public.training_programs(id) on delete set null,
+    employee_name   text not null,
+    program_title   text not null,
+    category        text not null,
+    score           numeric(5, 2),                   -- null when the programme has no quiz and HR hasn't scored it
+    issued_at       timestamptz not null default now()
+);
+
+alter table public.training_certificates enable row level security;
+
+create policy "training_certificates_select_own_or_hr" on public.training_certificates
+    for select using (user_id = auth.uid() or public.is_hr_admin());
+-- No insert/update/delete policies: only the trigger below writes here.
+
+-- Number = MON-<year issued, Malaysia time>-<id padded to 5 digits>.
+create or replace function public.set_certificate_no()
+returns trigger
+language plpgsql
+as $$
+begin
+    new.certificate_no := 'MON-' || to_char(new.issued_at at time zone 'Asia/Kuala_Lumpur', 'YYYY')
+                       || '-' || lpad(new.id::text, 5, '0');
+    return new;
+end;
+$$;
+
+create trigger trg_set_certificate_no
+    before insert on public.training_certificates
+    for each row
+    execute function public.set_certificate_no();
+
+create or replace function public.issue_training_certificate()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_no text;
+    v_title text;
+begin
+    if new.is_completed and (tg_op = 'INSERT' or not old.is_completed) then
+        insert into public.training_certificates
+            (enrollment_id, user_id, program_id, employee_name, program_title, category, score, issued_at, certificate_no)
+        select new.id, new.user_id, new.program_id, pr.name, p.title, p.category, new.performance_score,
+               coalesce(new.completed_at, now()), ''
+        from public.training_programs p
+        join public.profiles pr on pr.id = new.user_id
+        where p.id = new.program_id
+        on conflict (enrollment_id) do nothing
+        returning certificate_no, program_title into v_no, v_title;
+
+        if v_no is not null then
+            insert into public.notifications (user_id, title, body, type)
+            values (new.user_id, 'Certificate Earned',
+                    format('You completed "%s" and earned certificate %s. View it under Training → My Certificates.', v_title, v_no),
+                    'training');
+        end if;
+    elsif tg_op = 'UPDATE' and new.performance_score is distinct from old.performance_score then
+        update public.training_certificates
+        set score = new.performance_score
+        where enrollment_id = new.id;
+    end if;
+    return new;
+end;
+$$;
+
+create trigger trg_issue_training_certificate
+    after insert or update of is_completed, performance_score on public.training_enrollments
+    for each row
+    execute function public.issue_training_certificate();
+
 -- ML training recommender (FR9.2). The model is trained offline (ml/train.py)
 -- and uploaded into training_ml_models by ml/output/model_upload.sql; it is
 -- scored here with plain arithmetic, so there is no model server.
