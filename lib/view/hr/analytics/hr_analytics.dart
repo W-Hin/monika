@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../../controller/analytics_controller.dart';
+import '../../../utility/share_origin.dart';
 
 class HrAnalyticsScreen extends StatefulWidget {
   // See the identical comment on HrApprovalsScreen — explicit flag instead
@@ -34,15 +35,18 @@ class _HrAnalyticsScreenState extends State<HrAnalyticsScreen> {
     await Share.shareXFiles(
       [XFile.fromData(Uint8List.fromList(utf8.encode(csv)), name: fileName, mimeType: 'text/csv')],
       subject: title,
+      sharePositionOrigin: shareOrigin(context),
     );
   }
 
   Future<void> _downloadPdf(String title) async {
+    final origin = shareOrigin(context);
     final bytes = await analyticsController.pdfBytesFor(title);
     final fileName = '${title.replaceAll(' ', '_')}.pdf';
     await Share.shareXFiles(
       [XFile.fromData(bytes, name: fileName, mimeType: 'application/pdf')],
       subject: title,
+      sharePositionOrigin: origin,
     );
   }
 

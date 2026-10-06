@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io' show Platform;
+import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -79,6 +81,30 @@ class AttendanceController extends ChangeNotifier {
   // `history` because that's capped to the most recent 30 rows for the
   // Recent Records list, which would understate the window for anyone
   // with more than 30 records in the last 90 days.
+  /// The employee's own recent unexplained absences, which they can appeal.
+  List<AbsenceFlag> absenceFlags = [];
+
+  Future<void> loadAbsenceFlags() async {
+    try {
+      final rows = await AttendanceService.fetchMyAbsenceFlags();
+      absenceFlags = rows.map(AbsenceFlag.fromJson).toList();
+    } catch (_) {
+      // Best-effort, like the other attendance loads.
+    }
+    notifyListeners();
+  }
+
+  /// Returns null on success, or the reason the server refused.
+  Future<String?> appealAbsence(AbsenceFlag flag, String reason) async {
+    try {
+      await AttendanceService.appealAbsence(anomalyId: flag.id, reason: reason);
+      await loadAbsenceFlags();
+      return null;
+    } catch (e) {
+      return RegExp(r'message: ([^,)]+)').firstMatch(e.toString())?.group(1) ?? 'Could not send the appeal';
+    }
+  }
+
   List<AttendanceRecord> riskWindow = [];
   int get riskViolations => riskWindow.where((r) => r.status == AttendanceStatus.flagged).length;
   int get riskLateDays => riskWindow.where((r) => r.status == AttendanceStatus.late).length;
@@ -243,6 +269,13 @@ class AttendanceController extends ChangeNotifier {
   Future<WifiCheckResult> runWifiCheck() async {
     await loadPolicy();
     try {
+      // Android and iOS only reveal the WiFi name to apps that have location
+      // permission. The GPS check asks for it, so it runs first; this one
+      // only checks, to avoid two permission prompts at once.
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        return const WifiCheckResult(passed: false, detail: 'Allow location access so MONIKA can read the WiFi network name');
+      }
       final info = NetworkInfo();
       var ssid = await info.getWifiName();
       ssid = ssid?.replaceAll('"', '');
@@ -261,6 +294,36 @@ class AttendanceController extends ChangeNotifier {
     }
   }
 
+  static const _installIdKey = 'monika_device_install_id';
+  static const _secureStorage = FlutterSecureStorage();
+
+  /// A random ID created the first time MONIKA runs on this phone and kept
+  /// in secure storage (the Keychain on iOS, so it survives reinstalling the
+  /// app; encrypted storage on Android). It identifies this phone for device
+  /// binding. Previously Android used Build.ID, which is the firmware build
+  /// number and is identical on every phone of the same model and update,
+  /// and iOS used identifierForVendor, which changes on reinstall.
+  Future<String> _installId() async {
+    var id = await _secureStorage.read(key: _installIdKey);
+    if (id == null || id.isEmpty) {
+      final rnd = Random.secure();
+      id = List.generate(16, (_) => rnd.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+      await _secureStorage.write(key: _installIdKey, value: id);
+    }
+    return id;
+  }
+
+  /// The token older app versions stored for this phone, so an existing
+  /// binding can be moved to the install ID instead of flagging a mismatch.
+  Future<String?> _legacyDeviceToken() async {
+    try {
+      final deviceInfo = DeviceInfoPlugin();
+      if (Platform.isAndroid) return (await deviceInfo.androidInfo).id;
+      if (Platform.isIOS) return (await deviceInfo.iosInfo).identifierForVendor;
+    } catch (_) {}
+    return null;
+  }
+
   Future<(String token, String name)> _currentDeviceIdentity() async {
     final deviceInfo = DeviceInfoPlugin();
     if (kIsWeb) {
@@ -268,10 +331,10 @@ class AttendanceController extends ChangeNotifier {
       return (info.vendor ?? info.userAgent ?? 'web-device', '${info.browserName.name} browser');
     } else if (Platform.isAndroid) {
       final info = await deviceInfo.androidInfo;
-      return (info.id, '${info.manufacturer} ${info.model}');
+      return (await _installId(), '${info.manufacturer} ${info.model}');
     } else if (Platform.isIOS) {
       final info = await deviceInfo.iosInfo;
-      return (info.identifierForVendor ?? 'ios-device', info.utsname.machine);
+      return (await _installId(), info.name.isNotEmpty ? info.name : info.utsname.machine);
     } else if (Platform.isWindows) {
       final info = await deviceInfo.windowsInfo;
       return (info.deviceId, info.computerName);
@@ -302,6 +365,13 @@ class AttendanceController extends ChangeNotifier {
         unawaited(authController.refreshProfile());
         return DeviceCheckResult(passed: true, deviceToken: token, deviceName: name, detail: 'Registered as your device ($name)');
       }
+      // One-time move from the old token format: this phone was registered
+      // by an older version of the app, so re-bind it under its install ID.
+      if (storedToken != token && storedToken == await _legacyDeviceToken()) {
+        await AttendanceService.bindDevice(deviceToken: token, deviceName: name);
+        unawaited(authController.refreshProfile());
+        return DeviceCheckResult(passed: true, deviceToken: token, deviceName: name, detail: 'Matches your registered device ($name)');
+      }
       final passed = storedToken == token;
       return DeviceCheckResult(
         passed: passed,
@@ -329,7 +399,8 @@ class AttendanceController extends ChangeNotifier {
       if (storedToken == null) {
         return DeviceCheckResult(passed: false, deviceToken: token, deviceName: name, detail: 'No device registered yet — this device will be registered on your next successful clock-in');
       }
-      final passed = storedToken == token;
+      // Registered by an older app version; the next clock-in re-binds it.
+      final passed = storedToken == token || storedToken == await _legacyDeviceToken();
       return DeviceCheckResult(
         passed: passed,
         deviceToken: token,

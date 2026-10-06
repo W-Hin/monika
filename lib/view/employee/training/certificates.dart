@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors_extension.dart';
 import '../../../controller/certificate_controller.dart';
 import '../../../model/models.dart';
 import '../../../utility/certificate_pdf_builder.dart';
+import '../../../utility/share_origin.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
 
@@ -109,12 +110,14 @@ class _CertificateScreenState extends State<CertificateScreen> {
 
   Future<void> _download() async {
     setState(() => _exporting = true);
+    final origin = shareOrigin(context);
     try {
       final cert = widget.certificate;
       final bytes = await CertificatePdfBuilder.build(cert);
       await Share.shareXFiles(
         [XFile.fromData(bytes, name: 'Certificate_${cert.certificateNo}.pdf', mimeType: 'application/pdf')],
         subject: 'Certificate ${cert.certificateNo} — ${cert.programTitle}',
+        sharePositionOrigin: origin,
       );
     } catch (e) {
       if (mounted) {

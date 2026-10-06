@@ -1,0 +1,29 @@
+# Compiles the iOS app on a GitHub-hosted Mac, to check it builds without
+# needing a Mac locally. Run it by hand from the Actions tab ("Run
+# workflow"); it doesn't run on every push because macOS build minutes are
+# limited. The build is unsigned, so it proves the code compiles but can't
+# be installed — installing on an iPhone needs Xcode signing (see README).
+name: iOS build check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # The real config is not in Git; the example has the same shape and
+      # is enough to compile.
+      - name: Use example Supabase config
+        run: cp lib/core/config/supabase_config.example.dart lib/core/config/supabase_config.dart
+
+      - run: flutter pub get
+      - run: flutter build ios --release --no-codesign

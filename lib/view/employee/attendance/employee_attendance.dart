@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/common_widgets.dart';
 import '../../shared/widgets/status_pill.dart';
 import '../../../core/data/dummy_data.dart';
+import '../../../model/models.dart';
 import '../../../controller/attendance_controller.dart';
 import '../../../controller/auth_controller.dart';
 import '../../../controller/leave_controller.dart';
@@ -28,8 +30,57 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
     attendanceController.loadHistory();
     attendanceController.loadRiskWindow();
     attendanceController.loadYearWindow();
+    attendanceController.loadAbsenceFlags();
     leaveController.loadMy();
     _runLiveChecks();
+  }
+
+  Future<void> _appeal(AbsenceFlag flag) async {
+    final reason = TextEditingController();
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Appeal This Absence'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Tell HR why you had no clock-in on ${DateFormat('EEE, d MMM').format(flag.date)}, e.g. you were working off-site or forgot to clock in. HR will excuse it or reply.',
+                style: const TextStyle(fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reason,
+                maxLines: 3,
+                maxLength: 300,
+                onChanged: (_) => setDialogState(() {}),
+                decoration: const InputDecoration(hintText: 'Reason (at least 10 characters)'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+            TextButton(
+              onPressed: reason.text.trim().length >= 10 ? () => Navigator.of(dialogContext).pop(true) : null,
+              child: const Text('Send Appeal'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final text = reason.text.trim();
+    reason.dispose();
+    if (submitted != true) return;
+    final error = await attendanceController.appealAbsence(flag, text);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(error ?? '✓ Appeal sent to HR'),
+        backgroundColor: error == null ? null : context.colors.riskHigh,
+      ),
+    );
   }
 
   /// Re-runs the actual GPS/WiFi/device checks so this screen reflects
@@ -38,16 +89,18 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
   /// HR approved a device-change request and cleared it.
   Future<void> _runLiveChecks() async {
     setState(() => _checking = true);
+    // GPS first: it asks for location permission, which the WiFi check
+    // needs before the phone will reveal the network name.
+    final gps = await attendanceController.runGpsCheck();
     final results = await Future.wait([
-      attendanceController.runGpsCheck(),
       attendanceController.runWifiCheck(),
       attendanceController.checkDeviceStatus(),
     ]);
     if (!mounted) return;
     setState(() {
-      _gpsResult = results[0] as GpsCheckResult;
-      _wifiResult = results[1] as WifiCheckResult;
-      _deviceResult = results[2] as DeviceCheckResult;
+      _gpsResult = gps;
+      _wifiResult = results[0] as WifiCheckResult;
+      _deviceResult = results[1] as DeviceCheckResult;
       _checking = false;
     });
   }
@@ -81,6 +134,7 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
             attendanceController.loadHistory(),
             attendanceController.loadRiskWindow(),
             attendanceController.loadYearWindow(),
+            attendanceController.loadAbsenceFlags(),
             _runLiveChecks(),
           ]),
           child: ListView(
@@ -145,6 +199,14 @@ class _EmployeeAttendanceScreenState extends State<EmployeeAttendanceScreen> {
                 ),
               ],
             ),
+            if (attendanceController.absenceFlags.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              const SectionHeader(title: 'Unexplained Absences'),
+              ...attendanceController.absenceFlags.map((f) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: AbsenceFlagCard(flag: f, onAppeal: () => _appeal(f)),
+                  )),
+            ],
             const SizedBox(height: 24),
             const SectionHeader(title: 'IoT Verification Layers'),
             _VerificationInfoCard(
@@ -299,6 +361,55 @@ class _VerificationInfoCard extends StatelessWidget {
             ),
           ),
           trailing,
+        ],
+      ),
+    );
+  }
+}
+/// One unexplained absence with where its appeal stands.
+class AbsenceFlagCard extends StatelessWidget {
+  final AbsenceFlag flag;
+  final VoidCallback onAppeal;
+  const AbsenceFlagCard({super.key, required this.flag, required this.onAppeal});
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final fmt = DateFormat('d MMM');
+    final (String label, Color color) = flag.excused
+        ? ('Excused by HR', c.primary)
+        : switch (flag.appealStatus) {
+            'pending' => ('Appeal sent — waiting for HR', c.statusPending),
+            'rejected' => ('Appeal not accepted', c.riskHigh),
+            _ => flag.canAppeal ? ('You can appeal until ${fmt.format(flag.appealDeadline)}', c.amber) : ('Appeal period has ended', c.textMuted),
+          };
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.event_busy_rounded, size: 18, color: flag.excused ? c.primary : c.riskHigh),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(DateFormat('EEE, d MMM yyyy').format(flag.date), style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(label, style: TextStyle(fontSize: 11.5, color: color, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              if (flag.canAppeal)
+                TextButton(onPressed: onAppeal, child: const Text('Appeal')),
+            ],
+          ),
+          if (flag.appealResponse != null) ...[
+            const SizedBox(height: 6),
+            Text('HR: ${flag.appealResponse}', style: TextStyle(fontSize: 12, color: c.textSecondary, fontStyle: FontStyle.italic)),
+          ],
         ],
       ),
     );
