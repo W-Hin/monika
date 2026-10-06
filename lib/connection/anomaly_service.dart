@@ -37,16 +37,15 @@ class AnomalyService {
     return List<Map<String, dynamic>>.from(rows);
   }
 
-  /// Reverts the flagged attendance_records row this anomaly came from
-  /// (see AttendanceService.revertFlag) and marks this anomaly reviewed in
-  /// one action — a dispute investigation found the flag invalid, so both
-  /// halves of "this violation no longer stands" resolve together.
-  static Future<void> revertAndReview({required int anomalyId, required int attendanceRecordId}) async {
-    await _client.from('attendance_records').update({
-      'status': 'on_time',
-      'flag_reason': null,
-    }).eq('id', attendanceRecordId);
-    await markReviewed(anomalyId);
+  /// A dispute investigation found the flag invalid (FR3.6). Done in one
+  /// server-side step (revert_violation, migration 0043): the attendance
+  /// record goes back to On Time, the risk points the violation cost are
+  /// given back if it still counts towards the current period, the anomaly
+  /// is marked reviewed and reverted, and the employee is notified.
+  /// Returns how many points were given back.
+  static Future<int> revert(int anomalyId) async {
+    final restored = await _client.rpc('revert_violation', params: {'p_anomaly_id': anomalyId});
+    return (restored as num?)?.toInt() ?? 0;
   }
 
   static Future<void> markReviewed(int id) async {

@@ -41,6 +41,7 @@ class AnomalyController extends ChangeNotifier {
       severity: severity,
       reviewed: row['reviewed'] as bool? ?? false,
       attendanceRecordId: row['attendance_record_id'] as int?,
+      reverted: row['reverted_at'] != null,
     );
   }
 
@@ -70,17 +71,17 @@ class AnomalyController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// HR reverting a flagged attendance record after a dispute investigation
-  /// finds it invalid (FR3.6). Only callable when [AnomalyEvent
-  /// .attendanceRecordId] is non-null — see that field's doc comment for why
-  /// some anomaly types have nothing to revert.
-  Future<void> revertViolation(AnomalyEvent event) async {
-    final recordId = event.attendanceRecordId;
-    if (recordId == null) return;
-    await AnomalyService.revertAndReview(anomalyId: event.id, attendanceRecordId: recordId);
+  /// HR reverting a violation after a dispute investigation finds it
+  /// invalid (FR3.6). Only offered when [AnomalyEvent.attendanceRecordId]
+  /// is non-null — see that field's doc comment. Returns the risk points
+  /// given back; throws if the server refuses (e.g. already reverted, or
+  /// HR reverting their own violation).
+  Future<int> revertViolation(AnomalyEvent event) async {
+    final restored = await AnomalyService.revert(event.id);
     final i = feed.indexWhere((e) => e.id == event.id);
-    if (i != -1) feed[i] = feed[i].copyWith(reviewed: true);
+    if (i != -1) feed[i] = feed[i].copyWith(reviewed: true, reverted: true);
     notifyListeners();
+    return restored;
   }
 }
 

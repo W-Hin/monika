@@ -38,4 +38,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Revert This Violation?'), findsNothing);
   });
+
+  testWidgets('a violation that was already reverted cannot be reverted again', (tester) async {
+    await tester.pumpWidget(MaterialApp(theme: AppTheme.light, home: const AnomalyDetailScreen()));
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(find.text('Reverted'), find.byType(ListView), const Offset(0, -200));
+    // Two flagged clock-ins in the feed, only the unreverted one offers Revert.
+    expect(find.text('Revert (Dispute Investigation Found Invalid)', skipOffstage: false), findsOneWidget);
+  });
 }

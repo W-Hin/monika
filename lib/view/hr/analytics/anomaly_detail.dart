@@ -47,7 +47,7 @@ class _AnomalyDetailScreenState extends State<AnomalyDetailScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Revert This Violation?'),
-        content: Text('${event.employeeName}\'s flagged attendance record will be changed back to On Time. Use this only after a dispute investigation finds the flag invalid.'),
+        content: Text('${event.employeeName}\'s attendance record will be changed back to On Time and the risk points this violation cost will be given back. Use this only after a dispute investigation finds the flag invalid.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
           TextButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Revert')),
@@ -55,11 +55,23 @@ class _AnomalyDetailScreenState extends State<AnomalyDetailScreen> {
       ),
     );
     if (confirmed != true) return;
-    await anomalyController.revertViolation(event);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('✓ Reverted: ${event.employeeName}\'s attendance record is now On Time')),
-    );
+    try {
+      final restored = await anomalyController.revertViolation(event);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(restored > 0
+              ? '✓ Reverted: record is On Time and $restored risk points were given back to ${event.employeeName}'
+              : '✓ Reverted: record is On Time (${event.employeeName}\'s score had already reset, so no points were due)'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final m = RegExp(r'message: ([^,)]+)').firstMatch(e.toString());
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(m?.group(1) ?? 'Could not revert this violation'), backgroundColor: context.colors.riskHigh),
+      );
+    }
   }
 
   void _viewEmployee(BuildContext context, String employeeName) {
@@ -225,7 +237,7 @@ class _AnomalyCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                   decoration: BoxDecoration(color: c.riskLowBg, borderRadius: BorderRadius.circular(100)),
-                  child: Text('Reviewed', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: c.primary)),
+                  child: Text(event.reverted ? 'Reverted' : 'Reviewed', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: c.primary)),
                 ),
             ],
           ),
@@ -265,7 +277,7 @@ class _AnomalyCard extends StatelessWidget {
               ),
             ],
           ),
-          if (event.attendanceRecordId != null) ...[
+          if (event.attendanceRecordId != null && !event.reverted) ...[
             const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,

@@ -125,21 +125,6 @@ class AttendanceService {
         .single();
   }
 
-  /// HR-only, invoked when a dispute investigation finds a flagged clock-in
-  /// invalid. Clears the flag back to a normal on_time record — doesn't
-  /// attempt to retroactively credit back whatever risk_score deduction
-  /// the original anomaly caused, since the score has likely moved since
-  /// (further violations, a periodic reset) and there's no safe way to
-  /// unwind just this one deduction from a running total. A deliberate
-  /// simplification: HR corrects the record going forward, not the score's
-  /// history.
-  static Future<void> revertFlag(int attendanceRecordId) async {
-    await _client.from('attendance_records').update({
-      'status': 'on_time',
-      'flag_reason': null,
-    }).eq('id', attendanceRecordId);
-  }
-
   static Future<Map<String, dynamic>?> fetchPolicySettings() {
     return _client.from('policy_settings').select().eq('id', 1).maybeSingle();
   }
