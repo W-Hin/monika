@@ -120,6 +120,34 @@ class PeController extends ChangeNotifier {
     }
   }
 
+  /// Null if it can't be read (treated as "nothing to revert").
+  Future<TemplateRevertInfo?> revertInfoFor(KpiTemplate template) async {
+    if (template.dbId == null) return null;
+    try {
+      final rows = await PeService.fetchTemplateRevertInfo();
+      final row = rows.where((r) => (r['template_id'] as num).toInt() == template.dbId);
+      return row.isEmpty ? null : TemplateRevertInfo.fromJson(row.first);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Returns true on success. On failure, sets errorMessage to the
+  /// server's reason and returns false.
+  Future<bool> revertTemplate(KpiTemplate template) async {
+    errorMessage = null;
+    if (template.dbId == null) return false;
+    try {
+      await PeService.revertTemplate(template.dbId!);
+      await loadTemplates();
+      return true;
+    } catch (e) {
+      errorMessage = RegExp(r'message: ([^,)]+)').firstMatch(e.toString())?.group(1) ?? 'Could not revert template: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
   /// Returns true on success. On failure, sets errorMessage and returns
   /// false rather than throwing.
   Future<bool> deleteTemplate(KpiTemplate template) async {

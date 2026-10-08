@@ -110,6 +110,7 @@ class LeaveApplication {
   final int days;
   final String reason;
   final LeaveStatus status;
+  final String? decisionNote; // HR's reason for approving or rejecting
 
   const LeaveApplication({
     this.dbId,
@@ -122,6 +123,7 @@ class LeaveApplication {
     required this.days,
     required this.reason,
     required this.status,
+    this.decisionNote,
   });
 }
 
@@ -574,6 +576,22 @@ class TrainingExemption {
       );
 
   String get label => userUuid != null ? (employeeName ?? 'Employee') : 'All of ${departmentName ?? 'department'}';
+}
+
+/// Whether a KPI template can go back to its previous version (FR10.7).
+class TemplateRevertInfo {
+  final int? previousVersion;
+  final DateTime? previousSavedAt;
+  final bool usedInSubmitted; // the current version scored a submitted evaluation
+  const TemplateRevertInfo({this.previousVersion, this.previousSavedAt, this.usedInSubmitted = false});
+
+  factory TemplateRevertInfo.fromJson(Map<String, dynamic> j) => TemplateRevertInfo(
+        previousVersion: (j['previous_version'] as num?)?.toInt(),
+        previousSavedAt: DateTime.tryParse(j['previous_saved_at'] as String? ?? '')?.toLocal(),
+        usedInSubmitted: j['used_in_submitted'] as bool? ?? false,
+      );
+
+  bool get canRevert => previousVersion != null && !usedInSubmitted;
 }
 
 /// One past try at a programme's quiz (training_attempts).

@@ -79,11 +79,9 @@ class PeService {
     }
   }
 
-  /// HR — replaces a template's name/department/items in place. Existing
-  /// performance_evaluations keep referencing the same template_id (their
-  /// scores are already snapshotted onto performance_evaluation_scores at
-  /// submit time, so an edit here doesn't retroactively change past
-  /// evaluations, only what's suggested/picked going forward).
+  /// HR — saves an edited template in one step (save_kpi_template,
+  /// migration 0045), keeping the previous version so it can be reverted.
+  /// Past evaluations are unaffected: their scores are snapshotted.
   static Future<void> updateTemplate({
     required int id,
     required String name,
@@ -91,13 +89,25 @@ class PeService {
     required List<Map<String, dynamic>> items,
   }) async {
     final departmentId = await departmentIdForName(departmentName == 'All Departments' ? null : departmentName);
-    await _client.from('kpi_templates').update({'name': name, 'department_id': departmentId}).eq('id', id);
-    await _client.from('kpi_template_items').delete().eq('template_id', id);
-    if (items.isNotEmpty) {
-      await _client.from('kpi_template_items').insert(
-            items.map((i) => {...i, 'template_id': id}).toList(),
-          );
-    }
+    await _client.rpc('save_kpi_template', params: {
+      'p_id': id,
+      'p_name': name,
+      'p_department_id': departmentId,
+      'p_items': items,
+    });
+  }
+
+  /// HR — per template: its previous version (if any) and whether the
+  /// current version has been used in a submitted evaluation.
+  static Future<List<Map<String, dynamic>>> fetchTemplateRevertInfo() async {
+    final rows = await _client.rpc('kpi_template_revert_info');
+    return List<Map<String, dynamic>>.from(rows as List);
+  }
+
+  /// HR — goes back to the previous version (FR10.7). Refused once the
+  /// current version has been used in a submitted evaluation.
+  static Future<void> revertTemplate(int id) async {
+    await _client.rpc('revert_kpi_template', params: {'p_id': id});
   }
 
   /// HR — deletes a KPI template. Its items cascade-delete; any

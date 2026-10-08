@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors_extension.dart';
 import '../../shared/widgets/buttons.dart';
 import '../../shared/widgets/common_widgets.dart';
@@ -1393,12 +1394,51 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
   final List<_KpiItemDraft> _items = [];
   bool _saving = false;
   String? _errorText;
+  TemplateRevertInfo? _revertInfo;
 
   bool get _isEditing => widget.existing != null;
+
+  Future<void> _loadRevertInfo() async {
+    final info = await peController.revertInfoFor(widget.existing!);
+    if (mounted) setState(() => _revertInfo = info);
+  }
+
+  Future<void> _revert() async {
+    final info = _revertInfo!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Revert This Template?'),
+        content: Text(
+          'The template will go back to version ${info.previousVersion}'
+          '${info.previousSavedAt != null ? ' (saved ${DateFormat('d MMM yyyy').format(info.previousSavedAt!)})' : ''}. '
+          'Your current changes to it will be lost.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Revert')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _saving = true);
+    final ok = await peController.revertTemplate(widget.existing!);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (!ok) {
+      setState(() => _errorText = peController.errorMessage ?? 'Could not revert the template.');
+      return;
+    }
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('✓ Template reverted to version ${info.previousVersion}')),
+    );
+  }
 
   @override
   void initState() {
     super.initState();
+    if (_isEditing) _loadRevertInfo();
     final existingItems = widget.existing?.items ?? const [];
     if (existingItems.isEmpty) {
       _addItem();
@@ -1784,6 +1824,24 @@ class _CreateTemplateSheetState extends State<_CreateTemplateSheet> {
               onPressed: _save,
               isLoading: _saving,
             ),
+            if (_revertInfo?.previousVersion != null) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _revertInfo!.canRevert && !_saving ? _revert : null,
+                  icon: const Icon(Icons.history_rounded, size: 18),
+                  label: Text('Revert to Previous Version (v${_revertInfo!.previousVersion})'),
+                ),
+              ),
+              if (!_revertInfo!.canRevert) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'The current version has already been used in a submitted evaluation, so it can\'t be reverted.',
+                  style: TextStyle(fontSize: 11.5, color: c.textMuted),
+                ),
+              ],
+            ],
           ],
         ),
       ),

@@ -94,4 +94,21 @@ void main() {
       expect(find.text('Excused by HR'), findsOneWidget);
     });
   });
+
+  group('TemplateRevertInfo', () {
+    test('can revert when a previous version exists and the current one is unused', () {
+      expect(const TemplateRevertInfo(previousVersion: 1).canRevert, isTrue);
+    });
+    test('cannot revert once the current version scored a submitted evaluation', () {
+      expect(const TemplateRevertInfo(previousVersion: 1, usedInSubmitted: true).canRevert, isFalse);
+    });
+    test('cannot revert without a previous version', () {
+      expect(const TemplateRevertInfo().canRevert, isFalse);
+    });
+    test('reads the database row', () {
+      final info = TemplateRevertInfo.fromJson({'previous_version': 2, 'previous_saved_at': '2026-10-01T03:00:00Z', 'used_in_submitted': false});
+      expect(info.previousVersion, 2);
+      expect(info.previousSavedAt, isNotNull);
+    });
+  });
 }
