@@ -116,12 +116,10 @@ class _ClockInScreenState extends State<ClockInScreen> {
 
     try {
       final record = await attendanceController.submitClockIn(
-        gpsPassed: _gpsResult!.passed,
         gpsLat: _gpsResult!.lat,
         gpsLng: _gpsResult!.lng,
-        wifiPassed: _wifiResult!.passed,
         wifiSsid: _wifiResult!.ssid,
-        devicePassed: deviceResult.passed,
+        deviceToken: deviceResult.deviceToken,
       );
       if (!mounted) return;
       setState(() {

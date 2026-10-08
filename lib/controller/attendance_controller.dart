@@ -9,7 +9,6 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:intl/intl.dart';
 import '../connection/attendance_service.dart';
 import '../connection/auth_service.dart';
-import '../connection/anomaly_service.dart';
 import '../model/models.dart';
 import 'auth_controller.dart';
 
@@ -414,49 +413,19 @@ class AttendanceController extends ChangeNotifier {
     }
   }
 
+  /// Sends the phone's readings; the database decides the result and
+  /// raises any violations (migration 0045), so this only reports.
   Future<AttendanceRecord> submitClockIn({
-    required bool gpsPassed,
     double? gpsLat,
     double? gpsLng,
-    required bool wifiPassed,
     String? wifiSsid,
-    required bool devicePassed,
+    String? deviceToken,
   }) async {
-    await loadPolicy();
-    final now = DateTime.now();
-    String status;
-    String? flagReason;
-
-    if (!gpsPassed) {
-      status = 'flagged';
-      flagReason = 'GPS outside geofence radius';
-    } else if (!wifiPassed) {
-      status = 'flagged';
-      flagReason = 'Connected to unrecognised network during clock-in attempt';
-    } else if (!devicePassed) {
-      status = 'flagged';
-      flagReason = 'Device token mismatch — possible shared-device attempt';
-    } else {
-      final startParts = _workStart.split(':');
-      final workStartMinutes = int.parse(startParts[0]) * 60 + int.parse(startParts[1]);
-      final nowMinutes = now.hour * 60 + now.minute;
-      if (nowMinutes > workStartMinutes + _gracePeriodMinutes) {
-        status = 'late';
-        flagReason = 'Clocked in ${nowMinutes - workStartMinutes} min after grace period';
-      } else {
-        status = 'on_time';
-      }
-    }
-
     final row = await AttendanceService.clockIn(
       gpsLat: gpsLat,
       gpsLng: gpsLng,
-      gpsPassed: gpsPassed,
       wifiSsid: wifiSsid,
-      wifiPassed: wifiPassed,
-      devicePassed: devicePassed,
-      status: status,
-      flagReason: flagReason,
+      deviceToken: deviceToken,
     );
     _todayRecordId = row['id'] as int;
     todayRecord = _mapRecord(row);
@@ -465,119 +434,21 @@ class AttendanceController extends ChangeNotifier {
     // the screen is freshly re-created (e.g. a full app restart).
     await loadHistory();
     await loadAttendanceRate();
-
-    await _raiseAnomalies(
-      attendanceRecordId: _todayRecordId!,
-      gpsPassed: gpsPassed,
-      wifiPassed: wifiPassed,
-      wifiSsid: wifiSsid,
-      devicePassed: devicePassed,
-      status: status,
-    );
-    // Anomalies above may have just deducted this employee's risk_score
-    // server-side — refresh so the Risk Classification card reflects it
-    // immediately instead of only after the next login.
+    // Violations raised by the database may have just lowered the risk
+    // score — refresh so the Risk Classification card shows it now.
     unawaited(authController.refreshProfile());
 
     return todayRecord!;
   }
 
-  /// Best-effort: each failed IoT check raises its own anomaly_events row
-  /// (not mutually exclusive — GPS and WiFi can both fail on one attempt),
-  /// plus a repeated-late pattern check. Failures here don't roll back the
-  /// clock-in itself, since the attendance record is already saved.
-  Future<void> _raiseAnomalies({
-    required int attendanceRecordId,
-    required bool gpsPassed,
-    required bool wifiPassed,
-    String? wifiSsid,
-    required bool devicePassed,
-    required String status,
-  }) async {
-    try {
-      if (!gpsPassed) {
-        await AnomalyService.createEvent(
-          type: 'out_of_zone',
-          details: 'GPS coordinates outside the configured geofence radius',
-          severity: 'medium',
-          attendanceRecordId: attendanceRecordId,
-        );
-      }
-      if (!wifiPassed) {
-        await AnomalyService.createEvent(
-          type: 'wifi_mismatch',
-          details: wifiSsid != null
-              ? 'Connected to "$wifiSsid" instead of the registered office network'
-              : 'Could not verify the WiFi network during clock-in',
-          severity: 'low',
-          attendanceRecordId: attendanceRecordId,
-        );
-      }
-      if (!devicePassed) {
-        await AnomalyService.createEvent(
-          type: 'shared_device',
-          details: "Device token does not match this employee's registered device",
-          severity: 'high',
-          attendanceRecordId: attendanceRecordId,
-        );
-      }
-      if (status == 'late') {
-        final lateCount = await AttendanceService.countRecentLate();
-        if (lateCount >= 3) {
-          await AnomalyService.createEvent(
-            type: 'late',
-            details: '${_ordinal(lateCount)} late arrival in the past 14 days',
-            severity: 'medium',
-            attendanceRecordId: attendanceRecordId,
-          );
-        }
-      }
-    } catch (_) {
-      // Anomaly bookkeeping is secondary to the attendance record itself —
-      // don't let a transient failure here surface as a clock-in error.
-    }
-  }
-
-  String _ordinal(int n) {
-    if (n % 100 >= 11 && n % 100 <= 13) return '${n}th';
-    switch (n % 10) {
-      case 1:
-        return '${n}st';
-      case 2:
-        return '${n}nd';
-      case 3:
-        return '${n}rd';
-      default:
-        return '${n}th';
-    }
-  }
-
-  Future<AttendanceRecord?> submitClockOut() async {
+  /// [lat]/[lng] are where the phone is now; the database flags an early
+  /// or off-site clock-out itself.
+  Future<AttendanceRecord?> submitClockOut({double? lat, double? lng}) async {
     if (_todayRecordId == null) return null;
-    await loadPolicy();
-    final endParts = _workEnd.split(':');
-    final workEndMinutes = int.parse(endParts[0]) * 60 + int.parse(endParts[1]);
-    final now = DateTime.now();
-    final nowMinutes = now.hour * 60 + now.minute;
-    final early = nowMinutes < workEndMinutes - _gracePeriodMinutes;
-
-    final row = await AttendanceService.clockOut(_todayRecordId!, early: early);
+    final row = await AttendanceService.clockOut(_todayRecordId!, lat: lat, lng: lng);
     todayRecord = _mapRecord(row);
     notifyListeners();
-
-    if (early) {
-      try {
-        await AnomalyService.createEvent(
-          type: 'early_clockout',
-          details: 'Clocked out ${workEndMinutes - nowMinutes} min before the scheduled end time',
-          severity: 'low',
-          attendanceRecordId: _todayRecordId!,
-        );
-      } catch (_) {
-        // Anomaly bookkeeping is secondary to the clock-out itself.
-      }
-    }
-
+    unawaited(authController.refreshProfile());
     return todayRecord;
   }
 }

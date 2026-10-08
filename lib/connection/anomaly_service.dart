@@ -1,4 +1,3 @@
-import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Thin wrapper over the `anomaly_events` table.
@@ -11,22 +10,6 @@ class AnomalyService {
   /// or trips the repeated-late threshold. RLS only allows inserting a row
   /// for yourself (`anomaly_insert_own`) — HR can read/update everything,
   /// but creation is always attributed to whoever triggered it.
-  static Future<void> createEvent({
-    required String type,
-    required String details,
-    required String severity,
-    int? attendanceRecordId,
-  }) async {
-    final uid = _client.auth.currentUser!.id;
-    await _client.from('anomaly_events').insert({
-      'user_id': uid,
-      'attendance_record_id': attendanceRecordId,
-      'type': type,
-      'event_date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
-      'details': details,
-      'severity': severity,
-    });
-  }
 
   static Future<List<Map<String, dynamic>>> fetchFeed({int limit = 50}) async {
     final rows = await _client

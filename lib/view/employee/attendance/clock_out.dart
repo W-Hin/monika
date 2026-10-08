@@ -40,7 +40,7 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
     });
 
     try {
-      final record = await attendanceController.submitClockOut();
+      final record = await attendanceController.submitClockOut(lat: gpsResult.lat, lng: gpsResult.lng);
       if (!mounted) return;
       if (record == null) {
         setState(() {

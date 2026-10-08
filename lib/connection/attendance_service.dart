@@ -77,49 +77,39 @@ class AttendanceService {
     return List<Map<String, dynamic>>.from(rows);
   }
 
+  /// Sends this phone's raw readings. The database stamps the time and
+  /// date, measures the distance from the office, checks the WiFi name and
+  /// device against what is on file, and decides on-time / late / flagged
+  /// (migration 0045). The returned row is the result.
   static Future<Map<String, dynamic>> clockIn({
     double? gpsLat,
     double? gpsLng,
-    required bool gpsPassed,
     String? wifiSsid,
-    required bool wifiPassed,
-    required bool devicePassed,
-    required String status,
-    String? flagReason,
+    String? deviceToken,
   }) async {
     final uid = _client.auth.currentUser!.id;
-    final now = DateTime.now();
     return _client
         .from('attendance_records')
         .insert({
           'user_id': uid,
-          'work_date': _todayDate,
-          // toIso8601String() on a local DateTime omits any timezone
-          // suffix, so Postgres would otherwise cast it as if it were
-          // already UTC — .toUtc() first makes the stored instant correct.
-          'clock_in_at': now.toUtc().toIso8601String(),
-          'status': status,
-          'flag_reason': flagReason,
+          'work_date': _todayDate, // replaced by the database's own date
+          'clock_in_at': DateTime.now().toUtc().toIso8601String(), // replaced by the database's own time
+          'status': 'on_time', // decided by the database
           'gps_lat': gpsLat,
           'gps_lng': gpsLng,
-          'gps_passed': gpsPassed,
           'wifi_ssid': wifiSsid,
-          'wifi_passed': wifiPassed,
-          'device_passed': devicePassed,
+          'device_token_used': deviceToken,
         })
         .select()
         .single();
   }
 
-  static Future<Map<String, dynamic>> clockOut(int recordId, {bool early = false}) async {
-    final update = <String, dynamic>{'clock_out_at': DateTime.now().toUtc().toIso8601String()};
-    if (early) {
-      update['status'] = 'flagged';
-      update['flag_reason'] = 'Clocked out earlier than the scheduled end time';
-    }
+  /// Clock-out: the database stamps the time and flags an early or
+  /// off-site clock-out itself.
+  static Future<Map<String, dynamic>> clockOut(int recordId, {double? lat, double? lng}) async {
     return _client
         .from('attendance_records')
-        .update(update)
+        .update({'clock_out_lat': lat, 'clock_out_lng': lng})
         .eq('id', recordId)
         .select()
         .single();
