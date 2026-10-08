@@ -86,6 +86,13 @@ create table public.attendance_records (
     wifi_ssid     text,
     wifi_passed   boolean not null default false,
     device_passed boolean not null default false,
+    -- Device ID the app reported; compared with profiles.device_token on
+    -- insert, then cleared (attendance_validate_clock_in).
+    device_token_used    text,
+    -- Where the phone was at clock-out, and whether that was inside the office radius
+    clock_out_lat        numeric(10, 7),
+    clock_out_lng        numeric(10, 7),
+    clock_out_gps_passed boolean,
 
     created_at    timestamptz not null default now(),
 
@@ -129,6 +136,7 @@ create table public.leave_applications (
     status          text not null default 'pending' check (status in ('pending', 'approved', 'rejected', 'cancelled')),
     decided_by      uuid references public.profiles(id) on delete set null,
     decided_at      timestamptz,
+    decision_note   text, -- HR's reason, required when rejecting; shown to the employee
     created_at      timestamptz not null default now()
 );
 
@@ -184,6 +192,8 @@ create table public.kpi_templates (
     id             bigint generated always as identity primary key,
     name           text not null,
     department_id  bigint references public.departments(id) on delete set null, -- NULL = all departments
+    version        integer not null default 1, -- bumped on every save; earlier versions in kpi_template_versions
+    updated_at     timestamptz not null default now(),
     created_at     timestamptz not null default now()
 );
 
@@ -201,6 +211,7 @@ create table public.performance_evaluations (
     id              bigint generated always as identity primary key,
     user_id         uuid not null references public.profiles(id) on delete cascade,
     template_id     bigint references public.kpi_templates(id) on delete set null, -- kept nullable — template may be edited/retired after this was scored
+    template_version integer, -- which version of the template it was scored on (stamp_evaluation_template_version)
     year            smallint not null,
     comments        text,
     weighted_total  numeric(5, 2) not null, -- cached sum(score * weightage / 100); recomputed on save
@@ -580,14 +591,12 @@ create policy "attendance_update_own_or_hr" on public.attendance_records
     with check (user_id = auth.uid() or public.is_hr_admin());
 
 -- anomaly_events — HR reads all (employees see their own flags via
--- attendance_records.flag_reason instead); the app raises an employee's own
--- anomalies from their clock-in, so they may insert rows for themselves.
+-- attendance_records.flag_reason instead). Violations are raised only by
+-- the database (attendance triggers, absence detection), never by the app.
 create policy "anomaly_select_hr" on public.anomaly_events
     for select using (public.is_hr_admin());
 create policy "anomaly_write_hr" on public.anomaly_events
     for all using (public.is_hr_admin()) with check (public.is_hr_admin());
-create policy "anomaly_insert_own" on public.anomaly_events
-    for insert with check (user_id = auth.uid());
 
 -- leave_applications — employees submit/read their own; HR reads/decides all
 create policy "leave_select_own_or_hr" on public.leave_applications
@@ -726,6 +735,10 @@ begin
      and new.status is distinct from old.status then
     raise exception 'You cannot approve or reject your own leave application. Ask another HR admin to decide on it.';
   end if;
+  if new.status = 'rejected' and old.status is distinct from 'rejected'
+     and length(trim(coalesce(new.decision_note, ''))) = 0 then
+    raise exception 'Please give a reason for rejecting this leave application.';
+  end if;
   return new;
 end;
 $$;
@@ -811,6 +824,7 @@ begin
       new.user_id,
       case when new.status = 'approved' then 'Leave Application Approved' else 'Leave Application Rejected' end,
       format('Your %s leave application (%s to %s) has been %s.', new.leave_type, new.start_date, new.end_date, new.status) ||
+      coalesce(E'\n\nHR\'s note: ' || nullif(trim(coalesce(new.decision_note, '')), ''), '') ||
       E'\n\nNext steps:\n1. Go to the Leave page\n2. View your leave status',
       'leave_decision'
     );
@@ -1115,6 +1129,410 @@ begin
     end loop;
 end;
 $$;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Attendance decided by the database (migration 0045)
+-- ─────────────────────────────────────────────────────────────────────────
+
+-- The app only reports its readings (position, WiFi name, device ID). The
+-- database stamps the time and date, checks each layer, decides
+-- on-time / late / flagged and raises the violations, so a changed phone
+-- clock or a modified app can't avoid them.
+-- Today's date in Malaysia (the database itself runs in UTC).
+create or replace function public.malaysia_today()
+returns date
+language sql
+stable
+as $$
+    select (now() at time zone 'Asia/Kuala_Lumpur')::date;
+$$;
+
+-- Great-circle distance in metres between two coordinates.
+create or replace function public.distance_m(lat1 float8, lng1 float8, lat2 float8, lng2 float8)
+returns float8
+language sql
+immutable
+as $$
+    select 2 * 6371000 * asin(sqrt(
+        power(sin(radians(lat2 - lat1) / 2), 2)
+        + cos(radians(lat1)) * cos(radians(lat2)) * power(sin(radians(lng2 - lng1) / 2), 2)));
+$$;
+
+create or replace function public.attendance_validate_clock_in()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    pol record;
+    v_token text;
+    v_dist float8;
+    v_local time := (now() at time zone 'Asia/Kuala_Lumpur')::time;
+    v_late_by int;
+begin
+    -- Scripts and scheduled jobs (no signed-in user) insert as-is.
+    if auth.uid() is null then
+        return new;
+    end if;
+    select * into pol from public.policy_settings where id = 1;
+
+    new.clock_in_at := now();
+    new.work_date := public.malaysia_today();
+    new.clock_out_at := null;
+
+    v_dist := case when new.gps_lat is not null and new.gps_lng is not null
+                   then public.distance_m(pol.office_lat, pol.office_lng, new.gps_lat, new.gps_lng) end;
+    new.gps_passed := v_dist is not null and v_dist <= pol.geofence_radius_meters;
+
+    new.wifi_passed := new.wifi_ssid is not null
+                       and lower(replace(new.wifi_ssid, '"', '')) = lower(pol.office_wifi_ssid);
+
+    select device_token into v_token from public.profiles where id = new.user_id;
+    new.device_passed := v_token is not null and new.device_token_used is not null and v_token = new.device_token_used;
+    new.device_token_used := null;
+
+    v_late_by := floor(extract(epoch from (v_local - pol.work_start_time)) / 60)::int;
+    if not new.gps_passed then
+        new.status := 'flagged';
+        new.flag_reason := case when v_dist is null then 'Location unavailable during clock-in'
+                                else format('GPS %s m from the office, outside the %s m radius', round(v_dist), pol.geofence_radius_meters) end;
+    elsif not new.wifi_passed then
+        new.status := 'flagged';
+        new.flag_reason := 'Connected to unrecognised network during clock-in attempt';
+    elsif not new.device_passed then
+        new.status := 'flagged';
+        new.flag_reason := 'Device token mismatch — possible shared-device attempt';
+    elsif v_late_by > pol.grace_period_minutes then
+        new.status := 'late';
+        new.flag_reason := format('Clocked in %s min after the start time', v_late_by);
+    else
+        new.status := 'on_time';
+        new.flag_reason := null;
+    end if;
+    return new;
+end;
+$$;
+
+create trigger trg_attendance_validate_clock_in
+    before insert on public.attendance_records
+    for each row execute function public.attendance_validate_clock_in();
+
+-- Raises the violations for a clock-in, after the record exists.
+create or replace function public.attendance_raise_clock_in_anomalies()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_late int;
+begin
+    if auth.uid() is null then
+        return new;
+    end if;
+    if not new.gps_passed then
+        insert into public.anomaly_events (user_id, attendance_record_id, type, event_date, details, severity)
+        values (new.user_id, new.id, 'out_of_zone', new.work_date, coalesce(new.flag_reason, 'GPS outside the office radius'), 'medium');
+    end if;
+    if not new.wifi_passed then
+        insert into public.anomaly_events (user_id, attendance_record_id, type, event_date, details, severity)
+        values (new.user_id, new.id, 'wifi_mismatch', new.work_date,
+                case when new.wifi_ssid is null then 'Could not verify the WiFi network during clock-in'
+                     else format('Connected to "%s" instead of the registered office network', replace(new.wifi_ssid, '"', '')) end,
+                'low');
+    end if;
+    if not new.device_passed then
+        insert into public.anomaly_events (user_id, attendance_record_id, type, event_date, details, severity)
+        values (new.user_id, new.id, 'shared_device', new.work_date,
+                'Device does not match this employee''s registered device', 'high');
+    end if;
+    if new.status = 'late' then
+        select count(*) into v_late from public.attendance_records
+        where user_id = new.user_id and status = 'late' and work_date between new.work_date - 13 and new.work_date;
+        if v_late >= 3 then
+            insert into public.anomaly_events (user_id, attendance_record_id, type, event_date, details, severity)
+            values (new.user_id, new.id, 'late', new.work_date,
+                    v_late || case when v_late % 100 between 11 and 13 then 'th'
+                                   when v_late % 10 = 1 then 'st' when v_late % 10 = 2 then 'nd'
+                                   when v_late % 10 = 3 then 'rd' else 'th' end
+                           || ' late arrival in the past 14 days', 'medium');
+        end if;
+    end if;
+    return new;
+end;
+$$;
+
+create trigger trg_attendance_raise_clock_in_anomalies
+    after insert on public.attendance_records
+    for each row execute function public.attendance_raise_clock_in_anomalies();
+
+-- An employee's own update to today's record can only be a clock-out:
+-- everything from the clock-in is kept, the time is stamped by the
+-- database, and an early or off-site clock-out is flagged.
+create or replace function public.attendance_validate_clock_out()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    pol record;
+    v_dist float8;
+    v_local time := (now() at time zone 'Asia/Kuala_Lumpur')::time;
+    v_early_by int;
+    v_reasons text[] := '{}';
+begin
+    -- HR (e.g. reverting a flag) and scripts update records directly.
+    if auth.uid() is null or auth.uid() is distinct from old.user_id then
+        return new;
+    end if;
+    if old.clock_out_at is not null then
+        raise exception 'You have already clocked out today.';
+    end if;
+    select * into pol from public.policy_settings where id = 1;
+
+    new.user_id := old.user_id;
+    new.work_date := old.work_date;
+    new.clock_in_at := old.clock_in_at;
+    new.gps_lat := old.gps_lat;
+    new.gps_lng := old.gps_lng;
+    new.gps_passed := old.gps_passed;
+    new.wifi_ssid := old.wifi_ssid;
+    new.wifi_passed := old.wifi_passed;
+    new.device_passed := old.device_passed;
+    new.device_token_used := null;
+    new.status := old.status;
+    new.flag_reason := old.flag_reason;
+    new.clock_out_at := now();
+
+    v_dist := case when new.clock_out_lat is not null and new.clock_out_lng is not null
+                   then public.distance_m(pol.office_lat, pol.office_lng, new.clock_out_lat, new.clock_out_lng) end;
+    new.clock_out_gps_passed := v_dist is not null and v_dist <= pol.geofence_radius_meters;
+
+    v_early_by := floor(extract(epoch from (pol.work_end_time - v_local)) / 60)::int;
+    if v_early_by > pol.grace_period_minutes then
+        v_reasons := array_append(v_reasons, 'Clocked out earlier than the scheduled end time');
+    end if;
+    if not new.clock_out_gps_passed then
+        v_reasons := array_append(v_reasons, case when v_dist is null then 'Location unavailable during clock-out'
+                                                  else format('Clocked out %s m from the office', round(v_dist)) end);
+    end if;
+    if array_length(v_reasons, 1) > 0 then
+        new.status := 'flagged';
+        new.flag_reason := array_to_string(array_prepend(old.flag_reason, v_reasons), '; ');
+    end if;
+    return new;
+end;
+$$;
+
+create trigger trg_attendance_validate_clock_out
+    before update on public.attendance_records
+    for each row execute function public.attendance_validate_clock_out();
+
+create or replace function public.attendance_raise_clock_out_anomalies()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    pol record;
+    v_local time;
+    v_early_by int;
+begin
+    if auth.uid() is null or auth.uid() is distinct from new.user_id
+       or old.clock_out_at is not null or new.clock_out_at is null then
+        return new;
+    end if;
+    select * into pol from public.policy_settings where id = 1;
+    v_local := (new.clock_out_at at time zone 'Asia/Kuala_Lumpur')::time;
+    v_early_by := floor(extract(epoch from (pol.work_end_time - v_local)) / 60)::int;
+    if v_early_by > pol.grace_period_minutes then
+        insert into public.anomaly_events (user_id, attendance_record_id, type, event_date, details, severity)
+        values (new.user_id, new.id, 'early_clockout', new.work_date,
+                format('Clocked out %s min before the scheduled end time', v_early_by), 'low');
+    end if;
+    if not coalesce(new.clock_out_gps_passed, false) then
+        insert into public.anomaly_events (user_id, attendance_record_id, type, event_date, details, severity)
+        values (new.user_id, new.id, 'out_of_zone', new.work_date,
+                case when new.clock_out_lat is null then 'Location unavailable during clock-out'
+                     else format('Clocked out %s m from the office, outside the %s m radius',
+                                 round(public.distance_m(pol.office_lat, pol.office_lng, new.clock_out_lat, new.clock_out_lng)),
+                                 pol.geofence_radius_meters) end,
+                'medium');
+    end if;
+    return new;
+end;
+$$;
+
+create trigger trg_attendance_raise_clock_out_anomalies
+    after update on public.attendance_records
+    for each row execute function public.attendance_raise_clock_out_anomalies();
+
+-- Stored GPS coordinates are blanked after 6 months (PDPA data
+-- minimisation); the pass/fail results are kept.
+create or replace function public.purge_old_gps_coordinates()
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+    update public.attendance_records
+    set gps_lat = null, gps_lng = null, clock_out_lat = null, clock_out_lng = null
+    where work_date < public.malaysia_today() - interval '6 months'
+      and (gps_lat is not null or clock_out_lat is not null);
+$$;
+revoke all on function public.purge_old_gps_coordinates() from public, anon, authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- KPI template versions (FR10.7, migration 0045)
+-- ─────────────────────────────────────────────────────────────────────────
+
+create table public.kpi_template_versions (
+    id            bigint generated always as identity primary key,
+    template_id   bigint not null references public.kpi_templates(id) on delete cascade,
+    version       integer not null,
+    name          text not null,
+    department_id bigint references public.departments(id) on delete set null,
+    items         jsonb not null, -- [{name, weightage, category, metric_source}]
+    saved_at      timestamptz not null default now(),
+    unique (template_id, version)
+);
+
+alter table public.kpi_template_versions enable row level security;
+create policy "kpi_template_versions_select_hr" on public.kpi_template_versions
+    for select using (public.is_hr_admin());
+-- Written only by save_kpi_template() / revert_kpi_template() below.
+
+-- Every evaluation records which version of its template it was scored
+-- on. Restamped on every save; a submitted evaluation can't be saved
+-- again (prevent_completed_pe_edit), so its stamp is final.
+create or replace function public.stamp_evaluation_template_version()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    if new.template_id is not null then
+        select version into new.template_version from public.kpi_templates where id = new.template_id;
+    end if;
+    return new;
+end;
+$$;
+
+create trigger trg_stamp_evaluation_template_version
+    before insert or update on public.performance_evaluations
+    for each row execute function public.stamp_evaluation_template_version();
+
+-- Saves an edited template in one step, keeping the previous version.
+create or replace function public.save_kpi_template(p_id bigint, p_name text, p_department_id bigint, p_items jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    t record;
+    i jsonb;
+begin
+    if not public.is_hr_admin() then
+        raise exception 'Only HR admins can edit KPI templates.';
+    end if;
+    select * into t from public.kpi_templates where id = p_id for update;
+    if not found then
+        raise exception 'KPI template not found.';
+    end if;
+
+    insert into public.kpi_template_versions (template_id, version, name, department_id, items)
+    select t.id, t.version, t.name, t.department_id,
+           coalesce(jsonb_agg(jsonb_build_object('name', it.name, 'weightage', it.weightage,
+                                                 'category', it.category, 'metric_source', it.metric_source)
+                              order by it.id), '[]'::jsonb)
+    from public.kpi_template_items it
+    where it.template_id = t.id
+    on conflict (template_id, version) do update set
+        name = excluded.name, department_id = excluded.department_id, items = excluded.items, saved_at = now();
+
+    update public.kpi_templates
+    set name = p_name, department_id = p_department_id, version = t.version + 1, updated_at = now()
+    where id = t.id;
+
+    delete from public.kpi_template_items where template_id = t.id;
+    for i in select * from jsonb_array_elements(coalesce(p_items, '[]'::jsonb)) loop
+        insert into public.kpi_template_items (template_id, name, weightage, category, metric_source)
+        values (t.id, i ->> 'name', (i ->> 'weightage')::numeric, coalesce(i ->> 'category', 'Technical'),
+                coalesce(i ->> 'metric_source', 'manual'));
+    end loop;
+end;
+$$;
+grant execute on function public.save_kpi_template(bigint, text, bigint, jsonb) to authenticated;
+
+-- Per template: is there a previous version, and has the current one been
+-- used in a submitted evaluation (which locks it)?
+create or replace function public.kpi_template_revert_info()
+returns table (template_id bigint, current_version int, previous_version int, previous_saved_at timestamptz, used_in_submitted boolean)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+    select t.id, t.version, v.version, v.saved_at,
+           exists (select 1 from public.performance_evaluations e
+                   where e.template_id = t.id and e.template_version = t.version and not e.is_draft)
+    from public.kpi_templates t
+    left join lateral (
+        select version, saved_at from public.kpi_template_versions
+        where kpi_template_versions.template_id = t.id
+        order by version desc limit 1
+    ) v on true
+    where public.is_hr_admin();
+$$;
+grant execute on function public.kpi_template_revert_info() to authenticated;
+
+create or replace function public.revert_kpi_template(p_id bigint)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    t record;
+    v record;
+    i jsonb;
+begin
+    if not public.is_hr_admin() then
+        raise exception 'Only HR admins can revert KPI templates.';
+    end if;
+    select * into t from public.kpi_templates where id = p_id for update;
+    if not found then
+        raise exception 'KPI template not found.';
+    end if;
+    select * into v from public.kpi_template_versions where template_id = p_id order by version desc limit 1;
+    if not found then
+        raise exception 'This template has no previous version to go back to.';
+    end if;
+    if exists (select 1 from public.performance_evaluations e
+               where e.template_id = p_id and e.template_version = t.version and not e.is_draft) then
+        raise exception 'The current version has already been used in a submitted evaluation, so it can''t be reverted.';
+    end if;
+
+    update public.kpi_templates
+    set name = v.name, department_id = v.department_id, version = v.version, updated_at = now()
+    where id = p_id;
+    delete from public.kpi_template_items where template_id = p_id;
+    for i in select * from jsonb_array_elements(v.items) loop
+        insert into public.kpi_template_items (template_id, name, weightage, category, metric_source)
+        values (p_id, i ->> 'name', (i ->> 'weightage')::numeric, coalesce(i ->> 'category', 'Technical'),
+                coalesce(i ->> 'metric_source', 'manual'));
+    end loop;
+    -- That snapshot is now the live version; an earlier one (if any) is next.
+    delete from public.kpi_template_versions where id = v.id;
+    return v.version;
+end;
+$$;
+grant execute on function public.revert_kpi_template(bigint) to authenticated;
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- Training content, quizzes and access rules (migrations 0038 / 0039)
@@ -1505,14 +1923,6 @@ $$;
 grant execute on function public.withdraw_from_training(bigint) to authenticated;
 
 -- Unexplained-absence appeals (migration 0044).
-create or replace function public.malaysia_today()
-returns date
-language sql
-stable
-as $$
-    select (now() at time zone 'Asia/Kuala_Lumpur')::date;
-$$;
-
 -- Can HR still excuse this absence? Within 7 days of it, or later if the
 -- employee appealed inside those 7 days and the appeal is still open.
 create or replace function public.absence_revert_allowed(p_event_date date, p_appeal_status text, p_appealed_at timestamptz)
@@ -2200,6 +2610,9 @@ begin
 end;
 $$;
 revoke all on function public.refresh_all_training_recommendations() from public, anon, authenticated;
+
+-- 02:00 Malaysia time: blank GPS coordinates older than 6 months.
+select cron.schedule('purge-old-gps-coordinates', '0 18 * * *', $$select public.purge_old_gps_coordinates();$$);
 
 -- 01:30 Malaysia time, after the absence and risk jobs above.
 select cron.schedule('refresh-training-recommendations', '30 17 * * *', $$select public.refresh_all_training_recommendations();$$);
