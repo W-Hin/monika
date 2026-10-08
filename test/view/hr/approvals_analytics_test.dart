@@ -56,4 +56,26 @@ void main() {
     expect(find.text('"Working at the client site all day"'), findsOneWidget);
     expect(find.text('Excuse Absence (Valid Reason Given)'), findsOneWidget);
   });
+
+  testWidgets('rejecting leave needs a reason, approving does not', (tester) async {
+    await tester.pumpWidget(MaterialApp(theme: AppTheme.light, home: const HrApprovalsScreen()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Reject').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Reason for rejecting (required)'), findsOneWidget);
+    final confirm = find.widgetWithText(ElevatedButton, 'Confirm Rejection');
+    expect(tester.widget<ElevatedButton>(confirm).onPressed, isNull);
+
+    await tester.enterText(find.byType(TextField), 'Peak period, please pick another week');
+    await tester.pump();
+    expect(tester.widget<ElevatedButton>(confirm).onPressed, isNotNull);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Approve').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Add a note (optional)'), findsOneWidget);
+    expect(tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Confirm Approval')).onPressed, isNotNull);
+  });
 }

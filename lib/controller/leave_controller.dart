@@ -80,6 +80,7 @@ class LeaveController extends ChangeNotifier {
       days: row['days'] as int,
       reason: row['reason'] as String,
       status: status,
+      decisionNote: row['decision_note'] as String?,
     );
   }
 
@@ -159,8 +160,8 @@ class LeaveController extends ChangeNotifier {
   /// Throws on failure (e.g. the self-decision DB trigger rejecting an
   /// HR admin trying to approve their own application) — caller shows
   /// the error.
-  Future<void> decide({required LeaveApplication app, required bool approve}) async {
-    await LeaveService.decide(applicationId: app.dbId!, approve: approve);
+  Future<void> decide({required LeaveApplication app, required bool approve, String note = ''}) async {
+    await LeaveService.decide(applicationId: app.dbId!, approve: approve, note: note);
     if (approve) {
       final dbType = _typeToDb[app.leaveType] ?? 'annual';
       await LeaveService.incrementUsedDays(userUuid: app.userUuid!, leaveType: dbType, days: app.days);

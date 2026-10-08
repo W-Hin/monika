@@ -13,7 +13,7 @@ void main() {
   });
 
   group('LeaveApplicationTile', () {
-    LeaveApplication app(LeaveStatus status) => LeaveApplication(
+    LeaveApplication app(LeaveStatus status, {String? note}) => LeaveApplication(
           dbId: 1,
           id: 'LV-1',
           employeeName: 'Test Employee',
@@ -23,6 +23,7 @@ void main() {
           days: 1,
           reason: 'Personal matters',
           status: status,
+          decisionNote: note,
         );
 
     Future<void> pump(WidgetTester tester, LeaveStatus status, VoidCallback onCancel) =>
@@ -41,6 +42,14 @@ void main() {
     testWidgets('a decided application cannot be cancelled', (tester) async {
       await pump(tester, LeaveStatus.approved, () {});
       expect(find.text('Cancel Application'), findsNothing);
+    });
+
+    testWidgets("a rejected application shows HR's reason", (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(body: LeaveApplicationTile(app: app(LeaveStatus.rejected, note: 'Peak period'), onCancel: () {})),
+      ));
+      expect(find.text('HR: Peak period'), findsOneWidget);
     });
 
     testWidgets('a cancelled application shows its status', (tester) async {

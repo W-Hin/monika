@@ -47,7 +47,7 @@ class _HrApprovalsScreenState extends State<HrApprovalsScreen> {
           Navigator.of(context).pop();
           setState(() => _processingIds.add(app.dbId!));
           try {
-            await leaveController.decide(app: app, approve: approve);
+            await leaveController.decide(app: app, approve: approve, note: reason);
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -291,11 +291,8 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-// The optional note/reason text isn't persisted anywhere yet - the
-// leave_applications table only tracks status/decided_by/decided_at, no
-// note column. Kept as a courtesy field for the HR admin's own reference
-// while deciding; a real audit-trail note is a natural next addition if
-// ever needed.
+// HR's note is saved with the decision and shown to the employee. A reason
+// is required to reject (the database enforces it too).
 class _DecisionDialog extends StatefulWidget {
   final LeaveApplication app;
   final bool approve;
@@ -333,13 +330,14 @@ class _DecisionDialogState extends State<_DecisionDialog> {
           ),
           const SizedBox(height: 16),
           Text(
-            widget.approve ? 'Add a note (optional)' : 'Rejection reason (optional)',
+            widget.approve ? 'Add a note (optional)' : 'Reason for rejecting (required)',
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _reasonController,
             maxLines: 3,
+            onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               hintText: widget.approve
                   ? 'e.g. Approved. Enjoy your leave!'
@@ -351,7 +349,9 @@ class _DecisionDialogState extends State<_DecisionDialog> {
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
         ElevatedButton(
-          onPressed: () => widget.onConfirm(_reasonController.text),
+          onPressed: widget.approve || _reasonController.text.trim().isNotEmpty
+              ? () => widget.onConfirm(_reasonController.text)
+              : null,
           style: ElevatedButton.styleFrom(
             backgroundColor: widget.approve ? c.primary : c.riskHigh,
           ),

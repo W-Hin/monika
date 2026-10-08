@@ -81,12 +81,16 @@ class LeaveService {
     return List<Map<String, dynamic>>.from(rows);
   }
 
+  /// [note] is HR's reason; the database requires one when rejecting and
+  /// includes it in the employee's notification.
   static Future<void> decide({
     required int applicationId,
     required bool approve,
+    String note = '',
   }) async {
     await _client.from('leave_applications').update({
       'status': approve ? 'approved' : 'rejected',
+      'decision_note': note.trim().isEmpty ? null : note.trim(),
       'decided_by': _client.auth.currentUser?.id,
       'decided_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', applicationId);

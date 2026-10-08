@@ -212,6 +212,22 @@ final _fixtures = <String, List<Map<String, dynamic>>>{
       'profiles': {'name': 'Test Employee'},
     },
   ],
+  // A pending leave application for HR to decide on.
+  'leave_applications': [
+    {
+      'id': 1,
+      'reference_code': 'LV-1001',
+      'user_id': 'other-user-id',
+      'leave_type': 'annual',
+      'start_date': '2026-11-02',
+      'end_date': '2026-11-03',
+      'days': 2,
+      'reason': 'Family trip',
+      'status': 'pending',
+      'decision_note': null,
+      'profiles': {'name': 'Aina Rahman'},
+    },
+  ],
   // One mandatory programme for everyone, so HR sees its Exemptions action.
   'training_programs': [
     {

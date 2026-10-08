@@ -185,6 +185,10 @@ class LeaveApplicationTile extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(app.reason, style: TextStyle(fontSize: 12.5, color: c.textMuted, fontStyle: FontStyle.italic)),
+          if (app.decisionNote != null) ...[
+            const SizedBox(height: 6),
+            Text('HR: ${app.decisionNote}', style: TextStyle(fontSize: 12.5, color: c.textSecondary)),
+          ],
           if (app.status == LeaveStatus.pending)
             Align(
               alignment: Alignment.centerRight,
