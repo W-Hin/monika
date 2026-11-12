@@ -396,7 +396,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
       SnackBar(
         content: Text(
           success
-              ? '✓ Draft saved for ${employee.name} — resume anytime before submitting'
+              ? '✓ Draft saved for ${employee.name}, resume anytime before submitting'
               : peController.errorMessage ?? 'Could not save draft',
         ),
         backgroundColor: success ? null : context.colors.riskHigh,
@@ -713,7 +713,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'KPI Template: ${_selectedTemplate?.name ?? '—'}',
+                                'KPI Template: ${_selectedTemplate?.name ?? '-'}',
                                 style: TextStyle(
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w700,
@@ -905,7 +905,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
                                                     : _metrics[kpi['source']]
                                                               ?.score ==
                                                           null
-                                                    ? 'Auto-measured · ${_metrics[kpi['source']]?.detail ?? 'No data yet'} — score manually'
+                                                    ? 'Auto-measured · ${_metrics[kpi['source']]?.detail ?? 'No data yet'}, score manually'
                                                     : 'Auto-measured · ${_metrics[kpi['source']]!.detail}',
                                                 style: TextStyle(
                                                   fontSize: 11,
@@ -1144,7 +1144,7 @@ class _HrPeScreenState extends State<HrPeScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'This $_year evaluation has been submitted and is final — it can no longer be changed.',
+                            'This $_year evaluation has been submitted and is final. It can no longer be changed.',
                             style: TextStyle(
                               fontSize: 12,
                               color: c.primaryDark,

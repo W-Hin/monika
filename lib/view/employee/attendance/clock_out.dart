@@ -45,7 +45,7 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
       if (record == null) {
         setState(() {
           _isRunning = false;
-          _submitError = 'No clock-in record found for today — clock in first.';
+          _submitError = 'No clock-in record found for today. Clock in first.';
         });
         return;
       }
@@ -60,7 +60,7 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
       if (!mounted) return;
       setState(() {
         _isRunning = false;
-        _submitError = 'Could not save your clock-out — check your connection and try again.';
+        _submitError = 'Could not save your clock-out: check your connection and try again.';
       });
     }
   }
@@ -114,7 +114,7 @@ class _ClockOutScreenState extends State<ClockOutScreen> {
                             ),
                             const SizedBox(height: 14),
                             Text(
-                              _early ? 'Clock-Out Recorded — Flagged for Review' : 'Clock-Out Successful',
+                              _early ? 'Clock-Out Recorded. Flagged for Review' : 'Clock-Out Successful',
                               textAlign: TextAlign.center,
                               style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: c.textPrimary),
                             ),

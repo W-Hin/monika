@@ -684,7 +684,7 @@ class _CompletionTab extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Score — ${record.employeeName}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+        title: Text('Score: ${record.employeeName}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

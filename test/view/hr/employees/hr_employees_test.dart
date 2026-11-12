@@ -95,7 +95,7 @@ void main() {
       await tester.tap(find.text('Preview'));
       await tester.pump();
 
-      expect(find.text('Preview — 1 ready, 1 with errors'), findsOneWidget);
+      expect(find.text('Preview: 1 ready, 1 with errors'), findsOneWidget);
       expect(find.text('Import 1 Employee'), findsOneWidget);
     });
   });

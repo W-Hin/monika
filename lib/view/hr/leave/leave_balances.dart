@@ -29,7 +29,7 @@ class _HrLeaveBalancesScreenState extends State<HrLeaveBalancesScreen> {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Adjust Entitlement — ${balance.employeeName}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+        title: Text('Adjust Entitlement: ${balance.employeeName}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

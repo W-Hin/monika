@@ -199,7 +199,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
               Text(
                 emailSent
                     ? 'A welcome email with these login details has been sent to the employee. They can change their password after logging in.'
-                    : 'The account was created, but the welcome email could not be sent — share this temporary password with the employee securely instead.',
+                    : 'The account was created, but the welcome email could not be sent. Share this temporary password with the employee securely instead.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12.5, color: c.textSecondary, height: 1.4),
               ),
@@ -211,7 +211,7 @@ class _AddEmployeeScreenState extends State<AddEmployeeScreen> {
                   child: Text(
                     emailError != null
                         ? 'Email error: $emailError'
-                        : 'Email delivery is not configured — set GMAIL_SENDER_EMAIL and GMAIL_APP_PASSWORD as Edge Function secrets.',
+                        : 'Email delivery is not configured: set GMAIL_SENDER_EMAIL and GMAIL_APP_PASSWORD as Edge Function secrets.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 11, color: c.riskHigh),
                   ),

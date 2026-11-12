@@ -379,7 +379,7 @@ class AbsenceFlagCard extends StatelessWidget {
     final (String label, Color color) = flag.excused
         ? ('Excused by HR', c.primary)
         : switch (flag.appealStatus) {
-            'pending' => ('Appeal sent — waiting for HR', c.statusPending),
+            'pending' => ('Appeal sent. Waiting for HR', c.statusPending),
             'rejected' => ('Appeal not accepted', c.riskHigh),
             _ => flag.canAppeal ? ('You can appeal until ${fmt.format(flag.appealDeadline)}', c.amber) : ('Appeal period has ended', c.textMuted),
           };

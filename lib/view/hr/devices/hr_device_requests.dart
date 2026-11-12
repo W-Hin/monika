@@ -456,7 +456,7 @@ class _RequestCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'This is your own request — another HR admin must approve or reject it.',
+                      'This is your own request, another HR admin must approve or reject it.',
                       style: TextStyle(fontSize: 11.5, color: c.textMuted),
                     ),
                   ),

@@ -161,7 +161,7 @@ class _TrainingContentEditorScreenState
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: Text(
-                      'No questions yet — add at least one to turn on the quiz.',
+                      'No questions yet: add at least one to turn on the quiz.',
                       style: TextStyle(fontSize: 12.5, color: c.textMuted),
                     ),
                   ),
@@ -639,7 +639,7 @@ class _QuestionSheetState extends State<_QuestionSheet> {
         ),
         const SizedBox(height: 14),
         const Text(
-          'Options — tap the circle to mark the correct one',
+          'Options: tap the circle to mark the correct one',
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 6),

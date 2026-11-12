@@ -268,7 +268,7 @@ class _ClockInCard extends StatelessWidget {
         ? '$clockInTime  →  $clockOutTime'
         : hasClockedIn
             ? clockInTime!
-            : '— : — — ${DateTime.now().hour < 12 ? 'AM' : 'PM'}';
+            : '- : - - ${DateTime.now().hour < 12 ? 'AM' : 'PM'}';
 
     return Container(
       width: double.infinity,
@@ -317,7 +317,7 @@ class _ClockInCard extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             hasClockedOut
-                ? 'Great work today — see you tomorrow!'
+                ? 'Great work today, see you tomorrow!'
                 : hasClockedIn
                     ? 'Tap below to verify location before you leave'
                     : 'Tap below to verify location, network & device',

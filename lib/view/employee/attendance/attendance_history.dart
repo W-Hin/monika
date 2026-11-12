@@ -144,7 +144,7 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                SectionHeader(title: 'Records — ${DateFormat('MMMM yyyy').format(_selectedMonth)}'),
+                SectionHeader(title: 'Records: ${DateFormat('MMMM yyyy').format(_selectedMonth)}'),
                 if (attendanceController.loadingMonth)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 40),
@@ -196,7 +196,7 @@ class _HistoryRow extends StatelessWidget {
               const SizedBox(width: 16),
               Icon(Icons.logout_rounded, size: 14, color: c.textMuted),
               const SizedBox(width: 6),
-              Text('Out: ${record.clockOut ?? "—"}', style: TextStyle(fontSize: 12.5, color: c.textSecondary, fontFeatures: const [FontFeature.tabularFigures()])),
+              Text('Out: ${record.clockOut ?? "-"}', style: TextStyle(fontSize: 12.5, color: c.textSecondary, fontFeatures: const [FontFeature.tabularFigures()])),
             ],
           ),
           if (flagged && record.flagReason != null) ...[

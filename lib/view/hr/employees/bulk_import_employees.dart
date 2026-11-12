@@ -179,7 +179,7 @@ class _BulkImportEmployeesScreenState extends State<BulkImportEmployeesScreen> {
     for (final row in parsed) {
       if (row.email.isEmpty || row.validationError != null) continue;
       if ((emailCounts[row.email.toLowerCase()] ?? 0) > 1) {
-        row.validationError = 'Duplicate email — used by more than one row in this file';
+        row.validationError = 'Duplicate email, used by more than one row in this file';
       }
     }
 
@@ -237,7 +237,7 @@ class _BulkImportEmployeesScreenState extends State<BulkImportEmployeesScreen> {
       } catch (e) {
         setState(() {
           row.status = _RowStatus.failed;
-          row.resultError = 'Network error — could not reach the server';
+          row.resultError = 'Network error: could not reach the server';
         });
       }
       // Small gap between calls so distinct rows created in the same
@@ -258,7 +258,7 @@ class _BulkImportEmployeesScreenState extends State<BulkImportEmployeesScreen> {
     if (failedNow > 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('⚠ $failedNow account${failedNow == 1 ? '' : 's'} failed to create — see details below'),
+          content: Text('⚠ $failedNow account${failedNow == 1 ? '' : 's'} failed to create, see details below'),
           backgroundColor: context.colors.riskHigh,
           duration: const Duration(seconds: 5),
         ),
@@ -313,7 +313,7 @@ class _BulkImportEmployeesScreenState extends State<BulkImportEmployeesScreen> {
             ),
             if (_rows.isNotEmpty) ...[
               const SizedBox(height: 24),
-              SectionHeader(title: 'Preview — $validCount ready${invalidCount > 0 ? ', $invalidCount with errors' : ''}'),
+              SectionHeader(title: 'Preview: $validCount ready${invalidCount > 0 ? ', $invalidCount with errors' : ''}'),
               ListRow(
                 children: _rows.map((r) => _ImportRowTile(row: r)).toList(),
               ),
@@ -335,14 +335,14 @@ class _BulkImportEmployeesScreenState extends State<BulkImportEmployeesScreen> {
                       if (failedCount > 0) ...[
                         const SizedBox(height: 4),
                         Text(
-                          '$failedCount failed during creation — see the row${failedCount == 1 ? '' : 's'} marked with a red icon above for the reason.',
+                          '$failedCount failed during creation. See the row${failedCount == 1 ? '' : 's'} marked with a red icon above for the reason.',
                           style: TextStyle(fontSize: 11.5, color: c.riskHigh, height: 1.4),
                         ),
                       ],
                       if (invalidCount > 0) ...[
                         const SizedBox(height: 4),
                         Text(
-                          '$invalidCount row${invalidCount == 1 ? '' : 's'} skipped and never attempted — fix and paste again to retry just those.',
+                          '$invalidCount row${invalidCount == 1 ? '' : 's'} skipped and never attempted. Fix and paste again to retry just those.',
                           style: TextStyle(fontSize: 11.5, color: c.textSecondary, height: 1.4),
                         ),
                       ],
@@ -376,7 +376,7 @@ class _ImportRowTile extends StatelessWidget {
     final reason = row.validationError ?? row.resultError;
     if (reason == null) return null;
     final who = row.name.isEmpty ? 'This row' : row.name;
-    return '$who: account creation failed — $reason';
+    return '$who: account creation failed: $reason';
   }
 
   @override

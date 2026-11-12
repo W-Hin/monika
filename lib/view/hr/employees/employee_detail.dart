@@ -227,7 +227,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Text('Reset Risk Score'),
           content: Text(
-            '${_emp.name}\'s risk score will be reset to 100 (Low Risk). This does not undo any past anomaly events — it only clears the accumulated score, typically after they\'ve addressed whatever drove it down.',
+            '${_emp.name}\'s risk score will be reset to 100 (Low Risk). This does not undo any past anomaly events. It only clears the accumulated score, typically after they\'ve addressed whatever drove it down.',
             style: TextStyle(fontSize: 13, color: c.textSecondary, height: 1.4),
           ),
           actions: [
@@ -468,7 +468,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                         StatusPill.risk(_emp.risk),
                         const SizedBox(height: 4),
                         Text(
-                          'Deducted automatically per anomaly; only HR can reset it',
+                          'Deducted automatically per anomaly',
                           style: TextStyle(fontSize: 11, color: c.textMuted),
                         ),
                       ],

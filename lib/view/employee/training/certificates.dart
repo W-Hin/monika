@@ -116,7 +116,7 @@ class _CertificateScreenState extends State<CertificateScreen> {
       final bytes = await CertificatePdfBuilder.build(cert);
       await Share.shareXFiles(
         [XFile.fromData(bytes, name: 'Certificate_${cert.certificateNo}.pdf', mimeType: 'application/pdf')],
-        subject: 'Certificate ${cert.certificateNo} — ${cert.programTitle}',
+        subject: 'Certificate ${cert.certificateNo}: ${cert.programTitle}',
         sharePositionOrigin: origin,
       );
     } catch (e) {

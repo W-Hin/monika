@@ -134,7 +134,7 @@ class _ClockInScreenState extends State<ClockInScreen> {
       setState(() {
         _isRunning = false;
         _submitError =
-            'Could not save your attendance — check your connection and try again.';
+            'Could not save your attendance. Check your connection and try again.';
       });
     }
   }
@@ -218,7 +218,7 @@ class _ClockInScreenState extends State<ClockInScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Switch to the office WiFi in your device settings, then retry — this is usually just a forgotten connection, not flagged unless it happens again.',
+                              'Switch to the office WiFi in your device settings, then retry. This is usually just a forgotten connection, not flagged unless it happens again.',
                               style: TextStyle(
                                 fontSize: 11.5,
                                 color: c.textSecondary,
@@ -281,7 +281,7 @@ class _ClockInScreenState extends State<ClockInScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'This device is already registered to another employee\'s account, so it can\'t be paired with yours. Please contact HR by email to appeal — your attendance has not been recorded.',
+                              'This device is already registered to another employee\'s account, so it can\'t be paired with yours. Please contact HR by email to appeal. Your attendance has not been recorded.',
                               textAlign: TextAlign.center,
                               style: TextStyle(fontSize: 12.5, color: c.riskHigh, fontWeight: FontWeight.w600, height: 1.4),
                             ),
@@ -318,7 +318,7 @@ class _ClockInScreenState extends State<ClockInScreen> {
                             const SizedBox(height: 14),
                             Text(
                               _flagged
-                                  ? 'Clock-In Recorded — Flagged for Review'
+                                  ? 'Clock-In Recorded: Flagged for Review'
                                   : 'Clock-In Successful',
                               textAlign: TextAlign.center,
                               style: TextStyle(

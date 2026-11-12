@@ -79,7 +79,7 @@ void main() {
 
     testWidgets('shows a pending appeal without another Appeal button', (tester) async {
       await pump(tester, flag(status: 'pending'), () {});
-      expect(find.text('Appeal sent — waiting for HR'), findsOneWidget);
+      expect(find.text('Appeal sent. Waiting for HR'), findsOneWidget);
       expect(find.text('Appeal'), findsNothing);
     });
 

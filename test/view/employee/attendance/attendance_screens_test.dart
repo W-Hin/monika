@@ -25,7 +25,7 @@ void main() {
   testWidgets('AttendanceHistoryScreen builds', (tester) async {
     await tester.pumpWidget(_wrap(const AttendanceHistoryScreen()));
     await tester.pumpAndSettle();
-    expect(find.text('Records — ${DateFormat('MMMM yyyy').format(DateTime.now())}'), findsOneWidget);
+    expect(find.text('Records: ${DateFormat('MMMM yyyy').format(DateTime.now())}'), findsOneWidget);
   });
 
   testWidgets('ClockInScreen builds', (tester) async {
