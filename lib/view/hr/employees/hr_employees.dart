@@ -188,7 +188,7 @@ class _EmployeeRow extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(color: c.surfaceMuted, borderRadius: BorderRadius.circular(100)),
-                          child: Text('Deactivated', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: c.textMuted)),
+                          child: Text('Deactivated', style: TextStyle(fontSize: 7, fontWeight: FontWeight.w700, color: c.textMuted)),
                         ),
                       ],
                     ],
